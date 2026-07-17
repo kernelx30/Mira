@@ -47,6 +47,7 @@ app/src/main/assets/pets
 .claude
 .codex
 CLAUDE.md
+/AGENTS.md
 
 gradle/gradle-8.7-bin.zip
 gradle/gradle-8.7/*

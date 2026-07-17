@@ -67,16 +67,16 @@ class CompanionMemoryContextBuilderTest {
                         records =
                             listOf(
                                 userNameRecord("小杨"),
-                                userNameRecord("hackerx30"),
+                                userNameRecord("test-user"),
                             ),
                         episodes = emptyList(),
                     ),
                 useEnglish = false,
-                authoritativeUserName = "hackerx30",
+                authoritativeUserName = "test-user",
             )
 
         assertFalse(result.contains("小杨"))
-        assertTrue(result.contains("hackerx30"))
+        assertTrue(result.contains("test-user"))
     }
 
     private fun userNameRecord(value: String): CompanionMemoryRecordEntity =
