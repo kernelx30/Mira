@@ -31,6 +31,13 @@ Mira 将角色关系、长期记忆、语音交互和主动陪伴放在前台，
 
 应用 ID 为 `com.ai.assistance.mira`，可与上游 Operit 独立安装。
 
+## 真机界面
+
+<div align="center">
+  <img src="docs/assets/README_examples/mira/chat-home.png" width="42%" alt="Mira 聊天界面">
+  <img src="docs/assets/README_examples/mira/settings.png" width="42%" alt="Mira 设置界面">
+</div>
+
 ## 当前能力
 
 ### 聊天

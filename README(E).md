@@ -31,6 +31,13 @@ Mira puts character relationships, long-term memory, voice interaction, and proa
 
 The application ID is `com.ai.assistance.mira`, so Mira can be installed alongside upstream Operit.
 
+## Screenshots
+
+<div align="center">
+  <img src="docs/assets/README_examples/mira/chat-home.png" width="42%" alt="Mira chat screen">
+  <img src="docs/assets/README_examples/mira/settings.png" width="42%" alt="Mira settings screen">
+</div>
+
 ## Current Capabilities
 
 ### Conversation
