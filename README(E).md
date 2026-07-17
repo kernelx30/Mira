@@ -177,10 +177,10 @@ Rich MCP ecosystem
 | Item | Description |
 |------|-------------|
 | 📋 **System Requirements** | Android 8.0+ (API 26+), 6GB+ RAM recommended, 5GB+ free storage |
-| 📥 **Download & Install** | Download the latest APK from the [Release Page](https://github.com/AAswordman/Operit/releases) |
+| 📥 **Download & Install** | Download the latest APK from the [Release Page](https://github.com/kernelx30/Mira/releases) |
 | 📖 **User Guide** | [Official Website](https://operit.app) with detailed tutorials and examples |
 
-> **Security Warning:** To ensure your data security, please download this application exclusively from the official [Release Page](https://github.com/AAswordman/Operit/releases) or the [Official Website](https://operit.app). Installation packages from unofficial sources may be maliciously modified, potentially leading to privacy leaks or device monitoring.
+> **Security Warning:** Mira builds are published only on this repository's [Release Page](https://github.com/kernelx30/Mira/releases). Verify the repository address before installing.
 
 **Installation Steps:** Download APK → Install & Launch → Follow Setup Guide → Start Using ✨
 
@@ -425,7 +425,7 @@ Rich MCP ecosystem
 </tr>
 </table>
 
-> 📝 **Full Changelog**: Visit the [Releases Page](https://github.com/AAswordman/Operit/releases) for detailed updates on each version
+> 📝 **Full Changelog**: Visit the [Releases Page](https://github.com/kernelx30/Mira/releases) for detailed updates on each version
 
 ---
 
@@ -472,7 +472,7 @@ In simple terms, this means:
 
 ## 📝 Feedback
 
-Encountered a problem or have a suggestion? Welcome to [submit an Issue](https://github.com/AAswordman/Operit/issues)!
+Encountered a problem or have a suggestion? [Submit an Issue](https://github.com/kernelx30/Mira/issues).
 
 **Submission Guidelines:**
 - 📝 Clearly describe the problem/suggestion with reproduction steps
