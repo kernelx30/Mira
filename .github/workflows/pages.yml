@@ -1,0 +1,55 @@
+name: Deploy Mira Guide
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/Mira_User_Guide_CN.html"
+      - "docs/index.html"
+      - "docs/assets/mira-icon.svg"
+      - "docs/assets/guide/beginner/**"
+      - "docs/assets/README_examples/mira/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare site
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site/assets/guide _site/assets/README_examples
+          cp docs/Mira_User_Guide_CN.html _site/index.html
+          cp docs/assets/mira-icon.svg _site/assets/mira-icon.svg
+          cp -R docs/assets/guide/beginner _site/assets/guide/
+          cp -R docs/assets/README_examples/mira _site/assets/README_examples/
+          touch _site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

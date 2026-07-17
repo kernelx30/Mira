@@ -1,0 +1,1410 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Mira Android AI 伴侣从安装、模型与语音配置，到记忆、Shizuku、角色卡和插件调用的完整中文教程。">
+  <meta name="theme-color" content="#1769d2">
+  <link rel="icon" href="assets/mira-icon.svg" type="image/svg+xml">
+  <title>Mira 新手完整教程</title>
+  <style>
+    :root {
+      --blue: #1769d2;
+      --blue-soft: #e8f2ff;
+      --ink: #17202b;
+      --muted: #5f6976;
+      --line: #dfe4ea;
+      --surface: #ffffff;
+      --surface-2: #f5f7fa;
+      --green: #157a55;
+      --green-soft: #e7f7ef;
+      --amber: #8a5b00;
+      --amber-soft: #fff4d6;
+      --red: #b42318;
+      --red-soft: #ffebe8;
+      --shadow: 0 12px 30px rgba(24, 36, 50, .10);
+      --radius: 8px;
+      --content: 900px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--surface-2);
+      font-family: Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+      letter-spacing: 0;
+    }
+    button, input { font: inherit; }
+    a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { text-decoration-thickness: 2px; }
+    img { max-width: 100%; display: block; }
+    code, kbd {
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: .92em;
+    }
+    code {
+      padding: .08em .35em;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--surface-2);
+      overflow-wrap: anywhere;
+    }
+    kbd {
+      padding: .12em .4em;
+      border: 1px solid #b8c0ca;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: var(--surface);
+    }
+
+    .skip-link {
+      position: fixed;
+      left: 12px;
+      top: -60px;
+      z-index: 30;
+      padding: 8px 12px;
+      color: #fff;
+      background: var(--blue);
+    }
+    .skip-link:focus { top: 12px; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 58px;
+      padding: 8px clamp(14px, 3vw, 32px);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 0 0 auto;
+      font-weight: 750;
+    }
+    .brand img { width: 34px; height: 34px; border-radius: 7px; }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .search {
+      width: min(38vw, 360px);
+      height: 40px;
+      padding: 0 12px;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+    }
+    .search:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+    .command {
+      min-height: 40px;
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--ink);
+      background: var(--surface);
+      cursor: pointer;
+    }
+    .command:hover { border-color: var(--blue); color: var(--blue); }
+
+    .guide-flow {
+      display: grid;
+      gap: 22px;
+    }
+    .guide-step {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .guide-step > h3 { margin-top: 0; }
+    .guide-shot {
+      margin: 16px 0 4px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-2);
+    }
+    .guide-shot img {
+      width: min(100%, 520px);
+      margin: 0 auto;
+      border-radius: 6px;
+    }
+    .guide-shot figcaption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .92rem;
+      text-align: center;
+    }
+    .shot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .shot-grid .guide-shot { margin: 0; }
+    .guide-flow .path { margin: 10px 0; }
+    .guide-flow .callout { margin: 14px 0 0; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 0 clamp(14px, 3vw, 32px) 80px;
+    }
+    .toc {
+      position: sticky;
+      top: 78px;
+      align-self: start;
+      max-height: calc(100vh - 98px);
+      overflow: auto;
+      padding: 26px 22px 30px 0;
+      scrollbar-width: thin;
+    }
+    .toc strong { display: block; margin-bottom: 8px; font-size: .88rem; color: var(--muted); }
+    .toc a {
+      display: block;
+      padding: 5px 9px;
+      border-left: 2px solid transparent;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: .92rem;
+      line-height: 1.4;
+    }
+    .toc a:hover, .toc a.active {
+      border-left-color: var(--blue);
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    main {
+      min-width: 0;
+      padding: 42px 0 0 clamp(24px, 4vw, 60px);
+      border-left: 1px solid var(--line);
+    }
+    .hero, .chapter { max-width: var(--content); margin-inline: auto; }
+    .hero { padding-bottom: 44px; border-bottom: 1px solid var(--line); }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: .86rem;
+      font-weight: 750;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.7rem);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+    .lead { max-width: 720px; margin: 18px 0 0; color: var(--muted); font-size: 1.12rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 20px; color: var(--muted); font-size: .9rem; }
+    .chapter { padding: 48px 0 16px; }
+    .chapter + .chapter { border-top: 1px solid var(--line); }
+    h2 {
+      margin: 0 0 18px;
+      font-size: clamp(1.65rem, 3vw, 2.2rem);
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    h3 { margin: 34px 0 10px; font-size: 1.28rem; line-height: 1.35; letter-spacing: 0; }
+    h4 { margin: 24px 0 8px; font-size: 1.02rem; letter-spacing: 0; }
+    p { margin: 10px 0; }
+    ul, ol { padding-left: 1.4em; }
+    li + li { margin-top: 6px; }
+    .section-intro { color: var(--muted); font-size: 1.04rem; }
+
+    .quick-grid, .two-col, .three-col {
+      display: grid;
+      gap: 12px;
+      margin: 18px 0;
+    }
+    .quick-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .three-col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .panel {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .panel b { display: block; margin-bottom: 4px; }
+    .panel p { margin: 0; color: var(--muted); font-size: .94rem; }
+    .step-number {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      margin-bottom: 10px;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 750;
+    }
+
+    .callout {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border-left: 4px solid var(--blue);
+      background: var(--blue-soft);
+    }
+    .callout.good { border-left-color: var(--green); background: var(--green-soft); }
+    .callout.warn { border-left-color: #d19400; background: var(--amber-soft); color: #594000; }
+    .callout.danger { border-left-color: var(--red); background: var(--red-soft); color: #651b14; }
+    .callout b { display: block; margin-bottom: 3px; }
+
+    .path {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin: 12px 0;
+      padding: 11px 13px;
+      border: 1px solid #b9d6fb;
+      border-radius: 7px;
+      background: #f6faff;
+      font-weight: 680;
+    }
+    .path span + span::before { content: "›"; margin-right: 6px; color: var(--muted); }
+
+    .checklist { list-style: none; padding-left: 0; }
+    .checklist li { position: relative; padding-left: 28px; }
+    .checklist li::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: .48em;
+      width: 13px;
+      height: 13px;
+      border: 2px solid var(--blue);
+      border-radius: 3px;
+      background: var(--surface);
+    }
+
+    .table-wrap { overflow-x: auto; margin: 16px 0 24px; border: 1px solid var(--line); border-radius: var(--radius); }
+    table { width: 100%; border-collapse: collapse; min-width: 620px; background: var(--surface); }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); background: var(--surface-2); font-size: .88rem; }
+    tr:last-child td { border-bottom: 0; }
+
+    .figure {
+      display: grid;
+      grid-template-columns: minmax(230px, 42%) minmax(0, 1fr);
+      gap: 26px;
+      align-items: start;
+      margin: 24px 0;
+    }
+    .figure img {
+      width: 100%;
+      max-height: 680px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+    .legend { counter-reset: legend; list-style: none; padding: 0; margin: 0; }
+    .legend li { position: relative; padding-left: 38px; margin-bottom: 13px; }
+    .legend li::before {
+      counter-increment: legend;
+      content: counter(legend);
+      position: absolute;
+      left: 0;
+      top: 1px;
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--blue);
+      font-size: .82rem;
+      font-weight: 750;
+    }
+
+    details {
+      margin: 10px 0;
+      border-top: 1px solid var(--line);
+      background: var(--surface);
+    }
+    details:last-child { border-bottom: 1px solid var(--line); }
+    summary { padding: 13px 6px; cursor: pointer; font-weight: 700; }
+    details > div { padding: 0 6px 15px; color: var(--muted); }
+    pre {
+      overflow: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: #e8edf4;
+      background: #17202b;
+      line-height: 1.55;
+    }
+    pre code { padding: 0; border: 0; color: inherit; background: transparent; }
+    .search-hidden { display: none !important; }
+    .search-note { display: none; margin: 18px 0; padding: 12px; background: var(--amber-soft); }
+    .search-note.visible { display: block; }
+
+    footer {
+      max-width: var(--content);
+      margin: 48px auto 0;
+      padding: 24px 0;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .toc { position: static; max-height: none; padding: 18px 0; columns: 2; }
+      .toc strong { column-span: all; }
+      main { padding: 24px 0 0; border-left: 0; }
+      .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      body { font-size: 15px; }
+      .topbar { flex-wrap: wrap; }
+      .brand span { display: none; }
+      .top-actions { flex: 1; }
+      .search { width: 100%; min-width: 0; }
+      .toc { columns: 1; }
+      .quick-grid, .two-col, .three-col, .figure { grid-template-columns: 1fr; }
+      .figure img { max-height: 520px; }
+      .chapter { padding-top: 36px; }
+      h1 { font-size: 2.25rem; }
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --blue: #78aefc;
+        --blue-soft: #162a45;
+        --ink: #edf2f7;
+        --muted: #adb7c4;
+        --line: #364151;
+        --surface: #161b22;
+        --surface-2: #0e1319;
+        --green-soft: #102c24;
+        --amber-soft: #342a12;
+        --red-soft: #351915;
+        --shadow: none;
+      }
+      .path { border-color: #36577e; background: #142237; }
+      .callout.warn { color: #f2d27c; }
+      .callout.danger { color: #ffb4ab; }
+      .figure img { background: #fff; }
+    }
+    @media print {
+      :root { --ink: #111; --muted: #444; --line: #ccc; --surface: #fff; --surface-2: #fff; }
+      body { background: #fff; font-size: 11pt; }
+      .topbar, .toc, .skip-link { display: none !important; }
+      .layout { display: block; max-width: none; padding: 0; }
+      main { padding: 0; border: 0; }
+      .hero, .chapter, footer { max-width: none; }
+      .chapter { break-before: page; }
+      .chapter:first-of-type { break-before: auto; }
+      h2, h3, .panel, .callout, table, .figure { break-inside: avoid; }
+      a { color: #111; text-decoration: none; }
+      .search-hidden { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#content">跳到正文</a>
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/mira-icon.svg" alt="Mira 图标">
+      <span>Mira 使用手册</span>
+    </div>
+    <div class="top-actions">
+      <input id="search" class="search" type="search" placeholder="搜索：模型、语音、记忆、Skill…" aria-label="搜索教程">
+      <button class="command" type="button" onclick="window.print()">打印 / PDF</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="教程目录">
+      <strong>从零开始</strong>
+      <a href="#read-first">1. 先弄懂 Mira</a>
+      <a href="#field-guide">真机新手流程（从零开始）</a>
+      <a href="#install">2. 安装与首次启动</a>
+      <a href="#quick-start">3. 五分钟跑通聊天</a>
+      <a href="#interface">4. 主界面地图</a>
+      <a href="#model">5. AI 模型配置</a>
+      <a href="#functional-model">6. 功能模型配置</a>
+      <a href="#chat">7. 聊天完整用法</a>
+      <a href="#persona">8. 角色与人设</a>
+      <a href="#memory">9. 本地记忆系统</a>
+      <a href="#voice">10. 语音与通话</a>
+      <a href="#immersive">11. 沉浸对话</a>
+      <a href="#floating">12. 悬浮窗</a>
+      <a href="#proactive">13. 主动陪伴与保活</a>
+      <a href="#skills">14. Skill、MCP 与能力</a>
+      <a href="#permissions">15. 权限与设备控制</a>
+      <a href="#backup">16. 备份、迁移与隐私</a>
+      <a href="#appearance">17. 外观与无障碍</a>
+      <a href="#advanced">18. 高级能力地图</a>
+      <a href="#troubleshooting">19. 故障排查</a>
+      <a href="#glossary">20. 小白术语表</a>
+    </nav>
+
+    <main id="content">
+      <section class="hero">
+        <p class="eyebrow">Android 8.0+ · 本地优先 · 当前源码版</p>
+        <h1>Mira 新手完整教程</h1>
+        <p class="lead">从安装、接入第一个模型，到长期记忆、情感语音、悬浮陪伴和 Skill。每一章都写清入口、推荐值、验证方法和出错时该查什么。</p>
+        <div class="meta">
+          <span>适合：第一次使用 AI API 的用户</span>
+          <span>更新：2026-07-18</span>
+          <span>文档版本：1.2</span>
+        </div>
+      </section>
+
+      <p id="search-note" class="search-note">没有找到匹配章节。试试“API”“豆包”“悬浮窗”或“备份”。</p>
+
+      <section id="field-guide" class="chapter searchable">
+        <h2>真机新手流程：从干净安装到插件调用</h2>
+        <p class="section-intro">这一章按照一台真实 Android 手机的操作顺序编写。不要跳着配：先跑通文字模型，再配语音、终端和 Shizuku，最后安装并验证插件。</p>
+
+        <div class="callout danger">
+          <b>密钥只在官方平台创建，只填进 Mira 的本地配置</b>
+          不要把完整 Key 发到聊天、群聊、Issue、截图或日志里。教程中的密钥一律写成 <code>YOUR_API_KEY</code> 或使用掩码截图。
+        </div>
+
+        <div class="guide-flow">
+          <article class="guide-step">
+            <h3>A. 干净安装和首次引导</h3>
+            <ol>
+              <li>安装 APK，阅读本地数据与云端服务说明并同意。</li>
+              <li>按引导完成通知、存储和基础权限。麦克风、悬浮窗、位置、Shizuku 可以等真正使用时再开。</li>
+              <li>填写用户称呼和偏好。这里是用户资料，不是角色卡；以后可在设置中修改。</li>
+              <li>进入聊天首页后，先确认顶部角色名、模型入口和输入框都能正常显示。</li>
+            </ol>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/01-first-launch.png" alt="Mira 首次启动"><figcaption>首次启动</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/10-permission-overview.png" alt="Mira 权限概览"><figcaption>基础权限概览</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/11-user-preference-guide.png" alt="用户偏好设置"><figcaption>用户称呼与偏好</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/12-first-chat-home.png" alt="首次进入聊天首页"><figcaption>首次进入聊天页</figcaption></figure>
+            </div>
+          </article>
+
+          <article class="guide-step">
+            <h3>B. 配置 DeepSeek 主模型</h3>
+            <div class="path"><span>设置</span><span>模型与 API</span><span>新增服务</span><span>DeepSeek</span></div>
+            <ol>
+              <li>新手通常没有 API Key。先在 DeepSeek 官方开放平台完成注册、实名与充值，再创建 Key。</li>
+              <li>Key 只会完整显示一次，立即保存到密码管理器；截图时必须掩码。</li>
+              <li>回到 Mira，填写官方 Endpoint、API Key 和模型 ID，执行“测试连接”。</li>
+              <li>在聊天页发一句普通文本。必须同时验证：用户消息已保存、模型开始流式输出、回复结束后请求状态恢复。</li>
+            </ol>
+            <pre><code>Provider: DeepSeek
+Endpoint: https://api.deepseek.com
+API Key: YOUR_API_KEY
+Model: 以官方控制台当前可用模型为准</code></pre>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/13-deepseek-platform-entry.png" alt="DeepSeek 平台入口"><figcaption>进入官方 API 平台</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/14-deepseek-empty-api-keys.png" alt="DeepSeek API Key 列表"><figcaption>新账号还没有 Key</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/16-deepseek-key-masked.png" alt="DeepSeek Key 已掩码"><figcaption>密钥必须掩码</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/18-first-deepseek-reply.png" alt="DeepSeek 首次回复"><figcaption>首次文字回复验收</figcaption></figure>
+            </div>
+            <div class="callout warn"><b>发送后不回复时先看状态</b>依次检查连接测试、Endpoint、模型 ID、余额、网络、401/404/429/超时错误；不要先去改角色提示词。</div>
+          </article>
+
+          <article class="guide-step">
+            <h3>C. 配置豆包 Seed-TTS 2.0</h3>
+            <div class="path"><span>设置</span><span>语音与通话</span><span>TTS</span><span>豆包 Seed-TTS 2.0</span></div>
+            <ol>
+              <li>在火山引擎控制台进入“系统管理 → API Key 管理”，创建或复制 Token。</li>
+              <li>新版接入只填写 Token；旧版 App ID 字段留空。不要把 LLM Key 填到 TTS。</li>
+              <li>选择音色，例如 Vivi 2.0；搜索框应能正常唤起键盘。</li>
+              <li>先用“试听”验证，再为当前角色开启自动朗读。自动朗读不等于实时语音通话。</li>
+            </ol>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/24-doubao-tts-config.png" alt="豆包 TTS 配置入口"><figcaption>豆包 TTS 配置</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/25-doubao-tts-fields.png" alt="豆包 TTS 字段"><figcaption>新版字段填写方式</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/26-doubao-api-key-management-redacted.png" alt="豆包 API Key 管理已脱敏"><figcaption>官方 Token 页面，已脱敏</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/28-doubao-voice-search-keyboard.png" alt="豆包音色搜索键盘"><figcaption>搜索音色并唤起键盘</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/29-doubao-tts-test-success.png" alt="豆包 TTS 试听成功"><figcaption>试听成功</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/31-auto-read-chat-reply.png" alt="聊天自动朗读"><figcaption>文字先出现，朗读随后播放</figcaption></figure>
+            </div>
+            <div class="callout good"><b>语音验收</b>文本必须先可见，语音随后播放；用户再次发送消息时应停止上一段朗读；正在朗读的高亮只标当前句。</div>
+          </article>
+
+          <article class="guide-step">
+            <h3>D. 一键安装本地终端环境</h3>
+            <div class="path"><span>设置</span><span>高级功能</span><span>Mira 终端</span></div>
+            <ol>
+              <li>首次安装默认勾选 Node、PNPM、Python、venv、pip 和 uv。</li>
+              <li>普通用户只点“一键安装”，不需要逐条手敲命令。</li>
+              <li>完成后查看自动验收结果，必须出现 <code>Mira environment ready</code>。</li>
+            </ol>
+            <pre><code>Node: v24.18.0
+pnpm: 11.13.1
+TypeScript: 5.9.3
+Python: 3.12.3
+pip: 24.0
+uv: 0.11.29</code></pre>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/32-terminal-environment-selection.png" alt="终端环境选择"><figcaption>默认环境选择</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/33-terminal-node-python-selected.png" alt="Node 与 Python 已选择"><figcaption>Node 与 Python 默认勾选</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/34-terminal-environment-verified.png" alt="终端环境验收"><figcaption>安装完成自动验版本</figcaption></figure>
+            </div>
+          </article>
+
+          <article class="guide-step">
+            <h3>E. 补齐悬浮窗、电池豁免和位置权限</h3>
+            <div class="path"><span>设置</span><span>高级功能</span><span>权限授予</span></div>
+            <ol>
+              <li>悬浮窗用于陪伴气泡和快速回复。</li>
+              <li>电池优化豁免用于后台陪伴、提醒和悬浮服务保活。</li>
+              <li>位置权限只在天气、位置相关工具或主动陪伴规则需要时开启。</li>
+              <li>授权后回到权限页刷新，不能只相信系统弹窗已经点过。</li>
+            </ol>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/35-standard-permissions-missing-clean.png" alt="基础权限缺失"><figcaption>缺失权限状态</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/36-location-permission-granted.png" alt="位置权限已授权"><figcaption>位置权限授权完成</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/37-debugger-permission-level.png" alt="调试权限级别"><figcaption>进入 DEBUGGER 权限配置</figcaption></figure>
+            </div>
+          </article>
+
+          <article class="guide-step">
+            <h3>F. 配置 Shizuku 调试权限</h3>
+            <ol>
+              <li>安装并打开 Shizuku，选择通过无线调试启动。</li>
+              <li>系统设置中开启开发者选项和无线调试，选择“使用配对码配对设备”。</li>
+              <li>六位配对码只在本机通知栏输入，不截图、不发送给别人。</li>
+              <li>配对完成后返回 Shizuku 点“启动”，确认显示“Shizuku 正在运行”。</li>
+              <li>回 Mira 的“权限授予”，点红色“Shizuku 服务 / 未授权”，展开后授予权限，并设为当前级别。</li>
+            </ol>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/38-shizuku-start-guide.png" alt="Shizuku 启动向导"><figcaption>Shizuku 启动向导</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/39-shizuku-wireless-pairing.png" alt="Shizuku 无线调试配对"><figcaption>无线调试配对入口</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/40-shizuku-pairing-notification.png" alt="Shizuku 配对通知"><figcaption>通知栏输入配对码</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/41-shizuku-running.png" alt="Shizuku 正在运行"><figcaption>服务正在运行</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/42-shizuku-permission-active.png" alt="Mira Shizuku 权限已启用"><figcaption>Mira 已授权并使用 DEBUGGER</figcaption></figure>
+            </div>
+          </article>
+
+          <article class="guide-step">
+            <h3>G. 新建角色卡并开始独立会话</h3>
+            <div class="path"><span>聊天页顶部角色名</span><span>创建 / 管理角色群聊</span><span>角色卡</span><span>+</span></div>
+            <ol>
+              <li>顶部显示的是当前角色名，不要把教程写死成 Zero。示例设备的默认角色叫 Mira。</li>
+              <li>填写角色卡名称、描述、角色设定、开场白、“其他内容（聊天）”和“其他内容（语音）”。</li>
+              <li>新建表单若继承了默认 Mira 内容，必须全选替换，否则只是换名字。</li>
+              <li>点击“+ 添加”选择公开头像；相册页不进教程截图。</li>
+              <li>保存后点角色卡右上角三点，选择“设为活跃”。卡片主体目前不会切换角色。</li>
+              <li>新建对话。旧消息仍显示原角色署名是正确行为；新会话才绑定新角色。</li>
+            </ol>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/43-role-switcher.png" alt="角色切换面板"><figcaption>角色切换入口</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/44-character-card-management.png" alt="角色卡管理"><figcaption>角色卡管理</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/45-new-character-card-form.png" alt="新建角色卡表单"><figcaption>角色卡基础字段</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/46-character-card-extra-fields.png" alt="角色卡其他内容"><figcaption>聊天与语音补充设定</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/48-character-card-created.png" alt="角色卡创建完成"><figcaption>新角色卡已创建</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/49-character-card-active.png" alt="角色卡当前激活"><figcaption>通过三点菜单设为活跃</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/50-character-new-conversation.png" alt="新角色独立会话"><figcaption>新角色的独立会话</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/51-character-chat-verified.png" alt="新角色实际回复"><figcaption>角色设定实际生效</figcaption></figure>
+            </div>
+          </article>
+
+          <article class="guide-step">
+            <h3>H. 用自然语言调用终端工具</h3>
+            <p>用户不需要自己逐条敲命令。直接在聊天中说明“调用终端工具执行什么，并保留原始输出”。例如：</p>
+            <pre><code>请调用终端工具执行：
+date "+%Y-%m-%d %H:%M:%S %Z" &&
+python3 --version &&
+node --version &&
+pnpm --version。
+请保留完整工具执行轨迹，并把原始输出整理给我。</code></pre>
+            <p>验收时要看到执行过程、真实命令和原始输出。Markdown 表格列没显示全时，在表格内部左右滑动；这不是结果丢失。</p>
+            <figure class="guide-shot"><img src="assets/guide/beginner/52-terminal-tool-execution.png" alt="终端工具执行轨迹"><figcaption>终端工具执行轨迹与版本输出</figcaption></figure>
+          </article>
+
+          <article class="guide-step">
+            <h3>I. 从市场安装并启用插件</h3>
+            <div class="path"><span>设置</span><span>高级功能</span><span>扩展与技能</span><span>黄色小店图标</span></div>
+            <ol>
+              <li>市场搜索目前可能返回无关条目；找不到时回首页按分类和最近更新浏览，不要反复猜关键词。</li>
+              <li>打开插件详情，检查作者、版本、简介和是否需要额外账号或 Key。</li>
+              <li>点“安装插件”只完成下载与解包。</li>
+              <li>回“扩展与技能”，打开插件容器总开关。</li>
+              <li><b>如果是 ToolPkg，再点插件卡片主体进入详情，把实际子包开关也打开。</b>容器开了、子包关着时，AI 仍会说没有该工具。</li>
+              <li>启用后新建对话，让聊天工具快照重新生成，再用与工具描述一致的提示词测试。</li>
+            </ol>
+            <div class="shot-grid">
+              <figure class="guide-shot"><img src="assets/guide/beginner/53-extension-manager-empty.png" alt="扩展管理空状态"><figcaption>本地扩展管理入口</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/54-plugin-market-home.png" alt="插件市场首页"><figcaption>插件市场首页</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/55-questionnaire-plugin-detail.png" alt="问卷插件详情"><figcaption>安装前检查详情</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/56-questionnaire-plugin-installed.png" alt="问卷插件已安装"><figcaption>市场显示已安装</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/57-questionnaire-plugin-enabled.png" alt="插件容器已启用"><figcaption>容器总开关已启用</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/58-questionnaire-tool-unavailable.png" alt="问卷工具仍不可用"><figcaption>只开容器时，AI 仍找不到工具</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/59-questionnaire-subpackage-off.png" alt="问卷子包关闭"><figcaption>真正的子包开关仍关闭</figcaption></figure>
+              <figure class="guide-shot"><img src="assets/guide/beginner/60-questionnaire-subpackage-enabled.png" alt="问卷子包已启用"><figcaption>子包启用后才可调用</figcaption></figure>
+            </div>
+            <div class="callout warn"><b>插件安装成功但 AI 说没有工具</b>依次检查：容器开关、子包开关、角色工具白名单、新建会话后的工具快照。不要先卸载重装。</div>
+          </article>
+
+          <article class="guide-step">
+            <h3>J. 聊天、记忆与隐私验收</h3>
+            <ul class="checklist">
+              <li>聊天记录应保存在本地会话数据库，重启应用后仍能恢复。</li>
+              <li>会话抽屉应支持搜索历史聊天；新建对话时有草稿则选择“保存草稿并新建”。</li>
+              <li>角色、关系记忆和会话摘要必须按角色与会话隔离。</li>
+              <li>导出和备份前检查文件大小，备份副本不要只留在同一台手机。</li>
+              <li>公开截图前移除 Key、Token、手机号、验证码、支付、位置、Wi-Fi/BSSID、私人聊天和文件路径。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="read-first" class="chapter searchable">
+        <h2>1. 先弄懂 Mira</h2>
+        <p class="section-intro">Mira 是一款 Android 私人 AI 伴侣。它把聊天、角色、长期记忆和语音放在前台，同时保留文件、终端、Skill、MCP、工作流与设备协助能力。</p>
+
+        <h3>一句话理解工作方式</h3>
+        <div class="quick-grid">
+          <div class="panel"><b>聊天记录</b><p>默认保存在手机本地，用来恢复会话。</p></div>
+          <div class="panel"><b>长期记忆</b><p>在本地独立保存，可查看、纠正和删除。</p></div>
+          <div class="panel"><b>AI 回答</b><p>请求直达你选择的模型服务商。</p></div>
+          <div class="panel"><b>主动消息</b><p>由手机本地任务触发，不依赖 Mira 自建服务器。</p></div>
+        </div>
+        <div class="callout warn">
+          <b>“本地优先”不等于“所有推理都离线”</b>
+          角色、记忆、聊天记录和主动陪伴逻辑可以留在手机上；如果选择云端模型或云端 TTS/STT，请求内容仍会发送给对应服务商。是否收费、是否保存日志，由该服务商的规则决定。
+        </div>
+
+        <h3>最少需要准备什么</h3>
+        <ul class="checklist">
+          <li>Android 8.0 或更高版本的手机。</li>
+          <li>一个可用的对话模型 API Key，或已经配置好的本地模型。</li>
+          <li>稳定网络；使用海外服务商时还要保证手机能连接其接口。</li>
+          <li>想用语音时，额外准备 TTS/STT 服务，或使用系统/本地语音服务。</li>
+        </ul>
+
+        <h3>新手推荐路线</h3>
+        <ol>
+          <li>先只配置一个对话模型，完成一次普通文字聊天。</li>
+          <li>再设置名字、人设和自动记忆。</li>
+          <li>然后配置 TTS，确认能试听，再开启自动朗读和语音通话。</li>
+          <li>最后再碰 Skill、MCP、Shizuku、终端等高级能力。</li>
+        </ol>
+      </section>
+
+      <section id="install" class="chapter searchable">
+        <h2>2. 安装与首次启动</h2>
+
+        <h3>安装 APK</h3>
+        <ol>
+          <li>从 Mira 的发布页下载与你设备架构匹配的 APK。</li>
+          <li>在系统设置中允许当前文件管理器或浏览器“安装未知应用”。</li>
+          <li>打开 APK 完成安装。Mira 的应用 ID 是 <code>com.ai.assistance.mira</code>，可与上游 Operit 分开安装。</li>
+          <li>首次启动阅读说明并进入权限引导。</li>
+        </ol>
+        <div class="callout danger"><b>不要从聊天群里的不明链接安装改包</b>API Key、聊天记录和本地记忆都属于敏感数据。优先使用项目 Release 或自己构建的 APK。</div>
+
+        <h3>权限怎么选</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>权限</th><th>什么时候需要</th><th>暂时不开会怎样</th></tr></thead>
+            <tbody>
+              <tr><td>通知</td><td>主动消息、后台状态、语音前台服务</td><td>普通聊天仍可用，但主动提醒和后台反馈会受影响</td></tr>
+              <tr><td>麦克风</td><td>语音输入、唤醒、语音通话</td><td>只影响语音功能</td></tr>
+              <tr><td>悬浮窗</td><td>悬浮球和快速回复卡片</td><td>应用内聊天不受影响</td></tr>
+              <tr><td>文件/媒体</td><td>发送附件、导入 Skill、备份与恢复</td><td>相关操作时再授权即可</td></tr>
+              <tr><td>位置</td><td>让 Mira 获取你主动附加的位置</td><td>位置工具不可用</td></tr>
+              <tr><td>无障碍 / Shizuku / Root</td><td>设备控制与自动化</td><td>陪伴、聊天、记忆和语音照常使用</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout good"><b>最省事的首启选择</b>先开“通知”和你马上要用的“麦克风”。悬浮窗、Shizuku 和无障碍等到真正需要时再配置。</div>
+      </section>
+
+      <section id="quick-start" class="chapter searchable">
+        <h2>3. 五分钟跑通第一次聊天</h2>
+        <div class="two-col">
+          <div class="panel"><span class="step-number">1</span><b>打开会话抽屉</b><p>点左上角菜单，进入“设置 → 模型与 API”。</p></div>
+          <div class="panel"><span class="step-number">2</span><b>创建模型配置</b><p>选择供应商，填写 API Key、地址和模型名。</p></div>
+          <div class="panel"><span class="step-number">3</span><b>测试连接</b><p>测试通过后保存，并设为当前对话模型。</p></div>
+          <div class="panel"><span class="step-number">4</span><b>回到聊天</b><p>新建对话，发送“你好，请用一句话介绍自己”。</p></div>
+        </div>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>模型与 API</span><span>新增配置</span></div>
+        <p>看到 AI 正常流式回复，就说明最基础链路已经打通。此时先别急着配置十几个功能模型，先用主模型聊几轮，确认速度、费用和稳定性。</p>
+
+        <h3>第一次聊天的验收清单</h3>
+        <ul class="checklist">
+          <li>消息发送后出现处理状态，而不是立即报错。</li>
+          <li>AI 回复内容完整，没有一直停在“正在思考”。</li>
+          <li>新建对话后，旧消息不会混进新会话。</li>
+          <li>关闭再打开应用，刚才的会话仍能找到。</li>
+        </ul>
+      </section>
+
+      <section id="interface" class="chapter searchable">
+        <h2>4. 主界面地图</h2>
+        <p class="section-intro">手机聊天页没有常驻底部导航。顶部管理会话和角色，中间只放消息，底部只保留会话控制条和输入框；记忆、设置从左上角会话抽屉进入。平板和大屏可常驻会话侧栏，但聊天正文仍限制最大宽度。</p>
+        <div class="figure">
+          <img src="assets/README_examples/mira/chat-home.png" alt="聊天首页结构示意">
+          <ol class="legend">
+            <li><b>左上菜单</b>：打开会话列表，搜索、切换或管理历史对话。</li>
+            <li><b>角色区域</b>：显示当前角色；点击可切换角色或群组。</li>
+            <li><b>新建对话</b>：右上角带加号的对话图标，立即创建空白会话。</li>
+            <li><b>更多菜单</b>：当前聊天的导出、设置和高级操作。</li>
+            <li><b>会话控制条</b>：位于输入框上方，用于附件、模型、回复模式和会话能力。</li>
+            <li><b>输入区</b>：只负责文本、语音、发送和停止生成。</li>
+            <li><b>发送 / 语音</b>：输入框有文字时显示发送；空白时可进入语音输入。</li>
+          </ol>
+        </div>
+
+        <div class="three-col">
+          <div class="panel"><b>会话抽屉</b><p>新建、搜索、最近、归档、记忆和设置。</p></div>
+          <div class="panel"><b>角色菜单</b><p>切换角色、查看资料、关系状态和主动陪伴。</p></div>
+          <div class="panel"><b>更多菜单</b><p>自动朗读、语音、本会话记忆、导出和高级功能。</p></div>
+        </div>
+
+        <h3>输入框上面的控制条是什么</h3>
+        <ul>
+          <li><b>加号</b>：打开轻量附件菜单，只保留相机、照片、文件和引用记忆。</li>
+          <li><b>模型名称</b>：当前会话绑定的模型配置；点击可快速切换。</li>
+          <li><b>回复模式</b>：选择轻快、智能或深入；窄屏会与模型名称合并显示。</li>
+          <li><b>会话能力</b>：默认允许模型按需调用工具；附件和设备协助按当前权限生效。</li>
+          <li><b>灰色接话建议</b>：输入框为空时，功能模型根据上一轮对话生成的候选回复；点击输入框开始打字时会消失。</li>
+        </ul>
+      </section>
+
+      <section id="model" class="chapter searchable">
+        <h2>5. AI 模型配置</h2>
+        <p class="section-intro">模型配置决定“请求发到哪里、用哪个模型、允许生成多长”。API Key 像密码，Endpoint 像地址，模型名称像收件人。</p>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>模型与 API</span><span>模型参数</span></div>
+
+        <h3>四个必懂字段</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>字段</th><th>含义</th><th>小白常见错误</th></tr></thead>
+            <tbody>
+              <tr><td>API 提供商</td><td>接口协议类型，例如 OpenAI、Anthropic、Gemini、DeepSeek、豆包</td><td>只看模型名字，选错协议</td></tr>
+              <tr><td>API Key</td><td>服务商控制台创建的密钥</td><td>复制了前后空格，或把账号密码当 Key</td></tr>
+              <tr><td>Endpoint / API 地址</td><td>请求的完整接口地址或基础地址</td><td>漏掉 <code>https://</code>，或多写/少写路径</td></tr>
+              <tr><td>模型名称</td><td>服务商实际支持的模型 ID</td><td>填了宣传名，而不是 API 模型 ID</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>通用配置步骤</h3>
+        <ol>
+          <li>点“新增配置”，先起一个容易认的配置名，例如“DeepSeek 日常”或“豆包陪伴”。</li>
+          <li>选择真实供应商；兼容 OpenAI 协议的中转服务通常选择“OpenAI 通用”。</li>
+          <li>粘贴 API Key，填写服务商文档给出的 Endpoint 和模型 ID。</li>
+          <li>按模型能力开启识图、音频、视频或 Tool Call，不要给纯文本模型乱开多模态。</li>
+          <li>先执行“测试连接”，至少测试普通聊天；要让 Mira 操作工具，再测试 Tool Call。</li>
+          <li>保存后回到聊天页，通过输入框下方的模型按钮选择它。</li>
+        </ol>
+
+        <div class="callout warn"><b>AutoGLM 不适合作为日常对话主模型</b>UI 控制模型和聊天模型是两件事。日常聊天请选择正常对话模型；AutoGLM 只在明确要求智能体控制界面时使用。</div>
+
+        <h3>上下文和生成长度怎么设</h3>
+        <ul>
+          <li><b>上下文长度</b>：Mira 日常实际使用的聊天窗口。新手先用模型支持范围内的中等值。</li>
+          <li><b>最大上下文长度</b>：供应商文档声明的硬上限，不要凭感觉写得比模型能力更大。</li>
+          <li><b>最大生成 Token</b>：单次回答最长能输出多少；太小会截断，太大可能变慢和变贵。</li>
+          <li><b>总结阈值</b>：上下文使用到一定比例后，Mira 会压缩旧对话，最近消息仍保留。</li>
+        </ul>
+        <div class="callout good"><b>推荐原则</b>先用默认参数跑通，再一次只改一个参数。出现截断就调生成长度，出现超限就检查上下文上限和总结阈值。</div>
+
+        <h3>思考模式和档位</h3>
+        <p>思考模式适合复杂规划、代码、推理和工具任务。普通闲聊关闭会更快、更省钱。档位越高通常越慢、Token 越多；是否真正生效还取决于供应商和模型是否支持对应参数。</p>
+      </section>
+
+      <section id="functional-model" class="chapter searchable">
+        <h2>6. 功能模型配置</h2>
+        <p class="section-intro">主模型负责和你聊天；功能模型负责标题、记忆、总结、接话建议、图片识别等后台小任务。分开配置能兼顾质量、速度和费用。</p>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>模型与 API</span><span>功能模型配置</span></div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>功能</th><th>推荐选择</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>对话功能</td><td>你最信任的主模型</td><td>决定日常回答质量和人格稳定性</td></tr>
+              <tr><td>标题生成</td><td>快速、便宜的小模型</td><td>只负责生成会话标题</td></tr>
+              <tr><td>上下文总结</td><td>理解力稳定、上下文足够的模型</td><td>压缩长聊天，保留重点</td></tr>
+              <tr><td>记忆更新</td><td>指令遵循稳定的模型</td><td>从聊天中提炼身份、偏好、事件和约定</td></tr>
+              <tr><td>智能接话建议</td><td>响应快、成本低的模型</td><td>生成输入框里的灰色候选句</td></tr>
+              <tr><td>图像/音频/视频识别</td><td>明确支持相应模态的模型</td><td>同时在模型配置里开启对应能力</td></tr>
+              <tr><td>UI 控制器</td><td>专用视觉控制模型</td><td>只用于设备界面自动化</td></tr>
+              <tr><td>群组规划</td><td>速度与规划能力平衡的模型</td><td>决定多角色发言顺序</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn"><b>“自动记忆没反应”先查这里</b>确认“记忆更新”已经绑定可用模型，并且该配置测试连接成功。功能模型失败不会总是影响主聊天，所以很容易被忽略。</div>
+      </section>
+
+      <section id="chat" class="chapter searchable">
+        <h2>7. 聊天完整用法</h2>
+
+        <h3>新建、切换和搜索对话</h3>
+        <ul>
+          <li>右上角“对话加号”直接新建会话。</li>
+          <li>左上角菜单打开会话抽屉，可搜索标题和切换历史。</li>
+          <li>每个会话可绑定自己的角色、模型、思考档位和上下文设置。</li>
+          <li>删除前先确认是否需要导出；删除操作通常不可撤销。</li>
+        </ul>
+
+        <h3>发送附件</h3>
+        <p>点会话控制条左侧加号，从轻量附件菜单选择相机、照片、文件或引用记忆。文件和图片是否能被理解，取决于对应功能模型和能力开关。</p>
+        <div class="two-col">
+          <div class="panel"><b>照片与文件</b><p>从相机、相册或文件选择器添加当前对话需要的内容。</p></div>
+          <div class="panel"><b>引用记忆</b><p>从本地记忆中选择一条证据明确的内容加入本轮上下文。</p></div>
+        </div>
+        <div class="callout"><b>判断附件是否真的带上了</b>发送前输入区会出现附件提示；发送后消息详情中应能看到附件引用。图片“上传成功但 AI 看不懂”，通常是模型没有视觉能力。</div>
+
+        <h3>消息长按菜单</h3>
+        <p>不同消息可执行复制、编辑、删除、重新生成、回档、查看信息、切换回答候选和生成分享图等操作。重新生成会保留候选版本，可通过计数器前后切换。</p>
+
+        <h3>当前触发的 Skill</h3>
+        <p>当某个 Skill 被匹配并参与本轮处理时，聊天界面会显示当前 Skill。它表示本轮加载了哪套专业说明，不等于每次都执行设备操作。</p>
+
+        <h3>智能接话建议</h3>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>显示与行为</span><span>智能接话建议</span></div>
+        <p>默认开启时，输入框为空会出现灰色建议。点击发送可直接采用；一旦你主动点输入框开始输入，建议会消失，不会混进你自己的文字。想提升速度，请在功能模型中给“智能接话建议”绑定快速模型。</p>
+      </section>
+
+      <section id="persona" class="chapter searchable">
+        <h2>8. 角色与人设</h2>
+        <p class="section-intro">Mira 是产品名，默认角色只是一个可替换预设。Zero、Mira 或你导入的任何角色都不应该被写死在底层。</p>
+        <div class="path"><span>顶部角色名</span><span>角色资料</span><span>陪伴者设置</span></div>
+
+        <h3>角色卡里建议写什么</h3>
+        <ol>
+          <li><b>身份</b>：姓名、年龄设定、职业、生活环境。</li>
+          <li><b>性格</b>：稳定特质和矛盾点，不要只堆“温柔、可爱”。</li>
+          <li><b>交流方式</b>：用什么语言、句子长短、会不会用表情、如何称呼用户。</li>
+          <li><b>关系背景</b>：双方认识多久、共同经历、当前关系。</li>
+          <li><b>边界和习惯</b>：不喜欢什么、遇到不同意见怎么回应。</li>
+          <li><b>开场白</b>：第一次见面或新会话的自然开场。</li>
+        </ol>
+        <div class="callout good"><b>写人设的诀窍</b>多写可观察行为，少写空泛形容。“用户难过时先听，再问一个具体问题”比“共情力很强”更容易稳定执行。</div>
+
+        <h3>角色隔离</h3>
+        <p>每个角色可以拥有独立头像、语气、模型、自动朗读设置和专属记忆。角色可选择使用专属记忆或跟随全局记忆，也可单独授权内建工具、包、Skill 和 MCP。</p>
+
+        <h3>群组角色</h3>
+        <p>群组模式允许多个角色参与同一会话。功能模型中的“群组规划”决定谁先说、谁跳过以及是否继续讨论。刚开始使用时建议先把单角色调稳定，再组群。</p>
+      </section>
+
+      <section id="memory" class="chapter searchable">
+        <h2>9. 本地记忆系统</h2>
+        <p class="section-intro">聊天记录是“发生过什么”，长期记忆是“以后回答时值得继续带上的事实”。两者分开保存，避免每次把全部聊天原文塞给模型。</p>
+        <div class="path"><span>会话抽屉</span><span>记忆</span></div>
+
+        <h3>Mira 会记哪些内容</h3>
+        <div class="three-col">
+          <div class="panel"><b>身份与事实</b><p>名字、职业、家庭情况、稳定背景。</p></div>
+          <div class="panel"><b>偏好与习惯</b><p>喜欢什么、讨厌什么、日常规律。</p></div>
+          <div class="panel"><b>事件与约定</b><p>近期发生的事、承诺、纪念日和待办。</p></div>
+          <div class="panel"><b>边界</b><p>明确不希望出现的话题或互动方式。</p></div>
+          <div class="panel"><b>关系</b><p>双方称呼、关系阶段和共同经历。</p></div>
+          <div class="panel"><b>会话摘要</b><p>长对话压缩后的关键背景。</p></div>
+        </div>
+
+        <h3>自动记忆的流程</h3>
+        <ol>
+          <li>聊天中出现重要信息。</li>
+          <li>记忆功能模型提取候选事实，附带来源、范围、置信度和重要度。</li>
+          <li>候选进入本地记忆库；需要确认的内容显示为“待确认”。</li>
+          <li>后续回答前，系统按角色、会话和主题自动召回相关记忆。</li>
+          <li>你纠正内容时会创建新版本，旧版本保留为已覆盖记录，避免悄悄改历史。</li>
+        </ol>
+
+        <h3>手动新增、确认和纠正</h3>
+        <ul>
+          <li><b>新增</b>：点“新增伴侣记忆”，选择归属、类型、主题和内容。</li>
+          <li><b>确认</b>：对“待确认”候选核对原话，确认后提高可信度。</li>
+          <li><b>纠正</b>：不要重复新建冲突事实，打开原记录点“纠正”。</li>
+          <li><b>删除</b>：会同时删除该记忆的证据、关联和检索索引。</li>
+        </ul>
+        <div class="callout warn"><b>归属选错会导致“她明明记住却不提”</b>“当前会话”只在这一段聊天召回；“当前角色”跟着角色；“关于用户”的全局事实可跨角色使用。保存前先看归属。</div>
+
+        <h3>关系档案与思维记忆网</h3>
+        <p>默认“关系档案”适合普通用户，按关于我、关于角色、共同经历等方式浏览；“高级图谱”显示记忆节点和类别、范围、记忆域之间的关联，用于检查为什么某条记忆会被召回。</p>
+
+        <h3>记忆没有自动保存时</h3>
+        <ol>
+          <li>检查功能模型中的“记忆更新”是否有可用配置。</li>
+          <li>确认这句话是稳定事实，而不是随口假设或临时玩笑。</li>
+          <li>到“待确认记忆”查看是否进入审核队列。</li>
+          <li>直接说“请记住：……”可提高意图明确度。</li>
+          <li>重要信息可手动保存，避免完全依赖自动提取。</li>
+        </ol>
+      </section>
+
+      <section id="voice" class="chapter searchable">
+        <h2>10. 语音与通话</h2>
+        <p class="section-intro">STT 把你的声音转成文字，TTS 把 Mira 的文字读出来。两者可使用不同服务商；语音通话只是把收听、发送、思考和朗读串成连续闭环。</p>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>角色与声音</span><span>语音与通话</span></div>
+
+        <h3>先配置 TTS，再开自动朗读</h3>
+        <ol>
+          <li>选择 TTS 类型：系统 TTS、硅基流动、MiniMax、MiMo、豆包、OpenAI、VITS 或 HTTP 自定义。</li>
+          <li>按服务商填写 API Key、完整 URL、模型和音色 ID。</li>
+          <li>打开“试听当前声线”，确认声音、速度和音高。</li>
+          <li>开启“情感朗读”，选择克制、自然或鲜明。</li>
+          <li>为当前角色选择“跟随全局 / 开启 / 关闭”自动朗读。</li>
+        </ol>
+
+        <h3>常见云端 TTS 字段</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>服务</th><th>关键字段</th><th>容易填错的地方</th></tr></thead>
+            <tbody>
+              <tr><td>豆包 TTS</td><td>API Key/Token、voice_type；旧版还需 App ID</td><td>新版 API Key 与旧版 Access Token 混用</td></tr>
+              <tr><td>OpenAI HTTP TTS</td><td>完整 <code>/v1/audio/speech</code> URL、Key、model、voice</td><td>只填基础域名，漏掉接口路径</td></tr>
+              <tr><td>OpenAI Realtime</td><td>WebSocket URL、model、voice</td><td>把 HTTP 地址填进 WebSocket 配置</td></tr>
+              <tr><td>硅基流动</td><td>API Key、TTS 模型、预设或自定义音色</td><td>自定义音色 URI 不完整</td></tr>
+              <tr><td>MiniMax / MiMo</td><td>URL、API Key、模型、voice_id</td><td>模型名使用了聊天模型而不是语音模型</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>配置 STT</h3>
+        <p>本地 STT 更保护隐私但会占用设备资源；OpenAI、Deepgram 等远程 STT 依赖网络。远程 OpenAI STT 的 URL 必须完整包含 <code>/v1/audio/transcriptions</code>，模型可用 <code>whisper-1</code> 或服务商支持的转写模型。</p>
+
+        <h3>语音通话怎么用</h3>
+        <ol>
+          <li>从聊天界面进入语音通话，允许麦克风权限。</li>
+          <li>看到“正在听”后自然说话，停顿达到设定时间会自动发送。</li>
+          <li>Mira 思考并朗读回复；“允许语音打断”开启时，你可以在朗读中插话。</li>
+          <li>如果模型没有开始响应、整轮超时或发送失败，通话会恢复收听并给出状态。</li>
+        </ol>
+
+        <h3>推荐通话设置</h3>
+        <ul>
+          <li><b>允许语音打断</b>：默认开启。扬声器环境很吵、经常误打断时可关闭。</li>
+          <li><b>停顿多久后发送</b>：说话短促选“快速”；大多数人选“自然”；经常边想边说选“从容”。</li>
+          <li><b>情感强度</b>：先选“自然”。“鲜明”依赖 TTS 服务真正支持情绪或 style 参数。</li>
+          <li><b>耳机</b>：使用蓝牙耳机时保持系统媒体与通话路由正常，Mira 不强制切扬声器。</li>
+        </ul>
+        <div class="callout"><b>为什么调语速后听不出变化</b>先确认当前 TTS Provider 支持 rate/pitch，并重新试听。部分服务只接受固定档位或忽略客户端参数；情感朗读还可能在基础语速上做小幅动态调整。</div>
+      </section>
+
+      <section id="immersive" class="chapter searchable">
+        <h2>11. 沉浸对话</h2>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>聊天与记忆</span><span>沉浸对话</span></div>
+        <p>沉浸对话会把 AI 回复按句子拆成独立气泡，并按文本长度模拟发送节奏。它适合陪伴聊天，不适合需要一次复制整段代码或长报告的场景。</p>
+        <ul>
+          <li>可启用智能延迟，让短句先出现、长句稍后出现。</li>
+          <li>可合并用户连续发送的短消息，停顿后统一交给 AI。</li>
+          <li>可去除句末标点和显示标签，让聊天更接近即时通讯。</li>
+          <li>工具能力仍可使用，但执行过程默认折叠，避免打断聊天氛围。</li>
+          <li>可为当前角色配置表情包，支持 JPG、PNG、GIF 和 WebP。</li>
+        </ul>
+        <div class="callout warn"><b>调试问题时先临时关闭</b>如果出现气泡顺序、延迟或内容截断问题，先切回普通模式确认模型原始回复是否完整，再判断是模型问题还是沉浸拆分问题。</div>
+      </section>
+
+      <section id="floating" class="chapter searchable">
+        <h2>12. 悬浮窗</h2>
+        <p class="section-intro">悬浮球用于跨应用快速唤起 Mira；展开后是快速回复卡片，不会代替主应用里的完整聊天页。</p>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>主动陪伴</span><span>悬浮陪伴</span></div>
+        <ol>
+          <li>先授予系统“显示在其他应用上层”权限。</li>
+          <li>开启悬浮窗模式，屏幕边缘出现悬浮球。</li>
+          <li>拖动可横向和纵向移动；松手后可吸附左右安全边缘。</li>
+          <li>点击展开快速聊天卡片，可查看最近对话并发送消息。</li>
+          <li>点外部区域或关闭按钮收回悬浮球。</li>
+        </ol>
+        <div class="callout good"><b>防止挡住系统按钮</b>悬浮球会考虑状态栏、导航栏、刘海和安全边距。横屏或分屏后位置异常时，先收回再展开，让它重新计算可用区域。</div>
+
+        <h3>悬浮窗看不到对话</h3>
+        <ol>
+          <li>确认主应用已经有当前会话，而不是停在空白未创建状态。</li>
+          <li>打开主应用切换到目标会话，再重新展开悬浮窗。</li>
+          <li>检查通知/前台服务是否被系统停止。</li>
+          <li>仍不同步时关闭悬浮窗服务后重新开启。</li>
+        </ol>
+      </section>
+
+      <section id="proactive" class="chapter searchable">
+        <h2>13. 主动陪伴与后台保活</h2>
+        <p class="section-intro">Mira 的主动消息根据本地聊天上下文、记忆和提醒计划生成。没有 Mira 自建服务器替你保存关系档案，但 Android 是否允许它准时醒来仍受系统后台策略影响。</p>
+        <div class="path"><span>顶部角色名</span><span>主动陪伴</span><span>陪伴在线</span></div>
+
+        <h3>建议开启的系统设置</h3>
+        <ul class="checklist">
+          <li>允许通知，并保留“Mira 在后台待着”的前台服务通知。</li>
+          <li>把电池策略设为“不限制”或允许后台活动。</li>
+          <li>在国产系统的自启动管理中允许 Mira 自启动。</li>
+          <li>锁定最近任务，避免一键清理直接终止进程。</li>
+          <li>需要准时提醒时，允许精确闹钟或日程权限（若系统要求）。</li>
+        </ul>
+        <div class="callout warn"><b>“纯本地”不代表永远准点</b>息屏、超级省电、系统清理和厂商后台限制都可能延迟任务。重要闹钟仍应使用系统闹钟；Mira 的主动陪伴更适合问候、跟进和上下文提醒。</div>
+
+        <h3>主动消息为什么能接上上下文</h3>
+        <p>本地任务触发后，会读取当前角色、最近会话和相关长期记忆，再调用你配置的模型生成消息。主模型服务商仍会收到本次生成所需的上下文，但 Mira 不需要额外中转服务器。</p>
+      </section>
+
+      <section id="skills" class="chapter searchable">
+        <h2>14. Skill、MCP 与能力中心</h2>
+        <p class="section-intro">Skill 是专业说明书，MCP 是标准化外部工具连接，工具包和工作流则提供实际能力。它们解决的问题不同。</p>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>隐私与高级功能</span><span>高级功能</span></div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>类型</th><th>你可以把它理解成</th><th>典型用途</th></tr></thead>
+            <tbody>
+              <tr><td>Skill</td><td>一份带目录和附件的专业操作指南</td><td>志愿填报、写作流程、项目规范、领域知识</td></tr>
+              <tr><td>MCP</td><td>让模型调用外部服务的标准插座</td><td>搜索、数据库、GitHub、企业系统</td></tr>
+              <tr><td>工具包</td><td>Mira 内可执行的一组工具</td><td>文件、终端、网页、地图、自动化</td></tr>
+              <tr><td>工作流</td><td>把多步操作固定成流程</td><td>定期报告、批量处理、自动检查</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>安装一个 Skill</h3>
+        <ol>
+          <li>打开“高级功能 → Skill 市场”，或进入 Skill 管理器。</li>
+          <li>市场安装可搜索名称；仓库导入时粘贴 Git 仓库地址。</li>
+          <li>本地导入只支持合法 ZIP，包内必须能找到 <code>SKILL.md</code>。</li>
+          <li>安装后打开详情，确认入口文件、说明和附件都已识别。</li>
+          <li>进入角色的“工具访问”，允许该角色使用目标 Skill；同时确认内建 <code>use_package</code> 能力已开启。</li>
+          <li>回到聊天，用符合 Skill 描述的请求测试，观察聊天页显示的当前 Skill。</li>
+        </ol>
+
+        <h3>为什么装了却没触发</h3>
+        <ul>
+          <li>Skill 描述与当前问题不匹配。</li>
+          <li>当前角色没有授权该 Skill。</li>
+          <li>允许了 Skill/MCP，但没允许内建 <code>use_package</code>。</li>
+          <li><code>SKILL.md</code> 的名称、描述或目录结构不规范。</li>
+          <li>当前模型 Tool Call 能力不稳定，或模型配置未开启工具调用。</li>
+        </ul>
+
+        <h3>安装 MCP 前先看三件事</h3>
+        <ol>
+          <li>它需要哪些账号、Token、端口和运行环境。</li>
+          <li>它能访问哪些文件、数据库或网络服务。</li>
+          <li>它是本地进程还是远程服务，退出 Mira 后是否仍在运行。</li>
+        </ol>
+      </section>
+
+      <section id="permissions" class="chapter searchable">
+        <h2>15. 权限与设备控制</h2>
+        <p class="section-intro">Mira 的聊天能力和设备控制能力是分开的。小白只聊天时，不必配置最高权限。</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>通道</th><th>能力</th><th>特点</th></tr></thead>
+            <tbody>
+              <tr><td>普通 Android 权限</td><td>通知、麦克风、位置、文件</td><td>按功能逐项授权，最容易理解</td></tr>
+              <tr><td>无障碍</td><td>读取界面结构、点击、输入和滚动</td><td>兼容性广，但受页面结构影响</td></tr>
+              <tr><td>Shizuku</td><td>通过系统服务执行更完整的设备操作</td><td>通常需要无线调试配对，重启后可能要重启服务</td></tr>
+              <tr><td>Root</td><td>最高级系统访问</td><td>只适合清楚自己设备环境的用户</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>授权原则</h3>
+        <ul>
+          <li>只开启当前任务需要的权限。</li>
+          <li>给角色授权工具时，区分“能看到”和“能执行”。</li>
+          <li>第一次自动化先用可撤销的小任务测试，例如打开设置页，不要直接做批量删除。</li>
+          <li>系统升级或 Shizuku 重启后，重新检查连接状态。</li>
+        </ul>
+      </section>
+
+      <section id="backup" class="chapter searchable">
+        <h2>16. 备份、迁移与隐私</h2>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>聊天与记忆</span><span>数据备份与恢复</span></div>
+
+        <h3>建议备份哪些内容</h3>
+        <ul class="checklist">
+          <li>聊天记录和会话分组。</li>
+          <li>伴侣记忆、证据和关系档案。</li>
+          <li>角色卡、人设、头像与表情包。</li>
+          <li>模型配置名称和参数；导出前确认是否包含 API Key。</li>
+          <li>Skill、MCP、工作流和自定义提示词。</li>
+        </ul>
+        <p>聊天备份默认保存在 <code>下载/Mira/backup</code>。具体可导出内容以当前备份页面为准。</p>
+
+        <h3>换手机的稳妥流程</h3>
+        <ol>
+          <li>旧手机先执行完整备份，并确认文件大小不是 0。</li>
+          <li>把备份文件复制到电脑或可信存储，不要只留在旧手机。</li>
+          <li>新手机安装相同或更新版本的 Mira。</li>
+          <li>先导入聊天与记忆，再检查角色卡和扩展。</li>
+          <li>重新填写敏感 API Key，重新授权麦克风、通知、悬浮窗和 Shizuku。</li>
+          <li>随机打开三个旧会话，并在记忆页搜索一条已知内容做验收。</li>
+        </ol>
+
+        <div class="callout danger"><b>分享日志、截图和配置前先脱敏</b>检查 API Key、Bearer Token、聊天内容、文件路径、Cookie、地理位置和备份文件。清除 Cookie 只清理搜索工具、Browser 包和内置浏览器 Cookie，不等于清空全部聊天数据。</div>
+      </section>
+
+      <section id="appearance" class="chapter searchable">
+        <h2>17. 外观与无障碍</h2>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>隐私与高级功能</span><span>主题和外观 / 显示与行为</span></div>
+        <p>Mira 使用无底栏的自适应聊天布局：手机保持单栏全屏聊天，平板和宽屏可常驻会话侧栏或信息侧栏；状态栏、系统手势区、键盘和刘海区域分别处理。</p>
+        <ul>
+          <li><b>主题和外观</b>：颜色、明暗模式、聊天气泡和输入框样式。</li>
+          <li><b>输入框悬浮</b>：把贴底输入区改成悬浮圆角输入组件。</li>
+          <li><b>显示与行为</b>：时间显示、模型名、供应商、自动建议和其他全局行为。</li>
+          <li><b>布局调整</b>：用于极端字体大小、折叠屏或特殊分辨率下的边距微调。</li>
+        </ul>
+
+        <h3>大字体用户的建议</h3>
+        <ol>
+          <li>先保持系统字体在常用档位，观察聊天页和设置页是否完整换行。</li>
+          <li>不要同时把系统“字体大小”和“显示大小”都拉到极限后再判断单项问题。</li>
+          <li>出现按钮被挤出屏幕时，记录机型、分辨率、字体档位和具体页面截图。</li>
+          <li>横屏、分屏、折叠状态分别测试一次。</li>
+        </ol>
+
+        <div class="figure">
+          <img src="assets/README_examples/mira/settings.png" alt="Mira 设置页面截图">
+          <div>
+            <h3>设置页怎么找东西</h3>
+            <p>设置从左上角会话抽屉底部进入，按“角色与声音、聊天与记忆、主动陪伴、模型与 API、隐私与高级功能”分组。找不到时先判断它属于内容、模型、外观还是设备能力，不要在每个页面里来回翻。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="advanced" class="chapter searchable">
+        <h2>18. 高级能力地图</h2>
+        <p class="section-intro">Operit 官网把 Agent、自动化和开发能力放在主目录；Mira 仍保留这些底层能力，但统一收进“高级功能”，避免它们占据日常陪伴路径。先完成前面的聊天、语音和权限配置，再按任务开启。</p>
+
+        <div class="callout good">
+          <b>与 Operit 官方教程的对应关系</b>
+          Mira 已覆盖模型、终端、角色卡、语音、记忆、插件、权限、备份和常见故障；本章补齐本地模型、识图生图、工作流、深度搜索、UI 自动化、虚拟屏幕、工作区、外部调用以及角色卡分享。Operit 的桌宠和悬浮全屏工作台不作为独立主线：Mira 用陪伴气泡、快速回复卡片和正常聊天页承接。
+        </div>
+
+        <h3>本地模型与离线运行</h3>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>模型与 API</span><span>本地模型</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>方案</th><th>适合什么</th><th>验收重点</th></tr></thead>
+            <tbody>
+              <tr><td>MNN</td><td>适配移动端的本地模型与功能模型</td><td>模型文件完整、内存足够、普通生成和 Tool Call 分别测试</td></tr>
+              <tr><td>llama.cpp / GGUF</td><td>运行常见 GGUF 量化模型</td><td>量化规格与设备内存匹配，首轮加载没有被系统杀死</td></tr>
+              <tr><td>Ollama / 局域网服务</td><td>让手机连接电脑或服务器上的本地模型</td><td>手机能访问服务地址，端口和防火墙放行</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ol>
+          <li>先用云端小模型跑通 Mira，确认聊天链路本身正常。</li>
+          <li>下载与设备内存匹配的模型，不要一上来塞超大参数模型。</li>
+          <li>在本地模型页面完成加载测试，再创建对应模型配置。</li>
+          <li>分别验证短回复、长上下文、停止生成和工具调用；能回答文字不代表能正确 Tool Call。</li>
+        </ol>
+
+        <h3>识图、生图与功能模型</h3>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>模型与 API</span><span>功能模型配置</span></div>
+        <ul>
+          <li><b>识图</b>：主模型或独立功能模型必须明确支持视觉输入；用一张无隐私的测试图验证内容、文字和位置描述。</li>
+          <li><b>生图</b>：在绘图工具包中配置供应商、模型和尺寸，再让聊天模型按需调用；文本聊天模型本身不会凭空生成图片文件。</li>
+          <li><b>OCR</b>：属于设备或媒体能力，不放进默认附件菜单；需要时从高级功能或对应工具调用。</li>
+          <li><b>音频/视频理解</b>：分别绑定支持该模态的功能模型，别把 TTS 音色接口当成音频理解模型。</li>
+        </ul>
+
+        <h3>工作流、知识库与深度搜索</h3>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>隐私与高级功能</span><span>工作流 / 知识库 / 深度搜索</span></div>
+        <div class="three-col">
+          <div class="panel"><b>工作流</b><p>把多步工具调用固定成可复用流程，可由手动、定时或语音事件触发。</p></div>
+          <div class="panel"><b>知识库</b><p>保存文档和项目资料；陪伴记忆仍走独立记忆系统，不与文件库混成一套。</p></div>
+          <div class="panel"><b>深度搜索</b><p>组合网页、学术和地图检索，适合需要来源和多轮整理的任务。</p></div>
+        </div>
+        <ul>
+          <li><b>上下文总结</b>：压缩长会话以控制 Token；总结可编辑，但原始消息仍应保留在本地聊天记录。</li>
+          <li><b>工具箱</b>：管理内置工具、工具包和执行权限；默认允许模型按任务调用，不再提供“仅聊天”模式。</li>
+          <li><b>最小验收</b>：先让一个工作流只执行两步，并检查每一步的输入、输出、失败状态和取消操作。</li>
+        </ul>
+
+        <h3>UI 自动化、AutoGLM 与虚拟屏幕</h3>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>隐私与高级功能</span><span>设备协助</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>通道</th><th>特点</th><th>典型用途</th></tr></thead>
+            <tbody>
+              <tr><td>无障碍</td><td>配置简单，可读取界面节点并执行点击</td><td>普通应用内操作和重复步骤</td></tr>
+              <tr><td>Shizuku / DEBUGGER</td><td>权限更完整，适合终端和系统级操作</td><td>文件、包管理、调试和更稳定的自动化</td></tr>
+              <tr><td>Root</td><td>能力最高，设备环境要求也最高</td><td>虚拟屏、多显示器和深层系统操作</td></tr>
+              <tr><td>AutoGLM</td><td>视觉控制器，根据截图规划点击</td><td>缺少稳定 UI Tree 的复杂界面</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>虚拟屏幕用于把自动化任务放到独立显示区域，减少遮挡当前操作。先在真实界面跑通一个短任务，再测试虚拟屏；失败时检查截图是否更新、显示编号是否正确、控制模型是否被错误设成日常聊天模型。</p>
+
+        <h3>工作区、Web 开发与外部调用</h3>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>隐私与高级功能</span><span>工作区 / 开发者工具</span></div>
+        <ul>
+          <li><b>工作区</b>：可绑定手机目录、SAF、SFTP 或 SSH，用于项目文件、代码编辑和 Git 操作。</li>
+          <li><b>Web 制作与打包</b>：先在工作区生成并预览网页，再使用打包流程导出应用；预览成功不等于 APK 构建环境完整。</li>
+          <li><b>终端开发</b>：内置环境支持 Python、Node.js、pnpm、vim、SSH 和 Chroot；普通用户优先使用一键安装与自动验版本。</li>
+          <li><b>外部调用</b>：Tasker、广播或本地 HTTP 可触发指定代理/工作流；先用无敏感数据的固定文本验证入口，再接真实任务。</li>
+          <li><b>开发辅助</b>：返回码生成器、插件开发文档和调试工具服务开发者，不属于普通聊天必配项。</li>
+        </ul>
+
+        <h3>角色卡导入、标签、分享与群聊</h3>
+        <ul>
+          <li>角色卡可从兼容 JSON、酒馆卡或项目支持的格式导入；导入后先检查人设、开场白、头像和模型绑定。</li>
+          <li>标签用于管理大量角色和剧情线，不影响角色的真实记忆归属。</li>
+          <li>导出或二维码分享前，移除私人聊天、用户资料、API Key 和不想公开的关系记忆。</li>
+          <li>群聊中每个角色保留独立档案和说话方式，由群组规划模型决定发言顺序；用 <code>@角色名</code> 验证定向互动。</li>
+        </ul>
+
+        <div class="callout warn"><b>高级功能不是越多越好</b>每次只开启一个新能力，完成一次可见验收再继续。工具调用失败时保留执行轨迹和错误详情，别只截最后一句“失败了”。</div>
+      </section>
+
+      <section id="troubleshooting" class="chapter searchable">
+        <h2>19. 故障排查</h2>
+        <p class="section-intro">别一报错就乱改十个开关。按“现象 → 最可能原因 → 最小验证”排查。</p>
+
+        <details open>
+          <summary>发送消息后没有回复</summary>
+          <div>
+            <ol>
+              <li>到模型配置执行“测试连接”。</li>
+              <li>检查 API Key、Endpoint 和模型 ID。</li>
+              <li>确认手机能访问服务商域名。</li>
+              <li>切换到普通聊天、关闭思考模式，发送一句短文本。</li>
+              <li>查看错误详情是 401、404、429 还是超时：401 多为 Key，404 多为地址/模型，429 多为额度或限流。</li>
+            </ol>
+          </div>
+        </details>
+
+        <details>
+          <summary>输入框只有语音按钮，没有发送按钮</summary>
+          <div>发送按钮只在存在可发送文本或附件时显示。灰色智能接话只是候选提示，不算正式输入；点候选采用，或开始键入自己的内容。</div>
+        </details>
+
+        <details>
+          <summary>语音能识别，但 Mira 不朗读</summary>
+          <div>
+            <ol>
+              <li>打开“语音与通话”试听当前声线。</li>
+              <li>确认当前角色自动朗读不是“关闭”。</li>
+              <li>检查媒体音量和蓝牙输出设备。</li>
+              <li>云端 TTS 检查 API Key、完整 URL、模型和音色 ID。</li>
+            </ol>
+          </div>
+        </details>
+
+        <details>
+          <summary>语音通话把 Mira 自己的声音当成我说的话</summary>
+          <div>优先使用耳机；保持“允许语音打断”开启以使用回声判断。如果设备扬声器回声严重，可暂时关闭打断、降低媒体音量或把停顿节奏调为“自然/从容”。</div>
+        </details>
+
+        <details>
+          <summary>自动记忆不工作</summary>
+          <div>检查“记忆更新”功能模型、待确认记忆、记忆归属和自动记忆开关。用明确句式“请记住：我的生日是……”做最小验证。</div>
+        </details>
+
+        <details>
+          <summary>模型很快忘记前面的聊天</summary>
+          <div>检查当前会话绑定的上下文长度、模型真实上限、总结阈值和是否出现 Token 超限提示。长期事实应进入记忆库，不要只依赖原始聊天窗口。</div>
+        </details>
+
+        <details>
+          <summary>Skill 已安装但没有显示触发</summary>
+          <div>检查 Skill 描述、角色授权、<code>use_package</code>、Tool Call 测试和 <code>SKILL.md</code> 结构。用与 Skill 描述高度一致的请求做测试。</div>
+        </details>
+
+        <details>
+          <summary>悬浮球拖不动、位置不对或卡片空白</summary>
+          <div>重新授权悬浮窗，关闭后再开启服务；主应用先切到目标会话；旋转屏幕后收回并重新展开。系统省电清理后需要重新启动悬浮服务。</div>
+        </details>
+
+        <details>
+          <summary>主动消息不准时</summary>
+          <div>允许通知、自启动、后台活动和不受限电池策略，保留前台服务通知。检查是否进入超级省电或被一键清理。主动陪伴受 Android 调度影响，不应用来替代关键闹钟。</div>
+        </details>
+
+        <details>
+          <summary>应用闪退或界面卡住</summary>
+          <div>记录发生时间、页面、操作步骤和机型；重新打开后导出错误报告与应用日志。反馈前删除 API Key、聊天内容和私人路径。若能稳定复现，写出“打开哪页 → 点什么 → 出现什么”。</div>
+        </details>
+
+        <h3>一张排错顺序表</h3>
+        <pre><code>1. 只保留一个最小输入
+2. 确认当前角色、会话和模型配置
+3. 执行模型 / TTS / STT 的独立测试
+4. 暂时关闭沉浸、思考、Skill 和自动化
+5. 根据错误码检查 Key、地址、模型、额度和网络
+6. 恢复一个功能，测试一次
+7. 导出日志并记录可复现步骤</code></pre>
+      </section>
+
+      <section id="glossary" class="chapter searchable">
+        <h2>20. 小白术语表</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>术语</th><th>白话解释</th></tr></thead>
+            <tbody>
+              <tr><td>API</td><td>应用和模型服务商说话的接口。</td></tr>
+              <tr><td>API Key</td><td>访问接口的密钥，等同敏感密码。</td></tr>
+              <tr><td>Endpoint</td><td>接口地址，必须与服务商协议匹配。</td></tr>
+              <tr><td>Provider</td><td>模型或语音服务提供商。</td></tr>
+              <tr><td>Token</td><td>模型计算文字长度和费用的基本单位，不完全等于字数。</td></tr>
+              <tr><td>上下文</td><td>本轮发给模型参考的聊天、记忆、工具和文件内容。</td></tr>
+              <tr><td>Tool Call</td><td>模型按结构化格式请求 Mira 调用工具。</td></tr>
+              <tr><td>STT</td><td>Speech to Text，语音转文字。</td></tr>
+              <tr><td>TTS</td><td>Text to Speech，文字转语音。</td></tr>
+              <tr><td>Skill</td><td>让模型按专业流程处理某类任务的说明包。</td></tr>
+              <tr><td>MCP</td><td>连接外部工具和数据源的标准协议。</td></tr>
+              <tr><td>Embedding</td><td>把文本变成可比较的向量，用于检索相关记忆。</td></tr>
+              <tr><td>量化 / 本地模型</td><td>把模型压缩后放在设备运行，省云端费用但更吃手机性能。</td></tr>
+              <tr><td>Shizuku</td><td>让应用通过 Android 系统服务获得更完整操作能力的工具。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout good">
+          <b>最后的建议</b>
+          先把“一个主模型 + 一个角色 + 自动记忆 + 一个 TTS”调稳定，再逐步加功能模型、Skill 和设备控制。功能越多，排错变量越多；一次只改一件事，嘴硬没用，证据最省时间。
+        </div>
+      </section>
+
+      <footer>
+        本教程依据 2026-07-18 的 Mira 当前源码与界面文案编写。项目仍在快速迭代，具体选项名称以你安装版本为准。源码与更新：<a href="https://github.com/kernelx30/Mira">github.com/kernelx30/Mira</a>。
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const search = document.getElementById('search');
+    const sections = [...document.querySelectorAll('.searchable')];
+    const note = document.getElementById('search-note');
+    const tocLinks = [...document.querySelectorAll('.toc a')];
+
+    search.addEventListener('input', () => {
+      const keyword = search.value.trim().toLocaleLowerCase('zh-CN');
+      let visibleCount = 0;
+      sections.forEach(section => {
+        const matched = !keyword || section.textContent.toLocaleLowerCase('zh-CN').includes(keyword);
+        section.classList.toggle('search-hidden', !matched);
+        if (matched) visibleCount += 1;
+      });
+      note.classList.toggle('visible', visibleCount === 0);
+    });
+
+    const observer = new IntersectionObserver(entries => {
+      const current = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (!current) return;
+      tocLinks.forEach(link => link.classList.toggle('active', link.hash === `#${current.target.id}`));
+    }, { rootMargin: '-12% 0px -76% 0px' });
+    sections.forEach(section => observer.observe(section));
+  </script>
+</body>
+</html>

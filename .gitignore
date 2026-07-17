@@ -83,6 +83,11 @@ desktop.ini
 /hs_err_pid*.log
 /replay_pid*.log
 
+# Device captures are private by default. Publish reviewed images explicitly with `git add -f`.
+/docs/assets/guide/beginner/*.png
+/docs/releases/
+/docs/tools/
+
 
 
 # 系统级临时目录/文件

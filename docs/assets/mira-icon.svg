@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108" role="img" aria-labelledby="title">
+  <title id="title">Mira</title>
+  <rect width="108" height="108" rx="24" fill="#f8fbff"/>
+  <circle cx="54" cy="54" r="44" fill="#e5f2ff"/>
+  <circle cx="54" cy="54" r="28" fill="#1871d2"/>
+  <circle cx="43" cy="44" r="11" fill="#6bc9ff"/>
+  <path d="M34 61c6 0 8-14 16-14s9 14 20 14" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
