@@ -7,10 +7,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,9 +48,10 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
@@ -188,7 +190,7 @@ private fun HistoryQuickScrollButton(
         IconButton(
             onClick = onClick,
             enabled = enabled,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = icon,
@@ -220,12 +222,11 @@ private fun HistoryQuickScroller(
     val viewportHeightPx =
         (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat().coerceAtLeast(1f)
     val averageVisibleItemHeightPx =
-        visibleItems
-            .map { it.size }
-            .average()
-            .toFloat()
-            .takeIf { it > 0f }
-            ?: viewportHeightPx
+        if (visibleItems.isEmpty()) {
+            viewportHeightPx
+        } else {
+            visibleItems.sumOf { it.size }.toFloat() / visibleItems.size
+        }
     val estimatedContentHeightPx =
         (averageVisibleItemHeightPx * totalItemCount).coerceAtLeast(viewportHeightPx)
     val estimatedScrollOffsetPx =
@@ -323,7 +324,7 @@ private fun HistoryQuickScroller(
 
     Column(
         modifier = modifier
-            .width(20.dp)
+            .width(48.dp)
             .alpha(quickScrollerAlpha)
             .fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -343,7 +344,7 @@ private fun HistoryQuickScroller(
         Box(
             modifier = Modifier
                 .weight(1f)
-                .width(28.dp)
+                .width(48.dp)
                 .padding(vertical = 4.dp)
                 .onGloballyPositioned { coordinates ->
                     trackHeightPx = coordinates.size.height.toFloat()
@@ -447,6 +448,8 @@ fun ChatHistorySelector(
         onAutoSwitchCharacterCardChange: (Boolean) -> Unit,
         autoSwitchChatOnCharacterSelect: Boolean,
         onAutoSwitchChatOnCharacterSelectChange: (Boolean) -> Unit,
+        onOpenMemory: () -> Unit = {},
+        onOpenSettings: () -> Unit = {},
         onQuickScrollInteractionChange: (Boolean) -> Unit = {},
         activePrompt: ActivePrompt
 ) {
@@ -464,7 +467,6 @@ fun ChatHistorySelector(
     var hasLongPressedGroup by rememberLocal("has_long_pressed_group", defaultValue = false)
     
     // 搜索相关状态
-    var showSearchBox by remember { mutableStateOf(false) }
     var matchedChatIdsByContent by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isSearching by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -550,14 +552,24 @@ fun ChatHistorySelector(
             availableCharacterGroups = groups
         }
     }
-    val groupNameById = remember(availableCharacterGroups, resolvedGroupNameById) {
-        val fromList = availableCharacterGroups.associate { it.id to it.name }
-        fromList + resolvedGroupNameById
+    val characterCardsById = remember(availableCharacterCards) { availableCharacterCards.associateBy { it.id } }
+    val characterCardIdByName =
+        remember(availableCharacterCards) {
+            buildMap {
+                availableCharacterCards.forEach { card ->
+                    if (card.name !in this) put(card.name, card.id)
+                }
+            }
+        }
+    val characterGroupsById =
+        remember(availableCharacterGroups) { availableCharacterGroups.associateBy { it.id } }
+    val groupNameById = remember(characterGroupsById, resolvedGroupNameById) {
+        characterGroupsById.mapValues { (_, group) -> group.name } + resolvedGroupNameById
     }
-    val activeCharacterCardName = remember(activePrompt, availableCharacterCards) {
+    val activeCharacterCardName = remember(activePrompt, characterCardsById) {
         when (val prompt = activePrompt) {
             is ActivePrompt.CharacterCard ->
-                availableCharacterCards.firstOrNull { it.id == prompt.id }?.name
+                characterCardsById[prompt.id]?.name
             is ActivePrompt.CharacterGroup -> null
         }
     }
@@ -612,6 +624,7 @@ fun ChatHistorySelector(
             chatHistories
         }
     }
+    val chatHistoriesById = remember(chatHistories) { chatHistories.associateBy { it.id } }
     val groupIdsInFilteredHistories = remember(filteredHistories) {
         filteredHistories
             .mapNotNull { it.characterGroupId?.trim()?.takeIf { id -> id.isNotBlank() } }
@@ -1879,27 +1892,18 @@ fun ChatHistorySelector(
                 Text(
                     text = stringResource(R.string.chat_history),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.weight(1f))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(
-                        onClick = { showSearchBox = !showSearchBox },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            if (showSearchBox) Icons.Default.SearchOff else Icons.Default.Search,
-                            contentDescription = stringResource(R.string.search),
-                            tint = if (showSearchBox) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
                         onClick = { showSettingsDialog = true },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             Icons.Default.Tune,
@@ -1911,7 +1915,7 @@ fun ChatHistorySelector(
                     if (onBack != null) {
                         IconButton(
                             onClick = onBack,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -1942,7 +1946,8 @@ fun ChatHistorySelector(
                     )
                     onNewChat(characterCardName, characterGroupId)
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                shape = RoundedCornerShape(8.dp),
             ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.new_chat))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -1950,7 +1955,7 @@ fun ChatHistorySelector(
             }
             IconButton(
                 onClick = { showNewGroupDialog = true },
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     Icons.Default.AddCircleOutline,
@@ -1961,76 +1966,48 @@ fun ChatHistorySelector(
             }
         }
 
-        // 搜索框
-        if (showSearchBox) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                label = { Text(stringResource(R.string.search)) },
-                placeholder = { Text(stringResource(R.string.search_chat_history_hint)) },
-                leadingIcon = {
-                    if (isSearching) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(Icons.Default.Search, contentDescription = null)
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchQueryChange,
+            placeholder = { Text(stringResource(R.string.search_chat_history_hint)) },
+            leadingIcon = {
+                if (isSearching) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                }
+            },
+            trailingIcon = {
+                if (searchQuery.isNotBlank() && !isSearching) {
+                    IconButton(onClick = { onSearchQueryChange("") }) {
+                        Icon(Icons.Default.SearchOff, contentDescription = stringResource(R.string.clear_search))
                     }
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank() && !isSearching) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Default.SearchOff, contentDescription = stringResource(R.string.clear_search))
-                        }
-                    }
-                },
-                modifier = Modifier
+                }
+            },
+            modifier =
+                Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                singleLine = true
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        var showSwipeHint by rememberLocal(key = "show_swipe_hint", defaultValue = true)
-
-        if (showSwipeHint) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .clickable { showSwipeHint = false },
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SwapHoriz,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.swipe_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-        }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+        )
         HorizontalDivider()
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .weight(1f)
                 .padding(end = 2.dp)
         ) {
             LazyColumn(
                 state = actualLazyListState,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 10.dp, end = 22.dp)
+                    .padding(start = 10.dp, end = 54.dp)
             ) {
                 items(
                     items = flatItems,
@@ -2050,10 +2027,8 @@ fun ChatHistorySelector(
                             groupId?.let { userPreferencesManager.getAiAvatarForCharacterGroupFlow(it) }
                                 ?: flowOf(null)
                         }.collectAsState(initial = null)
-                        val groupFallbackMemberCardId = remember(groupId, availableCharacterGroups) {
-                            val group = if (groupId.isNullOrBlank()) null else {
-                                availableCharacterGroups.firstOrNull { it.id == groupId }
-                            }
+                        val groupFallbackMemberCardId = remember(groupId, characterGroupsById) {
+                            val group = if (groupId.isNullOrBlank()) null else characterGroupsById[groupId]
                             val sortedMembers = group?.members?.sortedBy { it.orderIndex }.orEmpty()
                             sortedMembers.firstOrNull()?.characterCardId
                         }
@@ -2062,9 +2037,9 @@ fun ChatHistorySelector(
                                 userPreferencesManager.getAiAvatarForCharacterCardFlow(it)
                             } ?: flowOf(null)
                         }.collectAsState(initial = null)
-                        val characterCardId = remember(item.characterCardName, availableCharacterCards) {
+                        val characterCardId = remember(item.characterCardName, characterCardIdByName) {
                             val cardName = item.characterCardName?.takeIf { it.isNotBlank() } ?: return@remember null
-                            availableCharacterCards.firstOrNull { it.name == cardName }?.id
+                            characterCardIdByName[cardName]
                         }
                         val characterCardAvatarUri by remember(characterCardId) {
                             characterCardId?.let { userPreferencesManager.getAiAvatarForCharacterCardFlow(it) }
@@ -2091,17 +2066,13 @@ fun ChatHistorySelector(
                                 .semantics {
                                     contentDescription = "${item.name}, $stateDescription"
                                 }
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onTap = {
-                                            collapsedCharacters =
-                                                if (collapsedCharacters.contains(item.key)) {
-                                                    collapsedCharacters - item.key
-                                                } else {
-                                                    collapsedCharacters + item.key
-                                                }
+                                .clickable {
+                                    collapsedCharacters =
+                                        if (collapsedCharacters.contains(item.key)) {
+                                            collapsedCharacters - item.key
+                                        } else {
+                                            collapsedCharacters + item.key
                                         }
-                                    )
                                 },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -2220,26 +2191,24 @@ fun ChatHistorySelector(
                                     .semantics {
                                         contentDescription = "${item.name}, $stateDescription"
                                     }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onTap = {
-                                                collapsedGroups = if (collapsedGroups.contains(item.key)) {
-                                                    collapsedGroups - item.key
-                                                } else {
-                                                    collapsedGroups + item.key
-                                                }
-                                            },
-                                            onLongPress = {
-                                                if (item.name != ungroupedText) {
-                                                    groupActionTarget = GroupTarget(
-                                                        groupName = item.name,
-                                                        characterCardName = item.characterCardName
-                                                    )
-                                                    hasLongPressedGroup = true
-                                                }
+                                    .combinedClickable(
+                                        onClick = {
+                                            collapsedGroups = if (collapsedGroups.contains(item.key)) {
+                                                collapsedGroups - item.key
+                                            } else {
+                                                collapsedGroups + item.key
                                             }
-                                        )
-                                    },
+                                        },
+                                        onLongClick = {
+                                            if (item.name != ungroupedText) {
+                                                groupActionTarget = GroupTarget(
+                                                    groupName = item.name,
+                                                    characterCardName = item.characterCardName
+                                                )
+                                                hasLongPressedGroup = true
+                                            }
+                                        },
+                                    ),
                                 color = MaterialTheme.colorScheme.surfaceContainer,
                                 shadowElevation = 2.dp,
                                 shape = MaterialTheme.shapes.medium
@@ -2393,12 +2362,10 @@ fun ChatHistorySelector(
                                                             .semantics(mergeDescendants = false) {
                                                                 contentDescription = "$titlePreview, $groupName"
                                                             }
-                                                            .pointerInput(Unit) {
-                                                                detectTapGestures(
-                                                                    onTap = { onSelectChat(item.history.id) },
-                                                                    onLongPress = { chatItemActionTarget = item.history }
-                                                                )
-                                                            },
+                                                            .combinedClickable(
+                                                                onClick = { onSelectChat(item.history.id) },
+                                                                onLongClick = { chatItemActionTarget = item.history },
+                                                            ),
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         val dragDescription = stringResource(R.string.drag_item, item.history.title)
@@ -2432,7 +2399,7 @@ fun ChatHistorySelector(
 
                                                             // 如果是分支，在右侧显示分支图标和父对话标题
                                                             if (item.history.parentChatId != null) {
-                                                                val parentChat = chatHistories.find { it.id == item.history.parentChatId }
+                                                                val parentChat = chatHistoriesById[item.history.parentChatId]
                                                                 if (parentChat != null) {
                                                                     Spacer(modifier = Modifier.height(2.dp))
                                                                     Row(
@@ -2504,6 +2471,32 @@ fun ChatHistorySelector(
                     .align(Alignment.CenterEnd)
                     .padding(end = 2.dp, top = 12.dp, bottom = 12.dp)
             )
+        }
+
+        HorizontalDivider()
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenMemory)
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(12.dp))
+            Text(stringResource(R.string.mate_nav_memory), style = MaterialTheme.typography.bodyLarge)
+        }
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenSettings)
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(21.dp))
+            Spacer(Modifier.width(12.dp))
+            Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.bodyLarge)
         }
     }
 }

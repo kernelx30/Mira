@@ -17,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
 
 data class ParamItem(val name: String, val value: String)
 
@@ -80,14 +82,14 @@ fun ParamVisualizer(xmlContent: String) {
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(
-                            modifier = Modifier.size(24.dp), // 限制IconButton的大小
+                            modifier = Modifier.size(48.dp),
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(param.value))
                             }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copy value",
+                                contentDescription = stringResource(R.string.copy),
                                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                                 modifier = Modifier.size(16.dp) // 限制Icon的大小
                             )

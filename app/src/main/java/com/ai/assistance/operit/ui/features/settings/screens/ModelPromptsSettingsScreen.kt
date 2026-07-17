@@ -549,7 +549,7 @@ fun ModelPromptsSettingsScreen(
                     mimeType = "application/json"
                 )
                 if (ok) {
-                    exportSavedPath = "${Environment.DIRECTORY_DOWNLOADS}/Operit/exports/$fileName"
+                    exportSavedPath = "${Environment.DIRECTORY_DOWNLOADS}/Mira/exports/$fileName"
                     showExportSavedDialog = true
                 } else {
                     Toast.makeText(context, context.getString(R.string.save_failed), Toast.LENGTH_SHORT).show()
@@ -1597,7 +1597,7 @@ fun ModelPromptsSettingsScreen(
                                             mimeType = "application/json"
                                         )
                                         if (ok) {
-                                            exportSavedPath = "${Environment.DIRECTORY_DOWNLOADS}/Operit/exports/$fileName"
+                                            exportSavedPath = "${Environment.DIRECTORY_DOWNLOADS}/Mira/exports/$fileName"
                                             showExportSavedDialog = true
                                         } else {
                                             Toast.makeText(context, context.getString(R.string.save_failed), Toast.LENGTH_SHORT).show()
@@ -1669,7 +1669,7 @@ fun ModelPromptsSettingsScreen(
                                             mimeType = "image/png"
                                         )
                                         if (ok) {
-                                            exportSavedPath = "${Environment.DIRECTORY_DOWNLOADS}/Operit/exports/$fileName"
+                                            exportSavedPath = "${Environment.DIRECTORY_DOWNLOADS}/Mira/exports/$fileName"
                                             showExportSavedDialog = true
                                         } else {
                                             Toast.makeText(context, context.getString(R.string.save_failed), Toast.LENGTH_SHORT).show()
@@ -3412,7 +3412,7 @@ private suspend fun saveBytesToDownloads(context: Context, bytes: ByteArray, fil
                     put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
                     put(
                         MediaStore.MediaColumns.RELATIVE_PATH,
-                        "${Environment.DIRECTORY_DOWNLOADS}/Operit/exports"
+                        "${Environment.DIRECTORY_DOWNLOADS}/Mira/exports"
                     )
                 }
 
@@ -3431,7 +3431,7 @@ private suspend fun saveBytesToDownloads(context: Context, bytes: ByteArray, fil
                 return@withContext false
             } else {
                 val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val targetDir = File(downloadsDir, "Operit/exports").apply { if (!exists()) mkdirs() }
+                val targetDir = File(downloadsDir, "Mira/exports").apply { if (!exists()) mkdirs() }
                 val outFile = File(targetDir, fileName)
                 FileOutputStream(outFile).use { outputStream ->
                     outputStream.write(bytes)

@@ -1,6 +1,9 @@
 package com.ai.assistance.operit.api.chat.enhance
 
 import android.content.Context
+import com.ai.assistance.operit.core.chat.CompanionEmojiMarkup
+import com.ai.assistance.operit.core.chat.CompanionMemoryContextBuilder
+import com.ai.assistance.operit.core.chat.ConversationTimeContext
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.core.chat.hooks.PromptHookContext
 import com.ai.assistance.operit.core.chat.hooks.PromptHookRegistry
@@ -18,6 +21,7 @@ import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelParameter
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.data.model.PreferenceProfile
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.core.tools.UIPageResultData
@@ -43,8 +47,11 @@ import java.util.Calendar
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -52,6 +59,7 @@ import com.ai.assistance.operit.core.tools.ComputerDesktopActionResultData
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
 import com.ai.assistance.operit.data.repository.CustomEmojiRepository
+import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
 import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkBuilder
 import com.ai.assistance.operit.data.repository.getCustomMoodDefinitions
 import com.ai.assistance.operit.data.repository.getMoodAnimationMapping
@@ -197,6 +205,7 @@ class ConversationService(
                         summaryPrompt = summaryPrompt
                     )
                 }
+            preparedHistory = normalizeConversationHistoryForModel(preparedHistory)
 
             // 使用summaryService发送请求，收集完整响应
             val contentBuilder = StringBuilder()
@@ -397,6 +406,73 @@ class ConversationService(
         }
     }
 
+    suspend fun generateNextUserMessage(
+        recentMessages: List<Pair<String, String>>,
+        multiServiceManager: MultiServiceManager,
+    ): String {
+        if (recentMessages.isEmpty()) return ""
+        var requestService: AIService? = null
+        return try {
+            val useEnglish = LocaleUtils.getCurrentLanguage(context).lowercase().startsWith("en")
+            val service =
+                multiServiceManager.getServiceForFunction(FunctionType.NEXT_USER_MESSAGE).also {
+                    requestService = it
+                }
+            val modelParameters =
+                multiServiceManager.getModelParametersForFunction(FunctionType.NEXT_USER_MESSAGE)
+            val result = StringBuilder()
+            service.sendMessage(
+                context = context,
+                chatHistory =
+                    listOf(
+                        PromptTurn(
+                            kind = PromptTurnKind.SYSTEM,
+                            content = FunctionalPrompts.nextUserMessageSystemPrompt(useEnglish),
+                        ),
+                        PromptTurn(
+                            kind = PromptTurnKind.USER,
+                            content =
+                                FunctionalPrompts.nextUserMessageUserPrompt(
+                                    recentMessages = recentMessages,
+                                    useEnglish = useEnglish,
+                                ),
+                        ),
+                    ),
+                modelParameters = modelParameters,
+                stream = false,
+                enableRetry = false,
+            ).collect { chunk -> result.append(chunk) }
+
+            runCatching {
+                apiPreferences.updateTokensForProviderModel(
+                    service.providerModel,
+                    service.inputTokenCount,
+                    service.outputTokenCount,
+                    service.cachedInputTokenCount,
+                )
+                apiPreferences.incrementRequestCountForProviderModel(service.providerModel)
+            }.onFailure { error ->
+                AppLogger.e(TAG, "更新输入建议 token 统计失败", error)
+            }
+
+            com.ai.assistance.operit.core.chat.NextUserMessageSuggestionPolicy
+                .sanitizeSuggestion(result.toString())
+        } catch (error: CancellationException) {
+            // collectLatest cancels stale suggestions; close the provider request as well.
+            withContext(NonCancellable) {
+                runCatching {
+                    requestService?.cancelStreaming()
+                }.onFailure { cancelError ->
+                    AppLogger.w(TAG, "取消输入建议请求失败: ${cancelError.message}")
+                }
+            }
+            throw error
+        } catch (error: Exception) {
+            AppLogger.e(TAG, "生成下一条用户输入建议失败", error)
+            ""
+        }
+    }
+
     private fun sanitizeConversationTitle(rawTitle: String): String {
         val firstLine = rawTitle
             .lineSequence()
@@ -481,6 +557,7 @@ class ConversationService(
             chatModelHasDirectImage: Boolean = false,
             toolExposureMode: ToolExposureMode = ToolExposureMode.FULL,
             preferenceProfileIdOverride: String? = null,
+            toolsEnabledOverride: Boolean? = null,
             dispatchHistoryHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchPromptHistoryHooks,
             dispatchSystemPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchSystemPromptComposeHooks,
             dispatchToolPromptComposeHooks: (PromptHookContext) -> PromptHookContext = PromptHookRegistry::dispatchToolPromptComposeHooks
@@ -514,19 +591,58 @@ class ConversationService(
                 )
             )
         val effectiveChatHistory = beforeContext.chatHistory
+        // Timing is a persisted conversation fact; prompt hooks must not erase it accidentally.
+        val conversationTimeContext =
+            ConversationTimeContext.buildPromptNote(
+                chatHistory = chatHistory,
+            )
+        val activePromptData = activePromptMetadata["activePrompt"] as? Map<*, *>
+        val activePromptType = activePromptData?.get("type") as? String
+        val activePromptId = activePromptData?.get("id") as? String
+        val memoryProfileId =
+            preferenceProfileIdOverride?.takeIf { it.isNotBlank() }
+                ?: userPreferencesManager.activeProfileIdFlow.first()
+        val activeUserProfile =
+            userPreferencesManager.getUserPreferencesFlow(memoryProfileId).first()
+        val effectiveUserName =
+            activeUserProfile.displayName.trim().ifBlank {
+                displayPreferencesManager.globalUserName.first()?.trim().orEmpty()
+            }
+        val companionMemoryTargetId =
+            when (activePromptType) {
+                "character_card" -> activePromptId?.let { "character:$it" }.orEmpty()
+                "character_group" -> activePromptId?.let { "group:$it" }.orEmpty()
+                else -> ""
+            }
+        val structuredCompanionContext =
+            CompanionMemoryContextBuilder.buildPromptNoteOrEmpty(
+                useEnglish = LocaleUtils.getCurrentLanguage(context).lowercase().startsWith("en"),
+                authoritativeUserName = effectiveUserName,
+                authoritativePreferredAddress = activeUserProfile.preferredAddress,
+                loadRecall = {
+                    CompanionMemoryRepository(context).recall(
+                        profileId = memoryProfileId,
+                        companionId = companionMemoryTargetId,
+                        conversationId = chatId.orEmpty(),
+                        query = processedInput,
+                    )
+                },
+                onFailure = { error ->
+                    AppLogger.e(
+                        TAG,
+                        "Companion memory recall failed; continuing without memory context",
+                        error,
+                    )
+                },
+            )
         val preparedHistory = mutableListOf<PromptTurn>()
         var resolvedUseEnglish: Boolean? = null
         conversationMutex.withLock {
             // Add system prompt if not already present
             if (!effectiveChatHistory.any { it.kind == PromptTurnKind.SYSTEM }) {
                 val safeProxySenderName = proxySenderName?.takeIf { it.isNotBlank() }
-
                 val preferencesText = if (safeProxySenderName == null) {
-                    val preferenceProfile =
-                        userPreferencesManager.getUserPreferencesFlow(
-                            preferenceProfileIdOverride?.takeIf { it.isNotBlank() }.orEmpty()
-                        ).first()
-                    buildPreferencesText(preferenceProfile)
+                    buildPreferencesText(activeUserProfile)
                 } else {
                     val proxyCard = characterCardManager.findCharacterCardByName(safeProxySenderName)
                     if (proxyCard == null) {
@@ -538,7 +654,6 @@ class ConversationService(
                         )
                     }
                 }
-
                 // 根据功能类型获取对应的提示词
                 val effectiveRoleCardId = roleCardId?.takeIf { it.isNotBlank() }
                 val activeCard = effectiveRoleCardId?.let {
@@ -555,7 +670,8 @@ class ConversationService(
                 val finalCustomSystemPromptTemplate = customSystemPromptTemplate ?: apiPreferences.customSystemPromptTemplateFlow.first()
 
                 // 获取工具启用状态
-                val enableTools = apiPreferences.enableToolsFlow.first()
+                val enableTools =
+                    toolsEnabledOverride ?: apiPreferences.enableToolsFlow.first()
                 val disableUserPreferenceDescription =
                         apiPreferences.disableUserPreferenceDescriptionFlow.first()
                 val toolPromptVisibility = runCatching {
@@ -623,9 +739,25 @@ class ConversationService(
                     append(avatarMoodRulesText)
                     append(systemPrompt)
                     append(waifuRulesText)
+                    append("\n\n")
+                    append(conversationTimeContext)
+                    if (structuredCompanionContext.isNotBlank()) {
+                        append("\n\n")
+                        append(structuredCompanionContext)
+                    }
                     if (!disableUserPreferenceDescription && preferencesText.isNotEmpty()) {
                         append("\n\nUser preference description: ")
                         append(preferencesText)
+                    }
+                    if (safeProxySenderName == null) {
+                        append("\n\n")
+                        append(
+                            buildAuthoritativeUserIdentityPrompt(
+                                useEnglish = useEnglish,
+                                displayName = effectiveUserName,
+                                preferredAddress = activeUserProfile.preferredAddress,
+                            )
+                        )
                     }
                 }
 
@@ -633,7 +765,8 @@ class ConversationService(
                 val aiName = activeCard?.name ?: context.getString(R.string.app_name)
                 val finalSystemPromptWithReplacements = replacePromptPlaceholders(
                     finalSystemPrompt,
-                    aiName
+                    aiName,
+                    effectiveUserName.ifBlank { if (useEnglish) "User" else "用户" },
                 )
                 preparedHistory.add(
                     0,
@@ -675,7 +808,7 @@ class ConversationService(
                     preparedHistory = preparedHistory
                 )
             )
-        return afterContext.preparedHistory
+        return normalizeConversationHistoryForModel(afterContext.preparedHistory)
     }
 
     /**
@@ -691,12 +824,17 @@ class ConversationService(
         chatHistory: List<PromptTurn>
     ): List<PromptTurn> {
         return chatHistory.map { turn ->
-            when (turn.kind) {
-                PromptTurnKind.ASSISTANT,
-                PromptTurnKind.TOOL_CALL,
-                PromptTurnKind.TOOL_RESULT -> turn.copy(content = normalizeToolResultMarkupForModel(turn.content))
-                else -> turn
-            }
+            val normalizedTurn =
+                when (turn.kind) {
+                    PromptTurnKind.ASSISTANT,
+                    PromptTurnKind.TOOL_CALL,
+                    PromptTurnKind.TOOL_RESULT ->
+                        turn.copy(content = normalizeToolResultMarkupForModel(turn.content))
+                    else -> turn
+                }
+
+            // Keep the local URI in storage for rendering; only provider history gets compact semantics.
+            CompanionEmojiMarkup.projectForModel(normalizedTurn)
         }
     }
 
@@ -708,13 +846,19 @@ class ConversationService(
             val toolName =
                 ChatMarkupRegex.nameAttr.find(attrs)?.groupValues?.getOrNull(1).orEmpty()
 
-            if (!toolName.equals(APPLY_FILE_TOOL_NAME, ignoreCase = true)) {
-                return@replace matchResult.value
+            if (toolName.equals(APPLY_FILE_TOOL_NAME, ignoreCase = true)) {
+                val requestContent =
+                    extractApplyFileRequestContent(body) ?: return@replace matchResult.value
+                return@replace "<$tagName$attrs><content>$requestContent</content></$tagName>"
             }
 
-            val requestContent =
-                extractApplyFileRequestContent(body) ?: return@replace matchResult.value
-            "<$tagName$attrs><content>$requestContent</content></$tagName>"
+            ToolResultArchive.projectXmlForModel(
+                context = context,
+                tagName = tagName,
+                attributes = attrs,
+                body = body,
+                toolName = toolName.ifBlank { "tool" },
+            ) ?: matchResult.value
         }
     }
 
@@ -848,6 +992,18 @@ class ConversationService(
     /** Build a formatted preferences text string from a PreferenceProfile */
     fun buildPreferencesText(profile: PreferenceProfile): String {
         val parts = mutableListOf<String>()
+
+        if (profile.displayName.isNotEmpty()) {
+            parts.add("User name: ${profile.displayName}")
+        }
+
+        if (profile.preferredAddress.isNotEmpty()) {
+            parts.add("Preferred form of address: ${profile.preferredAddress}")
+        }
+
+        if (profile.pronouns.isNotEmpty()) {
+            parts.add("Pronouns or preferred terms: ${profile.pronouns}")
+        }
 
         if (profile.gender.isNotEmpty()) {
             parts.add("Gender: ${profile.gender}")
@@ -1065,6 +1221,12 @@ class ConversationService(
             waifuRules.add(FunctionalPrompts.waifuCustomPromptRule(waifuCustomPrompt))
         }
 
+        waifuRules.add(FunctionalPrompts.waifuSpeechDirectionRule())
+
+        // Keep the final instruction adaptive so character-card brevity hints do not collapse
+        // every immersive reply into exactly one sentence.
+        waifuRules.add(FunctionalPrompts.waifuAdaptiveReplyRule())
+
         return if (waifuRules.isNotEmpty()) {
             buildString {
                 append("\n\n[Extra Rules]")
@@ -1118,16 +1280,68 @@ class ConversationService(
      * @param aiName The actual AI name to replace {{char}}.
      * @return The prompt with placeholders replaced.
      */
-    private suspend fun replacePromptPlaceholders(prompt: String, aiName: String): String {
+    private fun replacePromptPlaceholders(
+        prompt: String,
+        aiName: String,
+        userName: String,
+    ): String {
         var finalPrompt = prompt
-        
-        val globalUserName = displayPreferencesManager.globalUserName.first() ?: "User"
-        
+
         // 替换占位符
-        finalPrompt = finalPrompt.replace("{{user}}", globalUserName)
+        finalPrompt = finalPrompt.replace("{{user}}", userName)
         finalPrompt = finalPrompt.replace("{{char}}", aiName)
-        
+
         return finalPrompt
+    }
+
+    private fun buildAuthoritativeUserIdentityPrompt(
+        useEnglish: Boolean,
+        displayName: String,
+        preferredAddress: String,
+    ): String {
+        fun sanitize(value: String): String =
+            value.trim().replace(Regex("\\s+"), " ").take(80)
+
+        val safeName = sanitize(displayName)
+        val safeAddress = sanitize(preferredAddress)
+        return if (useEnglish) {
+            buildString {
+                appendLine("[Authoritative user identity]")
+                if (safeName.isNotBlank()) {
+                    appendLine("Configured user name: $safeName")
+                } else {
+                    appendLine("No user name is configured.")
+                }
+                if (safeAddress.isNotBlank()) {
+                    appendLine("Use this form of address: $safeAddress")
+                } else if (safeName.isNotBlank()) {
+                    appendLine("Use this form of address: $safeName")
+                } else {
+                    appendLine("Address the user without a personal name.")
+                }
+                append(
+                    "This block overrides conflicting memories and assistant messages. " +
+                        "Never infer or invent a user name from old dialogue, assistant claims, examples, or inferred memories."
+                )
+            }
+        } else {
+            buildString {
+                appendLine("【用户身份：以此处为准】")
+                if (safeName.isNotBlank()) {
+                    appendLine("已配置用户名：$safeName")
+                } else {
+                    appendLine("用户尚未配置姓名。")
+                }
+                if (safeAddress.isNotBlank()) {
+                    appendLine("称呼用户时使用：$safeAddress")
+                } else if (safeName.isNotBlank()) {
+                    appendLine("称呼用户时使用：$safeName")
+                } else {
+                    appendLine("不要使用具体人名，直接称“你”。")
+                }
+                append("本段覆盖冲突记忆和助手历史发言。不得根据旧对话、助手自己的说法、示例或推断记忆猜测、编造用户姓名。")
+            }
+        }
     }
 
     /**

@@ -9,11 +9,16 @@ import com.ai.assistance.operit.core.tools.MemoryLinkQueryResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.ToolExecutor
 import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.ActivePrompt
 import com.ai.assistance.operit.data.model.CharacterCardMemoryProfileBindingMode
+import com.ai.assistance.operit.data.model.CompanionMemoryRecallPolicy
+import com.ai.assistance.operit.data.model.CompanionMemoryTarget
 import com.ai.assistance.operit.data.model.Memory
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
+import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.CharacterGroupCardManager
 import com.ai.assistance.operit.data.preferences.MemorySearchSettingsPreferences
 import com.ai.assistance.operit.data.repository.MemoryRepository
 import kotlinx.coroutines.flow.first
@@ -88,6 +93,26 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
     private suspend fun resolveActiveProfileId(tool: AITool): String {
         return resolveRoleCardProfileId(resolveCallerCardId(tool))
             ?: resolveGlobalActiveProfileId()
+    }
+
+    private suspend fun resolveCompanionTarget(tool: AITool): CompanionMemoryTarget {
+        val cardManager = CharacterCardManager.getInstance(context)
+        val groupManager = CharacterGroupCardManager.getInstance(context)
+        val activePrompt = ActivePromptManager.getInstance(context).getActivePrompt()
+        return when (activePrompt) {
+            is ActivePrompt.CharacterGroup -> {
+                val group = groupManager.getCharacterGroupCard(activePrompt.id)
+                CompanionMemoryTarget(
+                    characterGroupId = activePrompt.id,
+                    characterGroupName = group?.name.orEmpty(),
+                )
+            }
+            is ActivePrompt.CharacterCard -> {
+                val cardId = resolveCallerCardId(tool) ?: activePrompt.id
+                val card = cardManager.getCharacterCard(cardId)
+                CompanionMemoryTarget(characterId = card.id, characterName = card.name)
+            }
+        }
     }
 
     private fun getMemoryRepository(profileId: String): MemoryRepository =
@@ -210,6 +235,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
     private suspend fun executeQueryMemory(tool: AITool): ToolResult {
         val profileId = resolveActiveProfileId(tool)
+        val companionTarget = resolveCompanionTarget(tool)
         val memoryRepository = getMemoryRepository(profileId)
         val query = tool.parameters.find { it.name == "query" }?.value ?: ""
         val folderPath = tool.parameters.find { it.name == "folder_path" }?.value
@@ -293,18 +319,25 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         )
 
         return try {
-            val results = memoryRepository.searchMemories(
-                query = query,
-                folderPath = folderPath,
-                scoreMode = settings.scoreMode,
-                keywordWeight = settings.keywordWeight,
-                tagWeight = settings.tagWeight,
-                semanticWeight = settings.vectorWeight,
-                edgeWeight = settings.edgeWeight,
-                relevanceThreshold = threshold ?: DEFAULT_RELEVANCE_THRESHOLD,
-                createdAtStartMs = startTimeMs,
-                createdAtEndMs = endTimeMs
-            )
+            val results =
+                memoryRepository.searchMemories(
+                    query = query,
+                    folderPath = folderPath,
+                    scoreMode = settings.scoreMode,
+                    keywordWeight = settings.keywordWeight,
+                    tagWeight = settings.tagWeight,
+                    semanticWeight = settings.vectorWeight,
+                    edgeWeight = settings.edgeWeight,
+                    relevanceThreshold = threshold ?: DEFAULT_RELEVANCE_THRESHOLD,
+                    createdAtStartMs = startTimeMs,
+                    createdAtEndMs = endTimeMs,
+                ).filter { memory ->
+                    CompanionMemoryRecallPolicy.canRecall(
+                        memory = memory,
+                        profileId = profileId,
+                        target = companionTarget,
+                    )
+                }
 
             // Keep de-duplication stable even when multiple calls share the same snapshot in parallel.
             val (excludedBySnapshotCount, returnedMemories) = synchronized(snapshotState.lock) {
@@ -337,6 +370,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
     private suspend fun executeGetMemoryByTitle(tool: AITool): ToolResult {
         val profileId = resolveActiveProfileId(tool)
+        val companionTarget = resolveCompanionTarget(tool)
         val memoryRepository = getMemoryRepository(profileId)
         val title = tool.parameters.find { it.name == "title" }?.value
         if (title.isNullOrBlank()) {
@@ -357,7 +391,14 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         AppLogger.d(TAG, "Getting memory by title: $title, chunk_index: $chunkIndexParam, chunk_range: $chunkRangeParam, query: $queryParam, limit: $chunkLimitParam")
 
         return try {
-            val memory = memoryRepository.findMemoryByTitle(title)
+            val memory =
+                memoryRepository.findMemoryByTitle(title)?.takeIf {
+                    CompanionMemoryRecallPolicy.canRecall(
+                        memory = it,
+                        profileId = profileId,
+                        target = companionTarget,
+                    )
+                }
             if (memory == null) {
                 return ToolResult(
                     toolName = tool.name,

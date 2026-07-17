@@ -1,593 +1,475 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Api
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.ManageHistory
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SettingsEthernet
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.style.TextOverflow
-import java.text.DecimalFormat
+import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.tools.defaultTool.standard.CookiePrivacyManager
-import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
-import com.ai.assistance.operit.data.preferences.UserPreferencesManager
-import com.ai.assistance.operit.data.repository.ChatHistoryManager
-import com.ai.assistance.operit.ui.features.github.GitHubLoginWebViewDialog
+import com.ai.assistance.operit.ui.common.MiraLogo
 import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.Color
 
-// 保存滑动状态变量，使其跨重组保持
 private val SettingsScreenScrollPosition = mutableStateOf(0)
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class MateSettingsItem(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
+
+private data class MateSettingsSection(
+    val title: String,
+    val icon: ImageVector,
+    val items: List<MateSettingsItem>,
+)
+
 @Composable
 fun SettingsScreen(
-        onNavigateToUserPreferences: () -> Unit,
-        navigateToGitHubAccount: () -> Unit,
-        navigateToToolPermissions: () -> Unit,
-        navigateToModelConfig: () -> Unit,
-        navigateToThemeSettings: () -> Unit,
-        navigateToGlobalDisplaySettings: () -> Unit,
-        navigateToModelPrompts: () -> Unit,
-        navigateToFunctionalConfig: () -> Unit,
-        navigateToChatHistorySettings: () -> Unit,
-        navigateToChatBackupSettings: () -> Unit,
-        navigateToLanguageSettings: () -> Unit,
-        navigateToSpeechServicesSettings: () -> Unit,
-        navigateToExternalHttpChatSettings: () -> Unit,
-        navigateToPersonaCardGeneration: () -> Unit,
-        navigateToWaifuModeSettings: () -> Unit,
-        navigateToTokenUsageStatistics: () -> Unit,
-        navigateToContextSummarySettings: () -> Unit,
-        navigateToLayoutAdjustmentSettings: () -> Unit
+    onNavigateToUserPreferences: () -> Unit,
+    navigateToGitHubAccount: () -> Unit,
+    navigateToToolPermissions: () -> Unit,
+    navigateToModelConfig: () -> Unit,
+    navigateToThemeSettings: () -> Unit,
+    navigateToGlobalDisplaySettings: () -> Unit,
+    navigateToModelPrompts: () -> Unit,
+    navigateToFunctionalConfig: () -> Unit,
+    navigateToChatHistorySettings: () -> Unit,
+    navigateToChatBackupSettings: () -> Unit,
+    navigateToLanguageSettings: () -> Unit,
+    navigateToSpeechServicesSettings: () -> Unit,
+    navigateToExternalHttpChatSettings: () -> Unit,
+    navigateToPersonaCardGeneration: () -> Unit,
+    navigateToWaifuModeSettings: () -> Unit,
+    navigateToTokenUsageStatistics: () -> Unit,
+    navigateToContextSummarySettings: () -> Unit,
+    navigateToLayoutAdjustmentSettings: () -> Unit,
+    navigateToCapabilities: () -> Unit,
+    navigateToPackageManager: () -> Unit,
+    navigateToTerminalSetup: () -> Unit,
+    navigateToCompanionSettings: () -> Unit,
+    navigateToCompanionPresence: () -> Unit,
 ) {
-        val context = LocalContext.current
-        val userPreferences = remember { UserPreferencesManager.getInstance(context) }
-        val githubAuth = remember { GitHubAuthPreferences.getInstance(context) }
-        val scope = rememberCoroutineScope()
-        var showGitHubLogin by remember { mutableStateOf(false) }
-        var showClearCookieConfirm by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val githubAuth = remember { GitHubAuthPreferences.getInstance(context) }
+    val scope = rememberCoroutineScope()
+    var showClearCookieConfirm by remember { mutableStateOf(false) }
+    val isGitHubLoggedIn by githubAuth.isLoggedInFlow.collectAsState(initial = false)
+    val gitHubUser by githubAuth.userInfoFlow.collectAsState(initial = null)
+    val scrollState = rememberScrollState(SettingsScreenScrollPosition.value)
 
-        val isGitHubLoggedIn = githubAuth.isLoggedInFlow.collectAsState(initial = false).value
-        val gitHubUser = githubAuth.userInfoFlow.collectAsState(initial = null).value
+    LaunchedEffect(scrollState) {
+        snapshotFlow { scrollState.value }.collect { SettingsScreenScrollPosition.value = it }
+    }
 
-        // 创建和记住滚动状态，设置为上次保存的位置
-        val scrollState = rememberScrollState(SettingsScreenScrollPosition.value)
+    val sections =
+        listOf(
+            MateSettingsSection(
+                title = stringResource(R.string.settings_section_character_voice),
+                icon = Icons.Filled.Face,
+                items =
+                    listOf(
+                        MateSettingsItem(
+                            stringResource(R.string.nav_assistant_config),
+                            stringResource(R.string.mate_persona_behavior),
+                            Icons.Filled.Face,
+                            navigateToCompanionSettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.persona_card_generation),
+                            stringResource(R.string.persona_card_generation_desc),
+                            Icons.Filled.Face,
+                            navigateToPersonaCardGeneration,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.waifu_mode_settings),
+                            stringResource(R.string.waifu_mode_settings_desc),
+                            Icons.Filled.EmojiEmotions,
+                            navigateToWaifuModeSettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_speech_services),
+                            stringResource(R.string.settings_speech_services_subtitle),
+                            Icons.Filled.RecordVoiceOver,
+                            navigateToSpeechServicesSettings,
+                        ),
+                    ),
+            ),
+            MateSettingsSection(
+                title = stringResource(R.string.settings_section_chat_memory),
+                icon = Icons.Filled.AutoStories,
+                items =
+                    listOf(
+                        MateSettingsItem(
+                            stringResource(R.string.settings_user_preferences),
+                            stringResource(R.string.settings_user_preferences_subtitle),
+                            Icons.Filled.Face,
+                            onNavigateToUserPreferences,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_section_context_summary),
+                            stringResource(R.string.settings_context_summary_subtitle),
+                            Icons.Filled.Memory,
+                            navigateToContextSummarySettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_chat_history_management),
+                            stringResource(R.string.settings_chat_history_management_subtitle),
+                            Icons.Filled.ManageHistory,
+                            navigateToChatHistorySettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_data_backup),
+                            stringResource(R.string.settings_data_backup_desc),
+                            Icons.Filled.CloudUpload,
+                            navigateToChatBackupSettings,
+                        ),
+                    ),
+            ),
+            MateSettingsSection(
+                title = stringResource(R.string.settings_section_proactive_companion),
+                icon = Icons.Filled.Favorite,
+                items =
+                    listOf(
+                        MateSettingsItem(
+                            stringResource(R.string.companion_presence_title),
+                            stringResource(R.string.companion_presence_keep_alive_desc),
+                            Icons.Filled.Favorite,
+                            navigateToCompanionPresence,
+                        ),
+                    ),
+            ),
+            MateSettingsSection(
+                title = stringResource(R.string.settings_section_models_api),
+                icon = Icons.Filled.Api,
+                items =
+                    listOf(
+                        MateSettingsItem(
+                            stringResource(R.string.settings_model_parameters),
+                            stringResource(R.string.settings_model_params_subtitle),
+                            Icons.Filled.Api,
+                            navigateToModelConfig,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_functional_model),
+                            stringResource(R.string.settings_functional_model_subtitle),
+                            Icons.Filled.Tune,
+                            navigateToFunctionalConfig,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_prompt_title),
+                            stringResource(R.string.settings_system_prompts_subtitle),
+                            Icons.Filled.ChatBubble,
+                            navigateToModelPrompts,
+                        ),
+                    ),
+            ),
+            MateSettingsSection(
+                title = stringResource(R.string.settings_section_privacy_advanced),
+                icon = Icons.Filled.Security,
+                items =
+                    listOf(
+                        MateSettingsItem(
+                            stringResource(R.string.settings_theme_appearance),
+                            stringResource(R.string.settings_theme_subtitle),
+                            Icons.Filled.Palette,
+                            navigateToThemeSettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_global_display),
+                            stringResource(R.string.settings_global_display_subtitle),
+                            Icons.Filled.Visibility,
+                            navigateToGlobalDisplaySettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.language_settings),
+                            stringResource(R.string.settings_language_subtitle),
+                            Icons.Filled.Language,
+                            navigateToLanguageSettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.github_account),
+                            gitHubUser?.login?.let { "@$it" }
+                                ?: stringResource(R.string.github_account_not_logged_in),
+                            Icons.Filled.Person,
+                            navigateToGitHubAccount,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_token_usage_stats),
+                            stringResource(R.string.settings_token_usage_subtitle),
+                            Icons.Filled.Analytics,
+                            navigateToTokenUsageStatistics,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_external_http_chat),
+                            stringResource(R.string.settings_external_http_chat_subtitle),
+                            Icons.Filled.SettingsEthernet,
+                            navigateToExternalHttpChatSettings,
+                        ),
+                        MateSettingsItem(
+                            stringResource(R.string.settings_clear_cookies),
+                            stringResource(R.string.settings_clear_cookies_subtitle),
+                            Icons.Filled.DeleteSweep,
+                        ) { showClearCookieConfirm = true },
+                        MateSettingsItem(
+                            stringResource(R.string.mira_advanced_features),
+                            stringResource(R.string.settings_capability_center_subtitle),
+                            Icons.Filled.Extension,
+                            navigateToCapabilities,
+                        ),
+                    ),
+            ),
+        )
 
-        // 当滚动状态改变时更新保存的位置
-        LaunchedEffect(scrollState) {
-                snapshotFlow { scrollState.value }.collect { position ->
-                        SettingsScreenScrollPosition.value = position
-                }
-        }
-
-        val hasBackgroundImage = userPreferences.useBackgroundImage.collectAsState(initial = false).value
-        
-        val cardContainerColor = if (hasBackgroundImage) {
-                MaterialTheme.colorScheme.surface
-        } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        }
-
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val wideLayout = maxWidth >= 840.dp
         Column(
-                modifier = Modifier.fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .verticalScroll(scrollState)
+            modifier =
+                Modifier.align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .widthIn(max = 1180.dp)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = if (wideLayout) 28.dp else 16.dp, vertical = 20.dp),
         ) {
-                // ======= 账号 =======
-                SettingsSection(
-                        title = stringResource(id = R.string.settings_section_account),
-                        icon = Icons.Default.AccountCircle,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(R.string.github_account),
-                                subtitle = if (isGitHubLoggedIn && gitHubUser != null) {
-                                        "@${gitHubUser!!.login}"
-                                } else {
-                                        stringResource(R.string.github_account_not_logged_in)
-                                },
-                                icon = Icons.Default.Person,
-                                onClick = navigateToGitHubAccount
-                        )
+            MateSettingsHeader(isGitHubLoggedIn = isGitHubLoggedIn, username = gitHubUser?.login)
+            Spacer(Modifier.height(24.dp))
 
-                        if (isGitHubLoggedIn) {
-                                CompactSettingsItem(
-                                        title = stringResource(R.string.logout),
-                                        subtitle = stringResource(R.string.github_account_logout_desc),
-                                        icon = Icons.Default.Logout,
-                                        onClick = {
-                                                scope.launch { githubAuth.logout() }
-                                        }
-                                )
-                        } else {
-                                CompactSettingsItem(
-                                        title = stringResource(R.string.login_github),
-                                        subtitle = stringResource(R.string.github_account_login_desc),
-                                        icon = Icons.Default.Login,
-                                        onClick = { showGitHubLogin = true }
-                                )
-                        }
-                }
-
-                if (showGitHubLogin) {
-                        GitHubLoginWebViewDialog(
-                                onDismissRequest = { showGitHubLogin = false }
-                        )
-                }
-
-                // ======= 个性化配置 =======
-                SettingsSection(
-                        title = stringResource(id = R.string.settings_section_personalization),
-                        icon = Icons.Default.Person,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_user_preferences),
-                                subtitle = stringResource(id = R.string.settings_user_preferences_subtitle),
-                                icon = Icons.Default.Face,
-                                onClick = onNavigateToUserPreferences
-                        )
-                        
-                        CompactSettingsItem(
-                                title = stringResource(R.string.language_settings),
-                                subtitle = stringResource(id = R.string.settings_language_subtitle),
-                                icon = Icons.Default.Language,
-                                onClick = navigateToLanguageSettings
-                        )
-                        
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_theme_appearance),
-                                subtitle = stringResource(id = R.string.settings_theme_subtitle),
-                                icon = Icons.Default.Palette,
-                                onClick = navigateToThemeSettings
-                        )
-                        
-                        CompactSettingsItem(
-                                title = stringResource(R.string.settings_global_display),
-                                subtitle = stringResource(R.string.settings_global_display_subtitle),
-                                icon = Icons.Default.Visibility,
-                                onClick = navigateToGlobalDisplaySettings
-                        )
-                        
-                        CompactSettingsItem(
-                                title = stringResource(R.string.layout_adjustment),
-                                subtitle = stringResource(R.string.layout_adjustment_subtitle),
-                                icon = Icons.Default.AspectRatio,
-                                onClick = navigateToLayoutAdjustmentSettings
-                        )
-                }
-
-                // ======= AI模型配置 =======
-                SettingsSection(
-                        title = stringResource(id = R.string.settings_section_ai_model),
-                        icon = Icons.Default.Settings,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_model_parameters),
-                                subtitle = stringResource(id = R.string.settings_model_params_subtitle),
-                                icon = Icons.Default.Api,
-                                onClick = navigateToModelConfig
-                        )
-                        
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_functional_model),
-                                subtitle = stringResource(id = R.string.settings_functional_model_subtitle),
-                                icon = Icons.Default.Tune,
-                                onClick = navigateToFunctionalConfig
-                        )
-                        
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_speech_services),
-                                subtitle = stringResource(id = R.string.settings_speech_services_subtitle),
-                                icon = Icons.Default.RecordVoiceOver,
-                                onClick = navigateToSpeechServicesSettings
-                        )
-                        
-                }
-
-                // ======= 提示词配置 =======
-                SettingsSection(
-                        title = stringResource(R.string.settings_prompt_section),
-                        icon = Icons.Default.Message,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(R.string.settings_prompt_title),
-                                subtitle = stringResource(id = R.string.settings_system_prompts_subtitle),
-                                icon = Icons.Default.ChatBubble,
-                                onClick = navigateToModelPrompts
-                        )
-                        
-                        // 新增：人设卡生成
-                        CompactSettingsItem(
-                                title = stringResource(R.string.persona_card_generation),
-                                subtitle = stringResource(R.string.persona_card_generation_desc),
-                                icon = Icons.Default.Face,
-                                onClick = navigateToPersonaCardGeneration
-                        )
-                        
-                        // 新增：Waifu模式设置
-                        CompactSettingsItem(
-                                title = stringResource(R.string.waifu_mode_settings),
-                                subtitle = stringResource(R.string.waifu_mode_settings_desc),
-                                icon = Icons.Default.EmojiEmotions,
-                                onClick = navigateToWaifuModeSettings
-                        )
-                }
-
-                // ======= 上下文和总结设置 =======
-                SettingsSection(
-                        title = stringResource(id = R.string.settings_section_context_summary),
-                        icon = Icons.Default.Analytics,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_section_context_summary),
-                                subtitle = stringResource(id = R.string.settings_context_summary_subtitle),
-                                icon = Icons.Default.Tune,
-                                onClick = navigateToContextSummarySettings
-                        )
-                }
-
-                // ======= 数据和权限 =======
-                SettingsSection(
-                        title = stringResource(id = R.string.settings_data_permissions),
-                        icon = Icons.Default.Security,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_tool_permissions),
-                                subtitle = stringResource(id = R.string.settings_tool_permissions_subtitle),
-                                icon = Icons.Default.AdminPanelSettings,
-                                onClick = navigateToToolPermissions
-                        )
-
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_data_backup),
-                                subtitle = stringResource(id = R.string.settings_data_backup_desc),
-                                icon = Icons.Default.CloudUpload,
-                                onClick = navigateToChatBackupSettings
-                        )
-                        
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_chat_history_management),
-                                subtitle = stringResource(id = R.string.settings_chat_history_management_subtitle),
-                                icon = Icons.Default.ManageHistory,
-                                onClick = navigateToChatHistorySettings
-                        )
-
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_token_usage_stats),
-                                subtitle = stringResource(id = R.string.settings_token_usage_subtitle),
-                                icon = Icons.Default.Analytics,
-                                onClick = navigateToTokenUsageStatistics
-                        )
-                }
-
-                // ======= 隐私与数据清理 =======
-                SettingsSection(
-                        title = stringResource(id = R.string.settings_privacy_data_cleanup),
-                        icon = Icons.Default.DeleteSweep,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_clear_cookies),
-                                subtitle = stringResource(id = R.string.settings_clear_cookies_subtitle),
-                                icon = Icons.Default.DeleteSweep,
-                                onClick = { showClearCookieConfirm = true }
-                        )
-                }
-
-                // ======= 外部调用 =======
-                SettingsSection(
-                        title = stringResource(id = R.string.settings_section_external_calls),
-                        icon = Icons.Default.SettingsEthernet,
-                        containerColor = cardContainerColor
-                ) {
-                        CompactSettingsItem(
-                                title = stringResource(id = R.string.settings_external_http_chat),
-                                subtitle = stringResource(id = R.string.settings_external_http_chat_subtitle),
-                                icon = Icons.Default.SettingsEthernet,
-                                onClick = navigateToExternalHttpChatSettings
-                        )
-                }
-
-                // 底部间距
-                Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (showClearCookieConfirm) {
-                AlertDialog(
-                        onDismissRequest = { showClearCookieConfirm = false },
-                        title = { Text(stringResource(R.string.clear_cookies_dialog_title)) },
-                        text = { Text(stringResource(R.string.clear_cookies_dialog_message)) },
-                        confirmButton = {
-                                TextButton(
-                                        onClick = {
-                                                showClearCookieConfirm = false
-                                                scope.launch {
-                                                        try {
-                                                                CookiePrivacyManager.clearAllCookies()
-                                                                Toast.makeText(
-                                                                        context,
-                                                                        context.getString(R.string.clear_cookies_success),
-                                                                        Toast.LENGTH_SHORT
-                                                                ).show()
-                                                        } catch (e: Exception) {
-                                                                AppLogger.e("SettingsScreen", "Failed to clear cookies", e)
-                                                                Toast.makeText(
-                                                                        context,
-                                                                        context.getString(R.string.clear_cookies_failed),
-                                                                        Toast.LENGTH_SHORT
-                                                                ).show()
-                                                        }
-                                                }
-                                        }
-                                ) {
-                                        Text(stringResource(R.string.clear_cookies_confirm))
-                                }
-                        },
-                        dismissButton = {
-                                TextButton(onClick = { showClearCookieConfirm = false }) {
-                                        Text(stringResource(android.R.string.cancel))
-                                }
-                        }
-                )
-        }
-}
-
-@Composable
-private fun SettingsSection(
-        title: String,
-        icon: ImageVector,
-        containerColor: Color,
-        content: @Composable ColumnScope.() -> Unit
-) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                // 分组标题
+            if (wideLayout) {
                 Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 6.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.Top,
                 ) {
-                        Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                        )
+                    Column(modifier = Modifier.weight(1f)) {
+                        sections.take(3).forEach { MateSettingsSectionCard(it) }
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        sections.drop(3).forEach { MateSettingsSectionCard(it) }
+                    }
                 }
-                
-                // 内容区域
-                Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                                containerColor = containerColor
-                        )
-                ) {
-                        Column(
-                                modifier = Modifier.padding(12.dp),
-                                content = content
-                        )
-                }
+            } else {
+                sections.forEach { MateSettingsSectionCard(it) }
+            }
+            Spacer(Modifier.height(24.dp))
         }
-}
+    }
 
-@Composable
-private fun CompactSettingsItem(
-        title: String,
-        subtitle: String,
-        icon: ImageVector,
-        onClick: () -> Unit
-) {
-        Row(
-                modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onClick() }
-                        .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-        ) {
-                Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                                text = title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                        )
-                }
-                
-                Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                )
-        }
-}
-
-@Composable
-private fun CompactToggleWithDescription(
-        title: String,
-        description: String,
-        checked: Boolean,
-        onCheckedChange: (Boolean) -> Unit
-) {
-        Row(
-                modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text(
-                                text = title,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                                text = description,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                        )
-                }
-                Switch(
-                        checked = checked,
-                        onCheckedChange = onCheckedChange,
-                        modifier = Modifier.scale(0.8f)
-                )
-        }
-}
-
-@Composable
-private fun CompactSlider(
-        title: String,
-        subtitle: String,
-        value: Float,
-        onValueChange: (Float) -> Unit,
-        valueRange: ClosedFloatingPointRange<Float>,
-        steps: Int,
-        decimalFormatPattern: String,
-        unitText: String? = null,
-        backgroundColor: Color
-) {
-        val focusManager = LocalFocusManager.current
-        val df = remember(decimalFormatPattern) { DecimalFormat(decimalFormatPattern) }
-
-        var sliderValue by remember(value) { mutableStateOf(value) }
-        var textValue by remember(value) { mutableStateOf(df.format(value)) }
-
-        Column(
-                modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(backgroundColor)
-                        .padding(8.dp)
-        ) {
-                Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                        text = title,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                        text = subtitle,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 10.sp
-                                )
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                BasicTextField(
-                                        value = textValue,
-                                        onValueChange = { newText ->
-                                                textValue = newText
-                                                newText.toFloatOrNull()?.let {
-                                                        sliderValue = it.coerceIn(valueRange)
-                                                }
-                                        },
-                                        modifier = Modifier
-                                                .width(40.dp)
-                                                .background(
-                                                        MaterialTheme.colorScheme.surfaceVariant,
-                                                        RoundedCornerShape(4.dp)
-                                                )
-                                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                                        textStyle = TextStyle(
-                                                color = MaterialTheme.colorScheme.primary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp,
-                                                textAlign = TextAlign.Center
-                                        ),
-                                        keyboardOptions = KeyboardOptions(
-                                                keyboardType = KeyboardType.Number,
-                                                imeAction = ImeAction.Done
-                                        ),
-                                        keyboardActions = KeyboardActions(
-                                                onDone = {
-                                                        val finalValue = textValue.toFloatOrNull()?.coerceIn(valueRange) ?: sliderValue
-                                                        onValueChange(finalValue)
-                                                        textValue = df.format(finalValue)
-                                                        focusManager.clearFocus()
-                                                }
-                                        ),
-                                        singleLine = true
-                                )
-
-                                if (unitText != null) {
-                                        Text(
-                                                text = unitText,
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 10.sp
-                                                ),
-                                                modifier = Modifier.padding(start = 2.dp)
+    if (showClearCookieConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearCookieConfirm = false },
+            title = { Text(stringResource(R.string.clear_cookies_dialog_title)) },
+            text = { Text(stringResource(R.string.clear_cookies_dialog_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearCookieConfirm = false
+                        scope.launch {
+                            runCatching { CookiePrivacyManager.clearAllCookies() }
+                                .onSuccess {
+                                    Toast.makeText(
+                                            context,
+                                            context.getString(R.string.clear_cookies_success),
+                                            Toast.LENGTH_SHORT,
                                         )
+                                        .show()
+                                }
+                                .onFailure { error ->
+                                    AppLogger.e("SettingsScreen", "Failed to clear cookies", error)
+                                    Toast.makeText(
+                                            context,
+                                            context.getString(R.string.clear_cookies_failed),
+                                            Toast.LENGTH_SHORT,
+                                        )
+                                        .show()
                                 }
                         }
+                    },
+                ) { Text(stringResource(R.string.clear_cookies_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCookieConfirm = false }) {
+                    Text(stringResource(android.R.string.cancel))
                 }
-        }
+            },
+        )
+    }
 }
 
+@Composable
+private fun MateSettingsHeader(isGitHubLoggedIn: Boolean, username: String?) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            modifier = Modifier.size(64.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+        ) {
+            MiraLogo(modifier = Modifier.fillMaxSize())
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text =
+                    if (isGitHubLoggedIn && !username.isNullOrBlank()) "@$username"
+                    else stringResource(R.string.mate_profile_local),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.MateSettingsSectionCard(section: MateSettingsSection) {
+    Row(
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = section.icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = section.title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        section.items.forEachIndexed { index, item ->
+            MateSettingsListItem(item)
+            if (index != section.items.lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 56.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(20.dp))
+}
+
+@Composable
+private fun MateSettingsListItem(item: MateSettingsItem) {
+    ListItem(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = item.onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        headlineContent = {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supportingContent = {
+            Text(
+                text = item.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        leadingContent = {
+            Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    item.icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(21.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        trailingContent = {
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        },
+    )
+}

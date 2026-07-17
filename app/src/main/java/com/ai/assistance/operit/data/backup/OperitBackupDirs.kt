@@ -9,8 +9,12 @@ object OperitBackupDirs {
         return OperitPaths.operitRootDir()
     }
 
+    fun miraRootDir(): File {
+        return OperitPaths.miraRootDir()
+    }
+
     fun backupRootDir(): File {
-        return ensureDir(File(operitRootDir(), "backup"))
+        return ensureDir(File(miraRootDir(), "backup"))
     }
 
     fun rawSnapshotDir(): File {

@@ -28,10 +28,15 @@ import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
+import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
+import com.ai.assistance.operit.data.model.ChatTurnOptions
+import com.ai.assistance.operit.data.model.ChatComposerSnapshot
 import com.ai.assistance.operit.data.model.ChatMessageLocatorPreview
+import com.ai.assistance.operit.data.model.ContextWindowUsage
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolParameter
+import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.ui.floating.FloatingMode
@@ -41,24 +46,37 @@ import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import com.ai.assistance.operit.ui.floating.ui.pet.AvatarEmotionManager
 import com.ai.assistance.operit.api.voice.VoiceService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.api.voice.ExpressiveTtsDirector
+import com.ai.assistance.operit.api.voice.VoiceCapabilities
+import com.ai.assistance.operit.core.chat.SpeechMarkupParser
+import com.ai.assistance.operit.core.chat.SpeechContentMetadata
+import com.ai.assistance.operit.data.model.SpeechSegment
 import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
 import com.ai.assistance.operit.data.preferences.ActivePromptManager
+import com.ai.assistance.operit.data.preferences.AutoReadOverride
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
+import com.ai.assistance.operit.data.preferences.WaifuPreferences
 import com.ai.assistance.operit.data.model.ActivePrompt
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
@@ -70,7 +88,6 @@ import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspacePrev
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.toWorkspaceCommandOutputEntries
 import com.ai.assistance.operit.core.tools.system.Terminal
 import com.ai.assistance.operit.util.TtsCleaner
-import com.ai.assistance.operit.util.TtsSegmenter
 import com.ai.assistance.operit.ui.features.chat.util.findMentionTokens
 import com.ai.assistance.operit.ui.features.chat.util.findMentionTokenEndingAtCursor
 import com.ai.assistance.operit.ui.features.chat.util.isMentionContinuation
@@ -86,10 +103,16 @@ import com.ai.assistance.operit.services.core.TokenStatisticsDelegate
 import com.ai.assistance.operit.services.core.AttachmentDelegate
 import com.ai.assistance.operit.services.core.MessageCoordinationDelegate
 import com.ai.assistance.operit.data.model.InputProcessingState
+import com.ai.assistance.operit.data.model.PendingQueueMessageItem
 import com.ai.assistance.operit.data.model.WorkspaceRenameResult
 import com.ai.assistance.operit.services.ChatServiceCore
 import com.ai.assistance.operit.services.ChatServiceUiBridge
 import com.ai.assistance.operit.services.EmptyChatServiceUiBridge
+import com.ai.assistance.operit.core.chat.CompanionMemoryReceiptBus
+import com.ai.assistance.operit.core.chat.MiraTurnCapability
+import com.ai.assistance.operit.core.chat.MiraTurnCapabilityResolver
+import com.ai.assistance.operit.core.chat.NextUserMessageSuggestionPolicy
+import com.ai.assistance.operit.core.chat.NextUserSuggestionMessage
 import com.ai.assistance.operit.ui.features.chat.util.MessageImageGenerator
 import com.ai.assistance.operit.ui.features.chat.components.CharacterSelectorTarget
 enum class ChatHistoryDisplayMode {
@@ -103,6 +126,8 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     companion object {
         private const val TAG = "ChatViewModel"
         private const val SPEECH_PREVIEW_MAX = 48
+        private const val WAIFU_MERGE_IDLE_TIMEOUT_MS = 180_000L
+        private const val WAIFU_MERGE_CANCEL_TIMEOUT_MS = 5_000L
     }
 
     private data class ActiveMentionTrigger(
@@ -115,6 +140,20 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         val value: TextFieldValue,
         val removedMentionToken: String? = null,
     )
+
+    private data class NextUserSuggestionTrigger(
+        val chatId: String,
+        val assistantTimestamp: Long,
+        val context: List<Pair<String, String>>,
+    )
+
+    private val pendingWaifuMergeMessages =
+        mutableMapOf<String, MutableList<PendingWaifuMergeMessage>>()
+    private var nextWaifuMergeSequenceId = 1L
+    private val deviceAssistChatIds = mutableSetOf<String>()
+
+    private val _composerFocusRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val composerFocusRequests: SharedFlow<Unit> = _composerFocusRequests
 
     private fun speechPreview(text: String): String {
         return text.replace("\n", "\\n").take(SPEECH_PREVIEW_MAX)
@@ -136,6 +175,11 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val speechServicesPreferences = SpeechServicesPreferences(context)
     private val activePromptManager = ActivePromptManager.getInstance(context)
     private val characterCardManager = CharacterCardManager.getInstance(context)
+    private val waifuPreferences = WaifuPreferences.getInstance(context)
+    private val displayPreferences = DisplayPreferencesManager.getInstance(context)
+    private val suggestedAssistantTimestampByChatId = mutableMapOf<String, Long>()
+    private val _suggestedUserMessage = MutableStateFlow<String?>(null)
+    val suggestedUserMessage: StateFlow<String?> = _suggestedUserMessage.asStateFlow()
 
     // 添加语音播放状态
     private val _isPlaying = MutableStateFlow(false)
@@ -144,13 +188,19 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val isSpeechSessionActive: StateFlow<Boolean> = _isSpeechSessionActive.asStateFlow()
     private val _isSpeechPaused = MutableStateFlow(false)
     val isSpeechPaused: StateFlow<Boolean> = _isSpeechPaused.asStateFlow()
+    private val _currentSpeechSegment = MutableStateFlow<String?>(null)
+    val currentSpeechSegment: StateFlow<String?> = _currentSpeechSegment.asStateFlow()
 
-    // 添加自动朗读状态 - Now managed by ApiConfigDelegate
-    val isAutoReadEnabled: StateFlow<Boolean> by lazy { apiConfigDelegate.enableAutoRead }
+    // Effective state: current character/group override first, global default second.
+    val isAutoReadEnabled: StateFlow<Boolean> by lazy { mainChatCore.enableAutoRead }
 
     // 添加回复相关状态
     private val _replyToMessage = MutableStateFlow<ChatMessage?>(null)
     val replyToMessage: StateFlow<ChatMessage?> = _replyToMessage.asStateFlow()
+    private val perChatComposerStateStore = PerChatComposerStateStore()
+    private val perChatPendingQueueStore = PerChatPendingQueueStore()
+    val pendingQueueMessagesByChatId: StateFlow<Map<String, List<PendingQueueMessageItem>>> =
+        perChatPendingQueueStore.itemsByChatId
 
     // API服务
     private var enhancedAiService: EnhancedAIService? = null
@@ -303,6 +353,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 聊天统计相关
     val currentWindowSize: StateFlow<Long> by lazy { tokenStatsDelegate.currentWindowSizeFlow }
+    val contextWindowUsage: StateFlow<ContextWindowUsage> by lazy {
+        tokenStatsDelegate.contextWindowUsageFlow
+    }
     val inputTokenCount: StateFlow<Long> by lazy { tokenStatsDelegate.cumulativeInputTokensFlow }
     val outputTokenCount: StateFlow<Long> by lazy { tokenStatsDelegate.cumulativeOutputTokensFlow }
     val perRequestTokenCount: StateFlow<Pair<Int, Int>?> by lazy { tokenStatsDelegate.perRequestTokenCountFlow }
@@ -315,6 +368,15 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 附件相关
     val attachments: StateFlow<List<AttachmentInfo>> by lazy { attachmentDelegate.attachments }
+    private val composerHasUserContent: StateFlow<Boolean> by lazy {
+        combine(userMessage, attachments, replyToMessage) { draft, currentAttachments, reply ->
+            draft.text.isNotBlank() || currentAttachments.isNotEmpty() || reply != null
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+    }
 
     // 聊天历史搜索状态
     private val _chatHistorySearchQuery = MutableStateFlow("")
@@ -419,6 +481,10 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         // Setup additional components
         setupPermissionSystemCollection()
         setupAttachmentDelegateToastCollection()
+        setupCompanionMemoryReceiptCollection()
+        setupPerChatComposerState()
+        setupPendingWaifuMergeRecovery()
+        setupNextUserMessageSuggestions()
 
         // 初始化语音服务
         initializeVoiceService()
@@ -469,10 +535,41 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         this@ChatViewModel.clearReplyToMessage()
                     }
 
+                    override fun clearReplyToMessageIfMatches(expected: ChatMessage) {
+                        val current = _replyToMessage.value
+                        if (
+                            current?.timestamp == expected.timestamp &&
+                                current.sender == expected.sender
+                        ) {
+                            _replyToMessage.value = null
+                        }
+                    }
+
+                    override fun consumeComposerSnapshot(
+                        chatId: String,
+                        snapshot: ChatComposerSnapshot,
+                    ) {
+                        val ownsDisplayedComposer =
+                            perChatComposerStateStore.consume(chatId, snapshot)
+
+                        if (ownsDisplayedComposer) {
+                            attachmentDelegate.consumeAttachments(snapshot.attachments)
+                            snapshot.replyToMessage?.let { expected ->
+                                val current = _replyToMessage.value
+                                if (
+                                    current?.timestamp == expected.timestamp &&
+                                        current.sender == expected.sender
+                                ) {
+                                    _replyToMessage.value = null
+                                }
+                            }
+                        }
+                    }
+
                     override fun getReplyToMessage(): ChatMessage? = replyToMessage.value
                 }
         )
-        mainChatCore.setSpeakMessageHandler(::speakMessage)
+        mainChatCore.setSpeakMessageHandler(::speakMessageAndWait)
         mainChatCore.setOnEnhancedAiServiceReady { service ->
             enhancedAiService = service
             setupInputProcessingStateListener(service)
@@ -497,6 +594,148 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private fun setupAttachmentDelegateToastCollection() {
         viewModelScope.launch {
             attachmentDelegate.toastEvent.collect { message -> uiStateDelegate.showToast(message) }
+        }
+    }
+
+    private fun setupPendingWaifuMergeRecovery() {
+        viewModelScope.launch {
+            combine(currentChatId, chatHistory) { chatId, messages ->
+                chatId to recoverablePendingWaifuMessages(messages)
+            }.collectLatest { (chatId, pendingMessages) ->
+                if (chatId.isNullOrBlank() || pendingMessages.isEmpty()) return@collectLatest
+
+                delay(1_000L)
+                if (currentChatId.value != chatId || messageProcessingDelegate.isChatLoading(chatId)) {
+                    return@collectLatest
+                }
+
+                val queuedTimestamps =
+                    pendingWaifuMergeMessages[chatId]
+                        .orEmpty()
+                        .mapTo(mutableSetOf()) { it.visibleMessageTimestamp }
+                val messagesToRecover =
+                    recoverablePendingWaifuMessages(chatHistory.value)
+                        .filterNot { it.timestamp in queuedTimestamps }
+                if (messagesToRecover.isEmpty()) return@collectLatest
+
+                AppLogger.w(
+                    TAG,
+                    "Recovering ${messagesToRecover.size} pending immersive message(s): chatId=$chatId",
+                )
+                messagesToRecover.forEach { message ->
+                    enqueueWaifuMergedMessage(
+                        chatId = chatId,
+                        text = message.content,
+                        visibleMessageTimestamp = message.timestamp,
+                        delayMs = 100L,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun setupCompanionMemoryReceiptCollection() {
+        viewModelScope.launch {
+            CompanionMemoryReceiptBus.events.collect { receipt ->
+                if (receipt.conversationId == currentChatId.value) {
+                    uiStateDelegate.showToast(
+                        context.getString(R.string.mira_memory_saved_receipt, receipt.summary),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun setupPerChatComposerState() {
+        viewModelScope.launch {
+            currentChatId.collect { nextChatId ->
+                clearSuggestedUserMessage()
+                val restoredState =
+                    perChatComposerStateStore.switchTo(
+                        nextChatId = nextChatId,
+                        currentAttachments = attachmentDelegate.attachments.value,
+                        currentReply = _replyToMessage.value,
+                    ) ?: return@collect
+
+                attachmentDelegate.updateAttachments(restoredState.attachments)
+                _replyToMessage.value = restoredState.replyToMessage
+                resetAttachmentPanelState()
+            }
+        }
+    }
+
+    private fun setupNextUserMessageSuggestions() {
+        viewModelScope.launch {
+            combine(
+                currentChatId,
+                chatHistory,
+                composerHasUserContent,
+                activeStreamingChatIds,
+                displayPreferences.enableAiInputSuggestion,
+            ) { chatId, messages, composerOccupied, activeChatIds, enabled ->
+                val activeChatId = chatId?.takeIf { it.isNotBlank() } ?: return@combine null
+                if (
+                    !enabled ||
+                        composerOccupied ||
+                        activeChatId in activeChatIds
+                ) {
+                    return@combine null
+                }
+
+                val suggestionContext =
+                    NextUserMessageSuggestionPolicy.buildContext(
+                        messages.map { message ->
+                            NextUserSuggestionMessage(
+                                sender = message.sender,
+                                content = message.content,
+                                timestamp = message.timestamp,
+                            )
+                        }
+                    )
+                val latestAssistant = suggestionContext.lastOrNull() ?: return@combine null
+                if (suggestedAssistantTimestampByChatId[activeChatId] == latestAssistant.timestamp) {
+                    return@combine null
+                }
+                NextUserSuggestionTrigger(
+                    chatId = activeChatId,
+                    assistantTimestamp = latestAssistant.timestamp,
+                    context = suggestionContext.map { it.sender to it.content },
+                )
+            }
+                .distinctUntilChanged()
+                .collectLatest { trigger ->
+                    _suggestedUserMessage.value = null
+                    if (trigger == null) return@collectLatest
+                    delay(250L)
+
+                    val suggestion =
+                        EnhancedAIService.getInstance(context)
+                            .generateNextUserMessage(trigger.context)
+                    if (suggestion.isBlank()) return@collectLatest
+
+                    val latestContext =
+                        NextUserMessageSuggestionPolicy.buildContext(
+                            chatHistory.value.map { message ->
+                                NextUserSuggestionMessage(
+                                    sender = message.sender,
+                                    content = message.content,
+                                    timestamp = message.timestamp,
+                                )
+                            }
+                        )
+                    val stillCurrent =
+                        currentChatId.value == trigger.chatId &&
+                            trigger.chatId !in activeStreamingChatIds.value &&
+                            composerHasUserContent.value.not() &&
+                            displayPreferences.enableAiInputSuggestion.first() &&
+                            suggestedAssistantTimestampByChatId[trigger.chatId] !=
+                                trigger.assistantTimestamp &&
+                            latestContext.lastOrNull()?.timestamp == trigger.assistantTimestamp
+                    if (!stillCurrent) return@collectLatest
+
+                    suggestedAssistantTimestampByChatId[trigger.chatId] = trigger.assistantTimestamp
+                    _suggestedUserMessage.value = suggestion
+                }
         }
     }
 
@@ -652,6 +891,57 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         chatHistoryDelegate.createNewChat(characterCardName = characterCardName, characterGroupId = characterGroupId)
     }
 
+    fun createSessionChat(isTemporary: Boolean = false) {
+        val currentChat = chatHistories.value.firstOrNull { it.id == currentChatId.value }
+        chatHistoryDelegate.createNewChat(
+            chatModelConfigId = currentChat?.chatModelConfigId,
+            chatModelIndex = currentChat?.chatModelIndex ?: 0,
+            memoryAutoUpdateOverride = if (isTemporary) false else currentChat?.memoryAutoUpdateOverride,
+            autoReadOverride = currentChat?.autoReadOverride,
+            isTemporary = isTemporary,
+        )
+        viewModelScope.launch {
+            delay(250)
+            _composerFocusRequests.emit(Unit)
+        }
+    }
+
+    fun updateCurrentChatModel(modelConfigId: String?, modelIndex: Int) {
+        val currentChat = chatHistories.value.firstOrNull { it.id == currentChatId.value } ?: return
+        chatHistoryDelegate.updateChatSessionControls(
+            chatId = currentChat.id,
+            modelConfigId = modelConfigId,
+            modelIndex = modelIndex,
+            memoryAutoUpdateOverride = currentChat.memoryAutoUpdateOverride,
+            autoReadOverride = currentChat.autoReadOverride,
+            isTemporary = currentChat.isTemporary,
+        )
+    }
+
+    fun updateCurrentChatMemoryOverride(enabled: Boolean?) {
+        val currentChat = chatHistories.value.firstOrNull { it.id == currentChatId.value } ?: return
+        chatHistoryDelegate.updateChatSessionControls(
+            chatId = currentChat.id,
+            modelConfigId = currentChat.chatModelConfigId,
+            modelIndex = currentChat.chatModelIndex,
+            memoryAutoUpdateOverride = enabled,
+            autoReadOverride = currentChat.autoReadOverride,
+            isTemporary = currentChat.isTemporary,
+        )
+    }
+
+    fun updateCurrentChatAutoReadOverride(enabled: Boolean?) {
+        val currentChat = chatHistories.value.firstOrNull { it.id == currentChatId.value } ?: return
+        chatHistoryDelegate.updateChatSessionControls(
+            chatId = currentChat.id,
+            modelConfigId = currentChat.chatModelConfigId,
+            modelIndex = currentChat.chatModelIndex,
+            memoryAutoUpdateOverride = currentChat.memoryAutoUpdateOverride,
+            autoReadOverride = enabled,
+            isTemporary = currentChat.isTemporary,
+        )
+    }
+
     fun createNewChatWithDraft(draft: String) {
         val trimmedDraft = draft.trim()
         if (trimmedDraft.isBlank()) return
@@ -731,6 +1021,67 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 uiStateDelegate.showToast(context.getString(R.string.chat_locked_cannot_delete))
             }
         }
+    }
+
+    fun updateChatPinned(chatId: String, pinned: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                ChatHistoryManager.getInstance(context).updateChatPinned(chatId, pinned)
+            }.onFailure { error ->
+                AppLogger.e(TAG, "更新会话置顶状态失败: chatId=$chatId", error)
+                uiStateDelegate.showToast(context.getString(R.string.mira_chat_action_failed))
+            }
+        }
+    }
+
+    fun updateChatArchived(chatId: String, archived: Boolean) {
+        if (chatId in activeStreamingChatIds.value) {
+            uiStateDelegate.showToast(context.getString(R.string.mira_archive_chat_busy))
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                ChatHistoryManager.getInstance(context).updateChatArchived(chatId, archived)
+                if (archived && currentChatId.value == chatId) {
+                    val replacement =
+                        chatHistories.value
+                            .asSequence()
+                            .filter { history -> history.id != chatId && !history.archived }
+                            .maxByOrNull { history -> history.updatedAt }
+                    if (replacement != null) {
+                        switchChat(replacement.id)
+                    } else {
+                        chatHistoryDelegate.createNewChat()
+                    }
+                }
+                uiStateDelegate.showToast(
+                    context.getString(if (archived) R.string.mira_chat_archived else R.string.mira_chat_unarchived)
+                )
+            }.onFailure { error ->
+                AppLogger.e(TAG, "更新会话归档状态失败: chatId=$chatId", error)
+                uiStateDelegate.showToast(context.getString(R.string.mira_chat_action_failed))
+            }
+        }
+    }
+
+    fun exportChat(chatId: String) {
+        viewModelScope.launch {
+            val path = ChatHistoryManager.getInstance(context).exportChatToDownloads(chatId)
+            if (path == null) {
+                uiStateDelegate.showToast(context.getString(R.string.mira_export_chat_failed))
+            } else {
+                uiStateDelegate.showToast(context.getString(R.string.mira_export_chat_success, path))
+            }
+        }
+    }
+
+    fun exportCurrentChat() {
+        val chatId = currentChatId.value
+        if (chatId.isNullOrBlank()) {
+            uiStateDelegate.showToast(context.getString(R.string.chat_no_active_conversation))
+            return
+        }
+        exportChat(chatId)
     }
 
     fun clearCurrentChat() {
@@ -1350,6 +1701,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     // 消息处理相关方法
     fun updateUserMessage(value: TextFieldValue) {
+        dismissSuggestedUserMessage()
         val normalization = normalizeMentionDeletion(userMessage.value, value)
         val normalizedValue = normalization.value
         val removedMentionToken = normalization.removedMentionToken
@@ -1364,6 +1716,26 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
         messageProcessingDelegate.updateUserMessage(normalizedValue)
         updateMentionSuggestionState(normalizedValue)
+    }
+
+    fun dismissSuggestedUserMessage() {
+        clearSuggestedUserMessage()
+        val chatId = currentChatId.value?.takeIf { it.isNotBlank() } ?: return
+        val latestAssistantTimestamp =
+            NextUserMessageSuggestionPolicy.buildContext(
+                chatHistory.value.map { message ->
+                    NextUserSuggestionMessage(
+                        sender = message.sender,
+                        content = message.content,
+                        timestamp = message.timestamp,
+                    )
+                }
+            ).lastOrNull()?.timestamp ?: return
+        suggestedAssistantTimestampByChatId[chatId] = latestAssistantTimestamp
+    }
+
+    private fun clearSuggestedUserMessage() {
+        _suggestedUserMessage.value = null
     }
 
     fun insertRoleMention(roleName: String) {
@@ -1446,54 +1818,151 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         hideMentionSuggestionPanel()
     }
 
-    fun sendUserMessage(promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT) {
+    fun sendUserMessage(
+        promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT,
+        onDispatchResolved: ((Boolean) -> Unit)? = null,
+    ): Boolean {
+        stopSpeakingForUserTurn()
         hideMentionSuggestionPanel()
-        messageCoordinationDelegate.sendUserMessage(promptFunctionType)
-    }
-
-    fun sendTextMessage(text: String, promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT) {
-        hideMentionSuggestionPanel()
-        messageCoordinationDelegate.sendUserMessage(
+        val targetChatId = currentChatId.value
+        if (targetChatId != null) {
+            messageProcessingDelegate.setActiveDraftChat(targetChatId)
+            perChatComposerStateStore
+                .switchTo(
+                    nextChatId = targetChatId,
+                    currentAttachments = attachmentDelegate.attachments.value,
+                    currentReply = _replyToMessage.value,
+                )
+                ?.let { restoredState ->
+                    attachmentDelegate.updateAttachments(restoredState.attachments)
+                    _replyToMessage.value = restoredState.replyToMessage
+                    resetAttachmentPanelState()
+                }
+        }
+        val currentChat = chatHistories.value.firstOrNull { it.id == targetChatId }
+        val outgoingText = userMessage.value.text
+        val composerSnapshot =
+            ChatComposerSnapshot(
+                text = outgoingText,
+                attachments = attachments.value.toList(),
+                replyToMessage = replyToMessage.value,
+            )
+        val turnCapability =
+            MiraTurnCapabilityResolver.resolve(
+                text = outgoingText,
+                hasAttachments = composerSnapshot.attachments.isNotEmpty(),
+            )
+        AppLogger.d(
+            TAG,
+            "agentTurn chatId=$targetChatId attachments=${composerSnapshot.attachments.size} capability=$turnCapability toolsEnabled=true",
+        )
+        return messageCoordinationDelegate.sendUserMessage(
             promptFunctionType = promptFunctionType,
-            messageTextOverride = text
+            composerSnapshot = composerSnapshot,
+            chatModelConfigIdOverride = currentChat?.chatModelConfigId,
+            chatModelIndexOverride = currentChat?.chatModelIndex,
+            turnOptions =
+                ChatTurnOptions(
+                    autoReadOverride = currentChat?.autoReadOverride,
+                    memoryAutoUpdateOverride = currentChat?.memoryAutoUpdateOverride,
+                    toolsEnabledOverride = true,
+                    requireToolExecution = turnCapability == MiraTurnCapability.DEVICE_ASSIST,
+                    consumeUserDraftAfterPersist = true,
+                ),
+            onDispatchResolved = onDispatchResolved,
         )
     }
 
-    suspend fun removeLastVisibleUserMessageFromCurrentChat(text: String): Boolean {
-        val chatId = currentChatId.value ?: return false
-        val messageText = text.trim()
-        if (messageText.isBlank()) return false
-
-        val lastMessage = chatHistory.value.lastOrNull() ?: return false
-        if (lastMessage.sender != "user" || lastMessage.content != messageText) {
-            AppLogger.w(
-                TAG,
-                "Waifu merge send expected last visible user message, but found sender=${lastMessage.sender}, contentLength=${lastMessage.content.length}"
-            )
-            return false
+    fun sendTextMessage(
+        text: String,
+        promptFunctionType: PromptFunctionType = PromptFunctionType.CHAT,
+        suppressUserMessageInHistory: Boolean = false,
+        historyMessageTimestampsToExclude: Set<Long> = emptySet(),
+        enableGroupOrchestrationForBoundText: Boolean = false,
+        chatIdOverride: String? = null,
+        reportBusyRejection: Boolean = true,
+        onDispatchResolved: ((Boolean) -> Unit)? = null,
+    ): Boolean {
+        if (!suppressUserMessageInHistory) {
+            stopSpeakingForUserTurn()
         }
-
-        chatHistoryDelegate.deleteMessagesByTimestamps(chatId, listOf(lastMessage.timestamp))
-        return true
+        hideMentionSuggestionPanel()
+        val targetChatId = chatIdOverride ?: currentChatId.value
+        val currentChat = chatHistories.value.firstOrNull { it.id == targetChatId }
+        val turnCapability = MiraTurnCapabilityResolver.resolve(text, hasAttachments = false)
+        AppLogger.d(
+            TAG,
+            "agentTurn chatId=$targetChatId attachments=0 capability=$turnCapability toolsEnabled=true",
+        )
+        return messageCoordinationDelegate.sendUserMessage(
+            promptFunctionType = promptFunctionType,
+            chatIdOverride = chatIdOverride,
+            messageTextOverride = text,
+            chatModelConfigIdOverride = currentChat?.chatModelConfigId,
+            chatModelIndexOverride = currentChat?.chatModelIndex,
+            turnOptions =
+                ChatTurnOptions(
+                    autoReadOverride = currentChat?.autoReadOverride,
+                    memoryAutoUpdateOverride = currentChat?.memoryAutoUpdateOverride,
+                    toolsEnabledOverride = true,
+                    requireToolExecution = turnCapability == MiraTurnCapability.DEVICE_ASSIST,
+                ),
+            suppressUserMessageInHistory = suppressUserMessageInHistory,
+            historyMessageTimestampsToExclude = historyMessageTimestampsToExclude,
+            enableGroupOrchestrationForBoundText = enableGroupOrchestrationForBoundText,
+            reportBusyRejection = reportBusyRejection,
+            onDispatchResolved = onDispatchResolved,
+        )
     }
 
-    suspend fun addVisibleUserMessageToCurrentChat(text: String) {
-        val messageText = text.trim()
-        if (messageText.isBlank()) return
+    fun isChatLoading(chatId: String): Boolean =
+        messageProcessingDelegate.isChatLoading(chatId)
 
-        val chatId = currentChatId.value ?: return
+    fun enqueuePendingQueueMessage(chatId: String, text: String): PendingQueueMessageItem =
+        perChatPendingQueueStore.enqueue(chatId, text)
+
+    fun removePendingQueueMessage(chatId: String, id: Long): PendingQueueMessageItem? =
+        perChatPendingQueueStore.remove(chatId, id)
+
+    fun restorePendingQueueMessage(item: PendingQueueMessageItem) {
+        perChatPendingQueueStore.restore(item)
+    }
+
+    fun cancelMessage(chatId: String) {
+        if (::messageCoordinationDelegate.isInitialized) {
+            messageCoordinationDelegate.cancelSummaryForChat(chatId)
+        }
+        messageProcessingDelegate.cancelMessage(chatId)
+    }
+
+    fun isDeviceAssistEnabled(chatId: String?): Boolean =
+        chatId != null && chatId in deviceAssistChatIds
+
+    fun setDeviceAssistEnabled(chatId: String?, enabled: Boolean) {
+        if (chatId == null) return
+        if (enabled) deviceAssistChatIds += chatId else deviceAssistChatIds -= chatId
+    }
+
+    suspend fun addVisibleUserMessageToChat(chatId: String, text: String): Long? {
+        stopSpeakingForUserTurn()
+        val messageText = text.trim()
+        if (messageText.isBlank()) return null
+
         val isFirstMessage = !chatHistoryDelegate.hasUserMessage(chatId)
         val fallbackTitle = if (isFirstMessage) {
             context.getString(R.string.new_conversation).also { chatHistoryDelegate.updateChatTitle(chatId, it) }
         } else {
             null
         }
-        chatHistoryDelegate.addMessageToChat(
+        val visibleMessage =
             ChatMessage(
                 sender = "user",
                 content = messageText,
-                roleName = context.getString(R.string.message_role_user)
-            ),
+                roleName = context.getString(R.string.message_role_user),
+                displayMode = ChatMessageDisplayMode.PENDING_DISPATCH,
+            )
+        chatHistoryDelegate.addMessageToChat(
+            visibleMessage,
             chatId
         )
         fallbackTitle?.let { titleToPreserve ->
@@ -1509,6 +1978,108 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 } catch (e: Exception) {
                     AppLogger.e(TAG, "生成可见用户消息对话标题失败", e)
                 }
+            }
+        }
+        return visibleMessage.timestamp
+    }
+
+    fun enqueueWaifuMergedMessage(
+        chatId: String,
+        text: String,
+        visibleMessageTimestamp: Long,
+        delayMs: Long,
+    ) {
+        val pendingMessage =
+            PendingWaifuMergeMessage(
+                sequenceId = nextWaifuMergeSequenceId++,
+                chatId = chatId,
+                text = text,
+                visibleMessageTimestamp = visibleMessageTimestamp,
+            )
+        pendingWaifuMergeMessages.getOrPut(chatId) { mutableListOf() }.add(pendingMessage)
+        AppLogger.d(
+            TAG,
+            "Waifu merge queued: chatId=$chatId timestamp=$visibleMessageTimestamp delayMs=$delayMs",
+        )
+
+        viewModelScope.launch {
+            delay(delayMs.coerceAtLeast(0L))
+            if (pendingWaifuMergeMessages[chatId]?.lastOrNull() != pendingMessage) {
+                return@launch
+            }
+
+            suspend fun awaitAcceptedDispatch(timeoutMs: Long): Boolean? =
+                withTimeoutOrNull(timeoutMs) {
+                    var accepted = false
+                    while (!accepted) {
+                        if (pendingWaifuMergeMessages[chatId]?.lastOrNull() != pendingMessage) {
+                            return@withTimeoutOrNull false
+                        }
+                        if (messageProcessingDelegate.isChatLoading(chatId)) {
+                            delay(50)
+                            continue
+                        }
+                        val pendingBatch = pendingWaifuMergeMessages[chatId].orEmpty()
+                        val mergedText =
+                            buildWaifuMergeDispatchText(
+                                pendingMessages = pendingBatch,
+                                throughSequenceId = pendingMessage.sequenceId,
+                            )
+                        if (mergedText.isBlank()) return@withTimeoutOrNull false
+                        val visibleTimestamps =
+                            pendingBatch
+                                .asSequence()
+                                .filter { it.sequenceId <= pendingMessage.sequenceId }
+                                .map { it.visibleMessageTimestamp }
+                                .toSet()
+                        val dispatchResolved = CompletableDeferred<Boolean>()
+                        val reserved =
+                            sendTextMessage(
+                                text = mergedText,
+                                suppressUserMessageInHistory = true,
+                                historyMessageTimestampsToExclude = visibleTimestamps,
+                                enableGroupOrchestrationForBoundText = true,
+                                chatIdOverride = chatId,
+                                reportBusyRejection = false,
+                                onDispatchResolved = { dispatchAccepted ->
+                                    dispatchResolved.complete(dispatchAccepted)
+                                },
+                            )
+                        if (!reserved) {
+                            delay(50)
+                            continue
+                        }
+                        accepted = dispatchResolved.await()
+                        if (!accepted) return@withTimeoutOrNull false
+                    }
+                    true
+                }
+
+            var accepted = awaitAcceptedDispatch(WAIFU_MERGE_IDLE_TIMEOUT_MS)
+            if (accepted == false) return@launch
+            if (accepted == null) {
+                if (messageProcessingDelegate.isChatLoading(chatId)) {
+                    AppLogger.w(TAG, "Waifu merge wait timed out; cancelling stale turn: chatId=$chatId")
+                    cancelMessage(chatId)
+                } else {
+                    AppLogger.w(TAG, "Waifu merge dispatch has not resolved yet; retrying: chatId=$chatId")
+                }
+                accepted = awaitAcceptedDispatch(WAIFU_MERGE_CANCEL_TIMEOUT_MS)
+                if (accepted == false) return@launch
+                if (accepted == null) {
+                    uiStateDelegate.showErrorMessage(
+                        context.getString(R.string.mira_send_state_stuck),
+                    )
+                    return@launch
+                }
+            }
+
+            AppLogger.d(TAG, "Waifu merge dispatching: chatId=$chatId timestamp=$visibleMessageTimestamp")
+            pendingWaifuMergeMessages[chatId]?.removeAll { queued ->
+                queued.sequenceId <= pendingMessage.sequenceId
+            }
+            if (pendingWaifuMergeMessages[chatId].isNullOrEmpty()) {
+                pendingWaifuMergeMessages.remove(chatId)
             }
         }
     }
@@ -2320,6 +2891,22 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         )
     }
 
+    fun launchFullscreenVoiceModeAfterMicPermissionGranted(
+            colorScheme: ColorScheme? = null,
+            typography: Typography? = null
+    ) {
+        if (!Settings.canDrawOverlays(context)) {
+            openOverlayPermissionSettings()
+            return
+        }
+
+        launchFloatingModeIn(
+            mode = FloatingMode.FULLSCREEN,
+            colorScheme = colorScheme,
+            typography = typography
+        )
+    }
+
     fun launchFloatingWindowWithPermissionCheck(
             launcher: ActivityResultLauncher<String>,
             onPermissionGranted: () -> Unit
@@ -2909,7 +3496,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                     event = "speakingStateFlow",
                     extra = "provider=${service::class.java.simpleName} emitted=$isSpeaking"
                 )
-                if (isSpeaking || !_isSpeechSessionActive.value || _isSpeechPaused.value || isAutoReadEnabled.value) {
+                if (isSpeaking || !_isSpeechSessionActive.value || _isSpeechPaused.value) {
                     cancelSpeechControlsHide(
                         "stateChanged provider=${service::class.java.simpleName} emitted=$isSpeaking"
                     )
@@ -2920,7 +3507,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 logSpeechState("scheduleHide", "reason=idle provider=${service::class.java.simpleName} delayMs=3000")
                 speechControlsHideJob = viewModelScope.launch {
                     delay(3000)
-                    if (!_isPlaying.value && _isSpeechSessionActive.value && !_isSpeechPaused.value && !isAutoReadEnabled.value) {
+                    if (!_isPlaying.value && _isSpeechSessionActive.value && !_isSpeechPaused.value) {
                         _isSpeechSessionActive.value = false
                         logSpeechState("hideControls", "reason=idleTimeout provider=${service::class.java.simpleName}")
                     } else {
@@ -2937,12 +3524,36 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     fun speakMessage(message: String, interrupt: Boolean) {
+        enqueueSpeech(message, interrupt, speechDirectionJson = null)
+    }
+
+    fun speakMessage(message: ChatMessage) {
+        enqueueSpeech(
+            message = message.content,
+            interrupt = true,
+            speechDirectionJson = message.speechDirectionJson,
+        )
+    }
+
+    private suspend fun speakMessageAndWait(message: String, interrupt: Boolean) {
+        enqueueSpeech(message, interrupt, speechDirectionJson = null).join()
+    }
+
+    private fun enqueueSpeech(
+        message: String,
+        interrupt: Boolean,
+        speechDirectionJson: String?,
+    ): Job {
+        val previousPlaybackJob = speechPlaybackJob
         if (interrupt) {
-            speechPlaybackJob?.cancel()
+            previousPlaybackJob?.cancel()
             logSpeechState("cancelPlaybackJob", "reason=newInterruptingSpeak")
         }
-        speechPlaybackJob = viewModelScope.launch {
+        return viewModelScope.launch {
             try {
+                if (!interrupt) {
+                    previousPlaybackJob?.join()
+                }
                 cancelSpeechControlsHide("newSpeak")
                 val currentVoiceService = ensureActiveVoiceService()
                 _isSpeechSessionActive.value = true
@@ -2960,24 +3571,52 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 }
 
                 val cleanerRegexs = speechServicesPreferences.ttsCleanerRegexsFlow.first()
-                val cleanedText = TtsCleaner.clean(message, cleanerRegexs)
-                val cleanMessage = WaifuMessageProcessor.cleanContentForWaifu(cleanedText)
+                val parsedSpeech = SpeechMarkupParser.parse(message)
+                val persistedSegments = SpeechContentMetadata.decodeSegments(speechDirectionJson)
+                val sourceSegments = persistedSegments.ifEmpty { parsedSpeech.segments }
+                val cleanedSegments =
+                    sourceSegments.mapNotNull { segment ->
+                        val cleanedText = TtsCleaner.clean(segment.text, cleanerRegexs)
+                        val cleanMessage = WaifuMessageProcessor.cleanContentForWaifu(cleanedText)
+                        cleanMessage.takeIf { it.isNotBlank() }?.let {
+                            SpeechSegment(text = it, direction = segment.direction)
+                        }
+                    }
                 AppLogger.d(
                     TAG,
-                    "speech[cleaned] rawLen=${message.length} cleanedLen=${cleanedText.length} finalLen=${cleanMessage.length} preview=\"${speechPreview(cleanMessage)}\""
+                    "speech[cleaned] rawLen=${message.length} visibleLen=${parsedSpeech.visibleText.length} segmentCount=${cleanedSegments.size}"
                 )
 
-                if (cleanMessage.isBlank()) {
+                if (cleanedSegments.isEmpty()) {
                     AppLogger.d(TAG, "朗读内容为空，跳过请求")
                     _isSpeechSessionActive.value = false
                     logSpeechState("speakMessage.abort", "reason=blankAfterClean")
                     return@launch
                 }
 
-                val segments = TtsSegmenter.split(cleanMessage)
-                AppLogger.d(TAG, "speech[segments] count=${segments.size} lengths=${segments.joinToString(prefix = "[", postfix = "]") { it.length.toString() }}")
+                val baseRate = speechServicesPreferences.ttsSpeechRateFlow.first()
+                val basePitch = speechServicesPreferences.ttsPitchFlow.first()
+                val expressiveTtsEnabled = speechServicesPreferences.expressiveTtsEnabledFlow.first()
+                val expressionStrength = speechServicesPreferences.expressiveTtsStrengthFlow.first()
+                val requests =
+                    ExpressiveTtsDirector.planSegments(
+                        segments = cleanedSegments,
+                        capabilities =
+                            if (expressiveTtsEnabled) {
+                                currentVoiceService.capabilities
+                            } else {
+                                VoiceCapabilities.PLAIN
+                            },
+                        baseRate = baseRate,
+                        basePitch = basePitch,
+                        expressionScale = expressionStrength.scale,
+                    )
+                AppLogger.d(
+                    TAG,
+                    "speech[directed] count=${requests.size} capabilities=${currentVoiceService.capabilities} emotions=${requests.joinToString { it.direction.emotion.name }}"
+                )
                 var isFirstSegment = true
-                for ((index, segment) in segments.withIndex()) {
+                for ((index, request) in requests.withIndex()) {
                     if (_isSpeechPaused.value) {
                         logSpeechState("waitResume", "segmentIndex=$index")
                         isSpeechPaused.filter { !it }.first()
@@ -2986,13 +3625,15 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
                     AppLogger.d(
                         TAG,
-                        "speech[segmentSpeak] index=$index/${segments.lastIndex} interrupt=${if (isFirstSegment) interrupt else false} len=${segment.length} preview=\"${speechPreview(segment)}\""
+                        "speech[segmentSpeak] index=$index/${requests.lastIndex} interrupt=${if (isFirstSegment) interrupt else false} emotion=${request.direction.emotion} rate=${request.rate} pitch=${request.pitch} len=${request.text.length} preview=\"${speechPreview(request.text)}\""
                     )
+                    _currentSpeechSegment.value = request.text
                     val success = currentVoiceService.speak(
-                        text = segment,
+                        text = request.text,
                         interrupt = if (isFirstSegment) interrupt else false,
-                        rate = null,
-                        pitch = null
+                        rate = request.rate,
+                        pitch = request.pitch,
+                        extraParams = request.extraParams,
                     )
                     AppLogger.d(TAG, "speech[segmentResult] index=$index success=$success provider=${currentVoiceService.javaClass.simpleName}")
 
@@ -3000,6 +3641,9 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         logSpeechState("segmentFailed", "index=$index")
                         uiStateDelegate.showToast(context.getString(R.string.chat_speak_failed))
                         break
+                    }
+                    while (currentVoiceService.isSpeaking || _isSpeechPaused.value) {
+                        delay(50)
                     }
                     isFirstSegment = false
                 }
@@ -3012,21 +3656,31 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 logSpeechState("speakMessage.exception", "type=${e::class.java.simpleName} message=${e.message}")
                 AppLogger.e(TAG, "朗读消息失败", e)
                 uiStateDelegate.showToast(context.getString(R.string.chat_speak_message_failed, e.message ?: "Unknown error"))
+            } finally {
+                if (!_isSpeechPaused.value) {
+                    _currentSpeechSegment.value = null
+                }
             }
-        }
+        }.also { speechPlaybackJob = it }
     }
 
     /** 停止朗读 */
     fun stopSpeaking() {
+        logSpeechState("stopSpeaking.request")
+        cancelSpeechControlsHide("stopSpeaking")
+        if (::messageProcessingDelegate.isInitialized) {
+            messageProcessingDelegate.cancelAutoRead(currentChatId.value)
+        }
+        speechPlaybackJob?.cancel()
+        speechPlaybackJob = null
+        _isSpeechPaused.value = false
+        _isSpeechSessionActive.value = false
+        _isPlaying.value = false
+        _currentSpeechSegment.value = null
+        val serviceToStop = voiceService
         viewModelScope.launch {
             try {
-                logSpeechState("stopSpeaking.request")
-                cancelSpeechControlsHide("stopSpeaking")
-                speechPlaybackJob?.cancel()
-                speechPlaybackJob = null
-                ensureActiveVoiceService()?.stop()
-                _isSpeechPaused.value = false
-                _isSpeechSessionActive.value = false
+                serviceToStop?.stop()
                 logSpeechState("stopSpeaking.done")
             } catch (e: Exception) {
                 logSpeechState("stopSpeaking.exception", "type=${e::class.java.simpleName} message=${e.message}")
@@ -3040,9 +3694,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             try {
                 logSpeechState("pauseSpeaking.request")
                 cancelSpeechControlsHide("pauseSpeaking")
-                speechPlaybackJob?.cancel()
-                speechPlaybackJob = null
-                logSpeechState("pauseSpeaking.cancelPlaybackJob")
                 val success = ensureActiveVoiceService()?.pause() == true
                 if (success) {
                     _isSpeechPaused.value = true
@@ -3079,16 +3730,43 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    private fun stopSpeakingForUserTurn() {
+        if (
+            !_isSpeechSessionActive.value &&
+                !_isPlaying.value &&
+                !_isSpeechPaused.value &&
+                _currentSpeechSegment.value == null
+        ) {
+            return
+        }
+        logSpeechState("interruptForUserTurn")
+        stopSpeaking()
+    }
+
+    private suspend fun saveCurrentAutoReadOverride(override: AutoReadOverride) {
+        waifuPreferences.saveAutoReadOverride(override)
+        when (val activePrompt = activePromptManager.activePromptFlow.first()) {
+            is ActivePrompt.CharacterCard ->
+                waifuPreferences.saveCurrentWaifuSettingsToCharacterCard(activePrompt.id)
+            is ActivePrompt.CharacterGroup ->
+                waifuPreferences.saveCurrentWaifuSettingsToCharacterGroup(activePrompt.id)
+        }
+    }
+
     fun toggleAutoRead() {
-        AppLogger.d(TAG, "speech[toggleAutoRead] before=${isAutoReadEnabled.value}")
-        apiConfigDelegate.toggleAutoRead()
-        // Stop speaking if auto-read is being turned off.
-        // We check the new value directly from the delegate's state flow.
+        val override =
+            if (isAutoReadEnabled.value) {
+                AutoReadOverride.DISABLED
+            } else {
+                AutoReadOverride.ENABLED
+            }
+        AppLogger.d(
+            TAG,
+            "speech[toggleAutoRead] effectiveBefore=${isAutoReadEnabled.value} override=${override.storageValue}",
+        )
         viewModelScope.launch {
-            // A small delay to allow the state flow to update, although it's often fast.
-            delay(50)
-            AppLogger.d(TAG, "speech[toggleAutoRead] after=${isAutoReadEnabled.value}")
-            if (!isAutoReadEnabled.value) {
+            saveCurrentAutoReadOverride(override)
+            if (override == AutoReadOverride.DISABLED) {
                 stopSpeaking()
             }
         }
@@ -3097,17 +3775,24 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun disableAutoRead() {
         if (isAutoReadEnabled.value) {
             AppLogger.d(TAG, "speech[disableAutoRead] current=true")
-            apiConfigDelegate.toggleAutoRead() // This will set it to false
-            stopSpeaking()
+            viewModelScope.launch {
+                saveCurrentAutoReadOverride(AutoReadOverride.DISABLED)
+                stopSpeaking()
+            }
         }
     }
 
     fun enableAutoReadAndSpeak(content: String) {
         AppLogger.d(TAG, "speech[enableAutoReadAndSpeak] autoReadBefore=${isAutoReadEnabled.value} len=${content.length} preview=\"${speechPreview(content)}\"")
-        if (!isAutoReadEnabled.value) {
-            apiConfigDelegate.toggleAutoRead() // This will set it to true
+        if (isAutoReadEnabled.value) {
+            speakMessage(content)
+            return
         }
-        speakMessage(content)
+
+        viewModelScope.launch {
+            saveCurrentAutoReadOverride(AutoReadOverride.ENABLED)
+            speakMessage(content)
+        }
     }
 
     /** 设置回复目标消息 */
@@ -3122,6 +3807,16 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun manuallyUpdateMemory() {
         messageCoordinationDelegate.manuallyUpdateMemory()
+    }
+
+    fun refreshContextWindowUsage() {
+        viewModelScope.launch {
+            runCatching {
+                messageCoordinationDelegate.refreshStableContextWindow(chatId = currentChatId.value)
+            }.onFailure { error ->
+                AppLogger.w(TAG, "Refresh context window usage failed: ${error.message}")
+            }
+        }
     }
 
     fun enqueueSelectedMessagesForMemoryAutoSave(messages: List<ChatMessage>) {

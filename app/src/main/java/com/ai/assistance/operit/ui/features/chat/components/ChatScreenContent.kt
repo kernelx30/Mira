@@ -13,7 +13,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -47,7 +46,9 @@ import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatHistoryDisplayMod
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleImageStyleConfig
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 import java.io.File
+import com.ai.assistance.operit.ui.adaptive.LocalAdaptiveWindowMetrics
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
@@ -65,14 +66,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.InputChip
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.Dialog
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.res.stringResource
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.chat.components.MessageEditor
-import com.ai.assistance.operit.ui.main.screens.GestureStateHolder
 import kotlin.math.roundToInt
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -98,14 +98,8 @@ fun ChatScreenContent(
         hasBackgroundImage: Boolean,
         editingMessageIndex: MutableState<Int?>,
         editingMessageContent: MutableState<String>,
-        chatScreenGestureConsumed: Boolean,
         onChatScreenGestureConsumed: (Boolean) -> Unit,
-        currentDrag: Float,
-        onCurrentDragChange: (Float) -> Unit,
-        verticalDrag: Float,
-        onVerticalDragChange: (Float) -> Unit,
-        dragThreshold: Float,
-        scrollState: ScrollState,
+        scrollState: LazyListState,
         autoScrollToBottom: Boolean,
         onAutoScrollToBottomChange: (Boolean) -> Unit,
         coroutineScope: CoroutineScope,
@@ -127,6 +121,10 @@ fun ChatScreenContent(
         onShowCharacterSelectorChange: (Boolean) -> Unit,
         onSwitchCharacter: (CharacterSelectorTarget) -> Unit,
         onOpenCharacterSettings: () -> Unit,
+        onOpenVoiceSettings: () -> Unit,
+        onOpenCapabilities: () -> Unit,
+        onOpenSettings: () -> Unit,
+        onOpenModelSettings: () -> Unit,
         chatAreaHorizontalPadding: Float = 16f,
         bubbleUserImageStyle: BubbleImageStyleConfig? = null,
         bubbleAiImageStyle: BubbleImageStyleConfig? = null,
@@ -139,56 +137,74 @@ fun ChatScreenContent(
         showChatFloatingDotsAnimation: Boolean = true,
 ) {
     val density = LocalDensity.current
+    val adaptiveMetrics = LocalAdaptiveWindowMetrics.current
     var headerHeight by remember { mutableStateOf(0.dp) }
+    // Mira always uses floating chat chrome; legacy Operit theme preferences must not turn the
+    // header back into a layout-consuming app bar.
+    val useFloatingHeader = true
 
     // Multi-select mode state
-    var isMultiSelectMode by remember { mutableStateOf(false) }
-    var selectedMessageIndices by remember { mutableStateOf(setOf<Int>()) }
-    val selectableMessageIndices = remember(chatHistory) {
-        chatHistory.mapIndexedNotNull { index, message ->
-            if (message.sender == "user" || message.sender == "ai") index else null
-        }.toSet()
+    var isMultiSelectMode by remember(currentChatId) { mutableStateOf(false) }
+    var selectedMessageIndices by remember(currentChatId) { mutableStateOf(setOf<Int>()) }
+    val selectableMessageIndices = remember(chatHistory, isMultiSelectMode) {
+        if (!isMultiSelectMode) {
+            emptySet()
+        } else {
+            chatHistory.mapIndexedNotNull { index, message ->
+                if (message.sender == "user" || message.sender == "ai") index else null
+            }.toSet()
+        }
     }
-    var isGeneratingImage by remember { mutableStateOf(false) }
-    var showSharePreviewDialog by remember { mutableStateOf(false) }
-    var showDeleteSelectedConfirmDialog by remember { mutableStateOf(false) }
-    var sharePreviewUri by remember { mutableStateOf<Uri?>(null) }
-    var sharePreviewThinkingExpanded by remember { mutableStateOf(false) }
-    var sharePreviewExpandThinkToolsGroups by remember { mutableStateOf(false) }
-    var sharePreviewIncludeBackground by remember { mutableStateOf(hasBackgroundImage) }
-    var sharePreviewBorderWidth by remember { mutableStateOf(1.5f) }
+    var isGeneratingImage by remember(currentChatId) { mutableStateOf(false) }
+    var showSharePreviewDialog by remember(currentChatId) { mutableStateOf(false) }
+    var showDeleteSelectedConfirmDialog by remember(currentChatId) { mutableStateOf(false) }
+    var sharePreviewUri by remember(currentChatId) { mutableStateOf<Uri?>(null) }
+    var sharePreviewThinkingExpanded by remember(currentChatId) { mutableStateOf(false) }
+    var sharePreviewExpandThinkToolsGroups by remember(currentChatId) { mutableStateOf(false) }
+    var sharePreviewIncludeBackground by remember(currentChatId) { mutableStateOf(hasBackgroundImage) }
+    var sharePreviewBorderWidth by remember(currentChatId) { mutableStateOf(1.5f) }
 
     // Export state
     val context = LocalContext.current
-    var showExportPlatformDialog by remember { mutableStateOf(false) }
-    var showAndroidExportDialog by remember { mutableStateOf(false) }
-    var showWindowsExportDialog by remember { mutableStateOf(false) }
-    var showExportProgressDialog by remember { mutableStateOf(false) }
-    var showExportCompleteDialog by remember { mutableStateOf(false) }
-    var exportProgress by remember { mutableStateOf(0f) }
-    var exportStatus by remember { mutableStateOf("") }
-    var exportSuccess by remember { mutableStateOf(false) }
-    var exportFilePath by remember { mutableStateOf<String?>(null) }
-    var exportErrorMessage by remember { mutableStateOf<String?>(null) }
-    var webContentDir by remember { mutableStateOf<File?>(null) }
-    var editingMessageType by remember { mutableStateOf<String?>(null) }
-    var pendingRollbackIndex by remember { mutableStateOf<Int?>(null) }
-    var pendingRewindIndex by remember { mutableStateOf<Int?>(null) }
-    var pendingRewindContent by remember { mutableStateOf<String?>(null) }
-    var rollbackPreview by remember { mutableStateOf<List<WorkspaceBackupManager.WorkspaceFileChange>>(emptyList()) }
-    var rewindPreview by remember { mutableStateOf<List<WorkspaceBackupManager.WorkspaceFileChange>>(emptyList()) }
+    var showExportPlatformDialog by remember(currentChatId) { mutableStateOf(false) }
+    var showAndroidExportDialog by remember(currentChatId) { mutableStateOf(false) }
+    var showWindowsExportDialog by remember(currentChatId) { mutableStateOf(false) }
+    var showExportProgressDialog by remember(currentChatId) { mutableStateOf(false) }
+    var showExportCompleteDialog by remember(currentChatId) { mutableStateOf(false) }
+    var exportProgress by remember(currentChatId) { mutableStateOf(0f) }
+    var exportStatus by remember(currentChatId) { mutableStateOf("") }
+    var exportSuccess by remember(currentChatId) { mutableStateOf(false) }
+    var exportFilePath by remember(currentChatId) { mutableStateOf<String?>(null) }
+    var exportErrorMessage by remember(currentChatId) { mutableStateOf<String?>(null) }
+    var webContentDir by remember(currentChatId) { mutableStateOf<File?>(null) }
+    var exportJob by remember { mutableStateOf<Job?>(null) }
+    DisposableEffect(currentChatId) {
+        onDispose { exportJob?.cancel() }
+    }
+    var editingMessageType by remember(currentChatId) { mutableStateOf<String?>(null) }
+    var pendingRollbackIndex by remember(currentChatId) { mutableStateOf<Int?>(null) }
+    var pendingRewindIndex by remember(currentChatId) { mutableStateOf<Int?>(null) }
+    var pendingRewindContent by remember(currentChatId) { mutableStateOf<String?>(null) }
+    var rollbackPreview by remember(currentChatId) {
+        mutableStateOf<List<WorkspaceBackupManager.WorkspaceFileChange>>(emptyList())
+    }
+    var rewindPreview by remember(currentChatId) {
+        mutableStateOf<List<WorkspaceBackupManager.WorkspaceFileChange>>(emptyList())
+    }
     val hasOlderDisplayHistory by actualViewModel.hasOlderDisplayHistory.collectAsState()
     val hasNewerDisplayHistory by actualViewModel.hasNewerDisplayHistory.collectAsState()
     val isLoadingDisplayWindow by actualViewModel.isLoadingDisplayWindow.collectAsState()
     
     // 监听朗读状态
     val isSpeechSessionActive by actualViewModel.isSpeechSessionActive.collectAsState()
+    val isSpeechPlaying by actualViewModel.isPlaying.collectAsState()
     val isSpeechPaused by actualViewModel.isSpeechPaused.collectAsState()
+    val currentSpeechSegment by actualViewModel.currentSpeechSegment.collectAsState()
     val isAutoReadEnabled by actualViewModel.isAutoReadEnabled.collectAsState()
-    LaunchedEffect(isSpeechSessionActive, isSpeechPaused, isAutoReadEnabled) {
+    LaunchedEffect(isSpeechSessionActive, isSpeechPlaying, isSpeechPaused, isAutoReadEnabled) {
         AppLogger.d(
             "ChatScreenContent",
-            "speechControls session=$isSpeechSessionActive paused=$isSpeechPaused autoRead=$isAutoReadEnabled visible=${isSpeechSessionActive || isSpeechPaused || isAutoReadEnabled}"
+            "speechControls session=$isSpeechSessionActive playing=$isSpeechPlaying paused=$isSpeechPaused autoRead=$isAutoReadEnabled visible=${isSpeechPlaying || isSpeechPaused}"
         )
     }
     LaunchedEffect(pendingRollbackIndex) {
@@ -217,13 +233,19 @@ fun ChatScreenContent(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize().padding(paddingValues)) {
-        if (chatHeaderOverlayMode && chatHeaderTransparent) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().padding(paddingValues)) {
+        val adaptiveHorizontalPadding =
+            ((maxWidth - adaptiveMetrics.chatContentMaxWidthDp.dp) / 2)
+                .coerceAtLeast(0.dp) + chatAreaHorizontalPadding.dp
+        if (useFloatingHeader) {
             // 覆盖模式：Header浮动在ChatArea之上
             Box(modifier = Modifier.fillMaxSize()) {
                 ChatArea(
                         chatHistory = chatHistory,
                         currentChatId = currentChatId,
+                        onStarterPromptSelected = { prompt ->
+                            actualViewModel.updateUserMessage(TextFieldValue(prompt))
+                        },
                         scrollState = scrollState,
                         isLoading = isLoading,
                         enableDialogs = enableMessageDialogs,
@@ -248,7 +270,8 @@ fun ChatScreenContent(
                         onSwitchMessageVariant = { index, targetVariantIndex ->
                             actualViewModel.switchMessageVariant(index, targetVariantIndex)
                         },
-                        onSpeakMessage = { content -> actualViewModel.speakMessage(content) },
+                        onSpeakMessage = { message -> actualViewModel.speakMessage(message) },
+                        currentSpeechSegment = currentSpeechSegment,
                         onAutoReadMessage = { content -> actualViewModel.enableAutoReadAndSpeak(content) },
                         onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) },
                         onToggleFavoriteMessage = { timestamp, isFavorite ->
@@ -304,7 +327,7 @@ fun ChatScreenContent(
                                 selectedMessageIndices + index
                             }
                         },
-                        horizontalPadding = chatAreaHorizontalPadding.dp,
+                        horizontalPadding = adaptiveHorizontalPadding,
                         bubbleUserImageStyle = bubbleUserImageStyle,
                         bubbleAiImageStyle = bubbleAiImageStyle,
                         bubbleUserRoundedCornersEnabled = bubbleUserRoundedCornersEnabled,
@@ -315,17 +338,28 @@ fun ChatScreenContent(
                         bubbleAiContentPaddingRight = bubbleAiContentPaddingRight,
                         showChatFloatingDotsAnimation = showChatFloatingDotsAnimation,
                 )
+                MiraChatEdgeFade(
+                    edge = MiraChatFadeEdge.TOP,
+                    height = (headerHeight + 20.dp).coerceAtLeast(96.dp),
+                    hasBackgroundImage = hasBackgroundImage,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
                 ChatScreenHeader(
                         modifier =
-                                Modifier.onGloballyPositioned { coordinates ->
-                                    headerHeight = with(density) { coordinates.size.height.toDp() }
+                                Modifier.onSizeChanged { size ->
+                                    headerHeight = with(density) { size.height.toDp() }
                                 },
                         actualViewModel = actualViewModel,
                         showChatHistorySelector = showChatHistorySelector,
                         chatHeaderTransparent = chatHeaderTransparent,
                         chatHeaderHistoryIconColor = chatHeaderHistoryIconColor,
                         chatHeaderPipIconColor = chatHeaderPipIconColor,
-                        onCharacterSwitcherClick = { onShowCharacterSelectorChange(true) }
+                        onCharacterSwitcherClick = { onShowCharacterSelectorChange(true) },
+                        onOpenCharacterSettings = onOpenCharacterSettings,
+                        onOpenVoiceSettings = onOpenVoiceSettings,
+                        onOpenCapabilities = onOpenCapabilities,
+                        onOpenSettings = onOpenSettings,
+                        onOpenModelSettings = onOpenModelSettings,
                 )
             }
         } else {
@@ -336,11 +370,19 @@ fun ChatScreenContent(
                         chatHeaderTransparent = chatHeaderTransparent,
                         chatHeaderHistoryIconColor = chatHeaderHistoryIconColor,
                         chatHeaderPipIconColor = chatHeaderPipIconColor,
-                        onCharacterSwitcherClick = { onShowCharacterSelectorChange(true) }
+                        onCharacterSwitcherClick = { onShowCharacterSelectorChange(true) },
+                        onOpenCharacterSettings = onOpenCharacterSettings,
+                        onOpenVoiceSettings = onOpenVoiceSettings,
+                        onOpenCapabilities = onOpenCapabilities,
+                        onOpenSettings = onOpenSettings,
+                        onOpenModelSettings = onOpenModelSettings,
                 )
                 ChatArea(
                         chatHistory = chatHistory,
                         currentChatId = currentChatId,
+                        onStarterPromptSelected = { prompt ->
+                            actualViewModel.updateUserMessage(TextFieldValue(prompt))
+                        },
                         scrollState = scrollState,
                         isLoading = isLoading,
                         enableDialogs = enableMessageDialogs,
@@ -365,7 +407,8 @@ fun ChatScreenContent(
                         onSwitchMessageVariant = { index, targetVariantIndex ->
                             actualViewModel.switchMessageVariant(index, targetVariantIndex)
                         },
-                        onSpeakMessage = { content -> actualViewModel.speakMessage(content) },
+                        onSpeakMessage = { message -> actualViewModel.speakMessage(message) },
+                        currentSpeechSegment = currentSpeechSegment,
                         onReplyToMessage = { message -> actualViewModel.setReplyToMessage(message) },
                         onToggleFavoriteMessage = { timestamp, isFavorite ->
                             actualViewModel.setMessageFavorite(timestamp, isFavorite)
@@ -404,7 +447,7 @@ fun ChatScreenContent(
                         bubbleAiBubbleWaterGlass = bubbleAiBubbleWaterGlass,
                         isMultiSelectMode = isMultiSelectMode,
                         selectedMessageIndices = selectedMessageIndices,
-                        horizontalPadding = chatAreaHorizontalPadding.dp,
+                        horizontalPadding = adaptiveHorizontalPadding,
                         onToggleMultiSelectMode = { initialIndex ->
                             isMultiSelectMode = !isMultiSelectMode
                             if (!isMultiSelectMode) {
@@ -468,7 +511,7 @@ fun ChatScreenContent(
                                 isMultiSelectMode = false
                                 selectedMessageIndices = emptySet()
                             },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Close,
@@ -533,7 +576,7 @@ fun ChatScreenContent(
                                 }
                             },
                             enabled = selectedMessageIndices.isNotEmpty(),
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(48.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -562,7 +605,7 @@ fun ChatScreenContent(
                                 }
                             },
                             enabled = selectedMessageIndices.isNotEmpty() && !isGeneratingImage,
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(48.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -585,7 +628,7 @@ fun ChatScreenContent(
                                 }
                             },
                             enabled = selectedMessageIndices.isNotEmpty(),
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(48.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.errorContainer,
                                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -608,24 +651,33 @@ fun ChatScreenContent(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val density = LocalDensity.current
             val endPadding = 16.dp
-            val bottomPadding = 80.dp
-            val fabSize = 40.dp
+            val bottomPadding = 12.dp
+            val fabSize = 48.dp
+            val controlSpacing = 8.dp
+            val controlWidth = fabSize * 2 + controlSpacing
 
             val containerWidthPx = with(density) { maxWidth.toPx() }
             val containerHeightPx = with(density) { maxHeight.toPx() }
-            val fabSizePx = with(density) { fabSize.toPx() }
+            val controlWidthPx = with(density) { controlWidth.toPx() }
+            val controlHeightPx = with(density) { fabSize.toPx() }
             val bottomInsetPx = with(density) { bottomInset.toPx() }
 
             val initialOffsetXPx =
-                (containerWidthPx - with(density) { (endPadding + fabSize).toPx() }).coerceAtLeast(0f)
+                (containerWidthPx - with(density) { (endPadding + controlWidth).toPx() }).coerceAtLeast(0f)
             val initialOffsetYPx =
                 (containerHeightPx - with(density) { (bottomPadding + bottomInset + fabSize).toPx() }).coerceAtLeast(0f)
 
             var stopButtonOffsetXPx by rememberSaveable { mutableFloatStateOf(initialOffsetXPx) }
             var stopButtonOffsetYPx by rememberSaveable { mutableFloatStateOf(initialOffsetYPx) }
 
-            val maxX = (containerWidthPx - fabSizePx).coerceAtLeast(0f)
-            val maxY = (containerHeightPx - fabSizePx - bottomInsetPx).coerceAtLeast(0f)
+            val maxX = (containerWidthPx - controlWidthPx).coerceAtLeast(0f)
+            val maxY =
+                (
+                    containerHeightPx -
+                        controlHeightPx -
+                        bottomInsetPx -
+                        with(density) { bottomPadding.toPx() }
+                ).coerceAtLeast(0f)
 
             // 屏幕尺寸变化（旋转/分屏）时，确保按钮仍然在可见区域内
             LaunchedEffect(maxX, maxY) {
@@ -634,7 +686,7 @@ fun ChatScreenContent(
             }
 
             AnimatedVisibility(
-                visible = isSpeechSessionActive || isSpeechPaused || isAutoReadEnabled,
+                visible = isSpeechPlaying || isSpeechPaused,
                 enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
                 exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
                 modifier = Modifier
@@ -653,71 +705,63 @@ fun ChatScreenContent(
                     }
             ) {
                 Row(
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(controlSpacing)
                 ) {
                     SmallFloatingActionButton(
-                        modifier = Modifier.align(Alignment.Top),
+                        modifier = Modifier.size(fabSize),
                         onClick = {
-                            AppLogger.d(
-                                "ChatScreenContent",
-                                "speechControls pauseClick session=$isSpeechSessionActive paused=$isSpeechPaused autoRead=$isAutoReadEnabled"
-                            )
-                            actualViewModel.pauseSpeaking()
+                            if (isSpeechPaused) {
+                                AppLogger.d(
+                                    "ChatScreenContent",
+                                    "speechControls resumeClick session=$isSpeechSessionActive playing=$isSpeechPlaying paused=$isSpeechPaused"
+                                )
+                                actualViewModel.resumeSpeaking()
+                            } else {
+                                AppLogger.d(
+                                    "ChatScreenContent",
+                                    "speechControls pauseClick session=$isSpeechSessionActive playing=$isSpeechPlaying paused=$isSpeechPaused"
+                                )
+                                actualViewModel.pauseSpeaking()
+                            }
                         },
-                        containerColor = MaterialTheme.colorScheme.secondary,
-                        contentColor = MaterialTheme.colorScheme.onSecondary
+                        containerColor =
+                            if (isSpeechPaused) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.secondary,
+                        contentColor =
+                            if (isSpeechPaused) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSecondary
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Pause,
-                            contentDescription = stringResource(R.string.pause_reading),
+                            imageVector =
+                                if (isSpeechPaused) Icons.Filled.PlayArrow
+                                else Icons.Filled.Pause,
+                            contentDescription =
+                                stringResource(
+                                    if (isSpeechPaused) R.string.resume_reading
+                                    else R.string.pause_reading
+                                ),
                             modifier = Modifier.size(24.dp)
                         )
                     }
 
-                    AnimatedVisibility(
-                        visible = isSpeechPaused,
-                        enter = fadeIn(),
-                        exit = fadeOut(),
-                        modifier = Modifier.align(Alignment.Top)
+                    SmallFloatingActionButton(
+                        modifier = Modifier.size(fabSize),
+                        onClick = {
+                            AppLogger.d(
+                                "ChatScreenContent",
+                                "speechControls stopClick session=$isSpeechSessionActive playing=$isSpeechPlaying paused=$isSpeechPaused"
+                            )
+                            actualViewModel.stopSpeaking()
+                        },
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    AppLogger.d(
-                                        "ChatScreenContent",
-                                        "speechControls resumeClick session=$isSpeechSessionActive paused=$isSpeechPaused autoRead=$isAutoReadEnabled"
-                                    )
-                                    actualViewModel.resumeSpeaking()
-                                },
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.PlayArrow,
-                                    contentDescription = stringResource(R.string.resume_reading),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-
-                            SmallFloatingActionButton(
-                                onClick = {
-                                    AppLogger.d(
-                                        "ChatScreenContent",
-                                        "speechControls stopClick session=$isSpeechSessionActive paused=$isSpeechPaused autoRead=$isAutoReadEnabled"
-                                    )
-                                    actualViewModel.stopSpeaking()
-                                },
-                                containerColor = MaterialTheme.colorScheme.error,
-                                contentColor = MaterialTheme.colorScheme.onError
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Stop,
-                                    contentDescription = stringResource(R.string.stop_reading),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Filled.Stop,
+                            contentDescription = stringResource(R.string.stop_reading),
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
             }
@@ -727,7 +771,14 @@ fun ChatScreenContent(
             AlertDialog(
                 onDismissRequest = { showDeleteSelectedConfirmDialog = false },
                 title = { Text(stringResource(R.string.confirm_delete)) },
-                text = { Text("Delete ${selectedMessageIndices.size} selected messages? This cannot be undone.") },
+                text = {
+                    Text(
+                        stringResource(
+                            R.string.chat_delete_selected_messages_confirmation,
+                            selectedMessageIndices.size,
+                        )
+                    )
+                },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -862,7 +913,8 @@ fun ChatScreenContent(
                         exportStatus = context.getString(R.string.chat_starting_export)
 
                         // 启动导出过程
-                        coroutineScope.launch {
+                        exportJob?.cancel()
+                        exportJob = coroutineScope.launch {
                             exportAndroidApp(
                                     context = context,
                                     packageName = packageName,
@@ -876,6 +928,7 @@ fun ChatScreenContent(
                                         exportStatus = status
                                     },
                                     onComplete = { success, filePath, errorMessage ->
+                                        exportJob = null
                                         showExportProgressDialog = false
                                         exportSuccess = success
                                         exportFilePath = filePath
@@ -900,7 +953,8 @@ fun ChatScreenContent(
                         exportStatus = context.getString(R.string.chat_starting_export)
 
                         // 启动导出过程
-                        coroutineScope.launch {
+                        exportJob?.cancel()
+                        exportJob = coroutineScope.launch {
                             exportWindowsApp(
                                     context = context,
                                     appName = appName,
@@ -911,6 +965,7 @@ fun ChatScreenContent(
                                         exportStatus = status
                                     },
                                     onComplete = { success, filePath, errorMessage ->
+                                        exportJob = null
                                         showExportProgressDialog = false
                                         exportSuccess = success
                                         exportFilePath = filePath
@@ -928,7 +983,11 @@ fun ChatScreenContent(
             ExportProgressDialog(
                     progress = exportProgress,
                     status = exportStatus,
-                    onCancel = { showExportProgressDialog = false }
+                    onCancel = {
+                        exportJob?.cancel()
+                        exportJob = null
+                        showExportProgressDialog = false
+                    }
             )
         }
 
@@ -1063,76 +1122,51 @@ fun ChatHistorySelectorPanel(
         autoSwitchCharacterCard: Boolean,
         onAutoSwitchCharacterCardChange: (Boolean) -> Unit,
         autoSwitchChatOnCharacterSelect: Boolean,
-        onAutoSwitchChatOnCharacterSelectChange: (Boolean) -> Unit
+        onAutoSwitchChatOnCharacterSelectChange: (Boolean) -> Unit,
+        onOpenMemory: () -> Unit = {},
+        onOpenSettings: () -> Unit = {},
 ) {
-    // 历史选择器面板（不再包含遮罩层，遮罩层已在外部处理）
     Box(
-            modifier =
-                    Modifier.width(280.dp)
-                            .fillMaxHeight()
-                            .background(
-                                    color =
-                                            MaterialTheme.colorScheme.surface.copy(
-                                                    alpha = 0.95f
-                                            ),
-                                    shape = RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)
-                            )
+        modifier =
+            Modifier
+                .fillMaxWidth(0.86f)
+                .widthIn(max = 320.dp)
+                .fillMaxHeight()
+                .background(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp),
+                ),
     ) {
         val activeStreamingChatIds by actualViewModel.activeStreamingChatIds.collectAsState()
-        // 直接使用ChatHistorySelector
-        ChatHistorySelector(
-                modifier = Modifier.fillMaxSize().padding(top = 8.dp),
-                onNewChat = { characterCardName, characterGroupId ->
-                    actualViewModel.createNewChat(characterCardName, characterGroupId)
-                    // 创建新对话后自动收起侧边框
-                    actualViewModel.showChatHistorySelector(false)
-                },
-                onSelectChat = { chatId ->
-                    actualViewModel.switchChat(chatId)
-                    // 切换聊天后也自动收起侧边框
-                    actualViewModel.showChatHistorySelector(false)
-                },
-                onDeleteChat = { chatId -> actualViewModel.deleteChatHistory(chatId) },
-                onUpdateChatTitle = { chatId, newTitle ->
-                    actualViewModel.updateChatTitle(chatId, newTitle)
-                },
-                onUpdateChatBinding = { chatId, characterCardName, characterGroupId ->
-                    actualViewModel.updateChatCharacterBinding(chatId, characterCardName, characterGroupId)
-                },
-                onCreateGroup = { groupName, characterCardName, characterGroupId ->
-                    actualViewModel.createGroup(groupName, characterCardName, characterGroupId)
-                },
-                onUpdateChatOrderAndGroup = { reorderedHistories, movedItem, targetGroup ->
-                    actualViewModel.updateChatOrderAndGroup(
-                            reorderedHistories,
-                            movedItem,
-                            targetGroup
-                    )
-                },
-                onUpdateGroupName = { oldName, newName, characterCardName ->
-                    actualViewModel.updateGroupName(oldName, newName, characterCardName)
-                },
-                onDeleteGroup = { groupName, deleteChats, characterCardName ->
-                    actualViewModel.deleteGroup(groupName, deleteChats, characterCardName)
-                },
-                chatHistories = chatHistories,
-                currentId = currentChatId,
-                activeStreamingChatIds = activeStreamingChatIds,
-                lazyListState = historyListState,
-                onBack = { actualViewModel.toggleChatHistorySelector() },
-                searchQuery = searchQuery,
-                onSearchQueryChange = onSearchQueryChange,
-                historyDisplayMode = historyDisplayMode,
-                onDisplayModeChange = onDisplayModeChange,
-                autoSwitchCharacterCard = autoSwitchCharacterCard,
-                onAutoSwitchCharacterCardChange = onAutoSwitchCharacterCardChange,
-                autoSwitchChatOnCharacterSelect = autoSwitchChatOnCharacterSelect,
-                onAutoSwitchChatOnCharacterSelectChange = onAutoSwitchChatOnCharacterSelectChange,
-                onQuickScrollInteractionChange = { consumed ->
-                    GestureStateHolder.isChatScreenGestureConsumed = consumed
-                    onChatScreenGestureConsumed(consumed)
-                },
-                activePrompt = activePrompt
+        MiraConversationDrawer(
+            modifier = Modifier.fillMaxSize(),
+            chatHistories = chatHistories,
+            currentId = currentChatId,
+            activeStreamingChatIds = activeStreamingChatIds,
+            searchQuery = searchQuery,
+            onSearchQueryChange = onSearchQueryChange,
+            onNewChat = {
+                actualViewModel.createSessionChat()
+                actualViewModel.showChatHistorySelector(false)
+            },
+            onSelectChat = { chatId ->
+                actualViewModel.switchChat(chatId)
+                actualViewModel.showChatHistorySelector(false)
+            },
+            onPinChat = actualViewModel::updateChatPinned,
+            onRenameChat = actualViewModel::updateChatTitle,
+            onArchiveChat = actualViewModel::updateChatArchived,
+            onExportChat = actualViewModel::exportChat,
+            onDeleteChat = actualViewModel::deleteChatHistory,
+            onOpenMemory = {
+                actualViewModel.showChatHistorySelector(false)
+                onOpenMemory()
+            },
+            onOpenSettings = {
+                actualViewModel.showChatHistorySelector(false)
+                onOpenSettings()
+            },
+            onClose = { actualViewModel.showChatHistorySelector(false) },
         )
     }
 }

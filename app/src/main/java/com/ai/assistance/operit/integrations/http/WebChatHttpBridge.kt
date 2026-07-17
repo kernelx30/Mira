@@ -65,6 +65,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -1150,12 +1151,38 @@ class WebChatHttpBridge(
                         )
                     )
 
-                    core.sendUserMessage()
+                    val dispatchResolved = CompletableDeferred<Boolean>()
+                    val reserved =
+                        core.sendUserMessage(
+                            onDispatchResolved = { accepted ->
+                                dispatchResolved.complete(accepted)
+                            }
+                        )
+                    val dispatchAccepted =
+                        reserved &&
+                            withTimeoutOrNull(STREAM_READY_TIMEOUT_MS) {
+                                dispatchResolved.await()
+                            } == true
+                    if (!dispatchAccepted) {
+                        writeSseEvent(
+                            writer,
+                            WebChatStreamEvent(
+                                event = STREAM_EVENT_ERROR,
+                                chatId = chatId,
+                                error = "The response pipeline did not accept the message",
+                            ),
+                        )
+                        return@use
+                    }
 
                     val responseStream: SharedStream<String>? =
                         withTimeoutOrNull<SharedStream<String>>(STREAM_READY_TIMEOUT_MS) {
                             var stream: SharedStream<String>? = null
                             while (stream == null) {
+                                val state = core.inputProcessingStateByChatId.value[chatId]
+                                if (state is InputProcessingState.Error) {
+                                    throw IllegalStateException(state.message)
+                                }
                                 stream = core.getResponseStream(chatId)
                                 if (stream == null) {
                                     delay(40)

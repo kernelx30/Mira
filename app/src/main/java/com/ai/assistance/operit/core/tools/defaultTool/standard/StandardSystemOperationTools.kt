@@ -511,11 +511,68 @@ open class StandardSystemOperationTools(private val context: Context) {
     }
 
     /** 启动应用程序 如果提供了activity参数，将启动指定的活动 否则使用默认启动器启动应用 */
+    private data class AppPackageResolution(
+        val packageName: String? = null,
+        val error: String? = null,
+    )
+
+    private fun resolveInstalledAppPackage(identifier: String): AppPackageResolution {
+        val requested = identifier.trim()
+        if (requested.isBlank()) return AppPackageResolution(error = "App name is empty")
+        val packageManager = context.packageManager
+
+        runCatching { packageManager.getApplicationInfo(requested, 0) }
+            .getOrNull()
+            ?.let { return AppPackageResolution(packageName = it.packageName) }
+
+        val normalizedRequested = normalizeAppName(requested)
+        val candidates =
+            packageManager.getInstalledApplications(PackageManager.GET_META_DATA).mapNotNull { appInfo ->
+                val label =
+                    runCatching { appInfo.loadLabel(packageManager).toString().trim() }
+                        .getOrNull()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: return@mapNotNull null
+                Triple(appInfo.packageName, label, normalizeAppName(label))
+            }
+
+        candidates.firstOrNull { (_, _, normalizedLabel) ->
+            normalizedLabel == normalizedRequested
+        }?.let { (packageName, _, _) ->
+            return AppPackageResolution(packageName = packageName)
+        }
+
+        if (normalizedRequested.length >= 2) {
+            val partialMatches =
+                candidates.filter { (_, _, normalizedLabel) ->
+                    normalizedLabel.contains(normalizedRequested) ||
+                        normalizedRequested.contains(normalizedLabel)
+                }
+            if (partialMatches.size == 1) {
+                return AppPackageResolution(packageName = partialMatches.single().first)
+            }
+            if (partialMatches.size > 1) {
+                val labels = partialMatches.take(6).joinToString { (_, label, _) -> label }
+                return AppPackageResolution(error = "App name is ambiguous: $labels")
+            }
+        }
+
+        return AppPackageResolution(error = "App not installed or not visible: $requested")
+    }
+
+    private fun normalizeAppName(value: String): String =
+        value
+            .lowercase(Locale.ROOT)
+            .replace(Regex("[\\s·・_\\-]+"), "")
+            .removeSuffix("应用")
+            .removeSuffix("app")
+            .removeSuffix("软件")
+
     open suspend fun startApp(tool: AITool): ToolResult {
-        val packageName = tool.parameters.find { it.name == "package_name" }?.value ?: ""
+        val requestedApp = tool.parameters.find { it.name == "package_name" }?.value ?: ""
         val activityName = tool.parameters.find { it.name == "activity" }?.value ?: ""
 
-        if (packageName.isBlank()) {
+        if (requestedApp.isBlank()) {
             return ToolResult(
                 toolName = tool.name,
                 success = false,
@@ -523,6 +580,16 @@ open class StandardSystemOperationTools(private val context: Context) {
                 error = "Must provide package_name parameter"
             )
         }
+
+        val resolution = resolveInstalledAppPackage(requestedApp)
+        val packageName =
+            resolution.packageName
+                ?: return ToolResult(
+                    toolName = tool.name,
+                    success = false,
+                    result = StringResultData(""),
+                    error = resolution.error ?: "Unable to resolve app: $requestedApp",
+                )
 
         return try {
             val intent: Intent? = if (activityName.isBlank()) {

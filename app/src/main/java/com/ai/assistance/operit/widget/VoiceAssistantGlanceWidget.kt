@@ -59,8 +59,8 @@ fun VoiceAssistantWidgetContent(context: Context) {
                 .background(
                     // 使用半透明背景，适配深色/浅色主题
                     ColorProvider(
-                        day = Color(0xCC2196F3), // 蓝色，70% 不透明度
-                        night = Color(0xCC1976D2)  // 深蓝色，70% 不透明度
+                        day = Color(0xE6167A75),
+                        night = Color(0xE60E5D59)
                     )
                 )
                 .padding(16.dp)
@@ -98,7 +98,7 @@ fun VoiceAssistantWidgetContent(context: Context) {
 
                 // 标题文字
                 Text(
-                    text = "Operit",
+                    text = context.getString(R.string.app_name),
                     style = TextStyle(
                         fontSize = 16.sp,
                         color = ColorProvider(Color.White)
@@ -119,4 +119,3 @@ fun VoiceAssistantWidgetContent(context: Context) {
         }
     }
 }
-

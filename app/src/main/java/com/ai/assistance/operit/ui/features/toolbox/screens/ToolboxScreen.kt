@@ -3,12 +3,18 @@ package com.ai.assistance.operit.ui.features.toolbox.screens
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +22,7 @@ import androidx.compose.ui.Modifier
 import com.ai.assistance.operit.ui.components.CustomScaffold
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -64,40 +71,15 @@ fun ToolboxScreen(
                                 ?.navigationEntries
                                 .orEmpty()
                                 .filter { entry ->
-                                        entry.surface == NavigationSurface.TOOLBOX
+                                        entry.surface == NavigationSurface.TOOLBOX ||
+                                                entry.surface == NavigationSurface.MAIN_SIDEBAR_TOOLS ||
+                                                entry.surface == NavigationSurface.MAIN_SIDEBAR_PLUGINS
                                 }
                 }
-        val tools =
-                remember(toolboxEntries) {
-                        toolboxEntries.map { entry ->
-                                Tool(
-                                        id = entry.entryId,
-                                        name = entry.title,
-                                        icon = entry.icon,
-                                        description = entry.description,
-                                        onClick = {
-                                                onNavigationEntrySelected(entry)
-                                        }
-                                )
-                        }
-                }
-
-        Box(modifier = Modifier.fillMaxSize()) {
-                LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 156.dp),
-                        contentPadding = PaddingValues(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                ) {
-                        items(
-                                items = tools,
-                                key = { tool -> tool.id }
-                        ) { tool ->
-                                ToolCard(tool = tool)
-                        }
-                }
-        }
+        CapabilityCenterContent(
+                entries = toolboxEntries,
+                onNavigationEntrySelected = onNavigationEntrySelected,
+        )
 }
 
 /** 工具项卡片 */
@@ -186,6 +168,244 @@ fun ToolCard(tool: Tool) {
                         }
                 }
         }
+}
+
+private enum class CapabilityGroup {
+        AGENT,
+        DEVICE,
+        WORKSPACE,
+        MEDIA,
+        OTHER,
+}
+
+private data class CapabilitySection(
+        val group: CapabilityGroup,
+        val title: String,
+        val entries: List<NavigationEntrySpec>,
+)
+
+private fun capabilityGroup(entry: NavigationEntrySpec): CapabilityGroup {
+        if (entry.surface == NavigationSurface.MAIN_SIDEBAR_TOOLS ||
+                entry.surface == NavigationSurface.MAIN_SIDEBAR_PLUGINS
+        ) {
+                return CapabilityGroup.AGENT
+        }
+        return when {
+                entry.entryId.contains("speech") ||
+                        entry.entryId.contains("ffmpeg") ||
+                        entry.entryId.contains("text_to_speech") -> CapabilityGroup.MEDIA
+                entry.entryId.contains("permission") ||
+                        entry.entryId.contains("autoglm") ||
+                        entry.entryId.contains("ui_debugger") ||
+                        entry.entryId.contains("process_limit") -> CapabilityGroup.DEVICE
+                entry.entryId.contains("file") ||
+                        entry.entryId.contains("terminal") ||
+                        entry.entryId.contains("shell") ||
+                        entry.entryId.contains("sql") ||
+                        entry.entryId.contains("html") ||
+                        entry.entryId.contains("logcat") ||
+                        entry.entryId.contains("tool_tester") ||
+                        entry.entryId.contains("token_config") -> CapabilityGroup.WORKSPACE
+                else -> CapabilityGroup.OTHER
+        }
+}
+
+@Composable
+private fun CapabilityCenterContent(
+        entries: List<NavigationEntrySpec>,
+        onNavigationEntrySelected: (NavigationEntrySpec) -> Unit,
+) {
+        val grouped = remember(entries) { entries.groupBy(::capabilityGroup) }
+        val sections =
+                listOf(
+                        CapabilitySection(
+                                CapabilityGroup.AGENT,
+                                stringResource(R.string.capability_group_agent),
+                                grouped[CapabilityGroup.AGENT].orEmpty(),
+                        ),
+                        CapabilitySection(
+                                CapabilityGroup.DEVICE,
+                                stringResource(R.string.capability_group_device),
+                                grouped[CapabilityGroup.DEVICE].orEmpty(),
+                        ),
+                        CapabilitySection(
+                                CapabilityGroup.WORKSPACE,
+                                stringResource(R.string.capability_group_workspace),
+                                grouped[CapabilityGroup.WORKSPACE].orEmpty(),
+                        ),
+                        CapabilitySection(
+                                CapabilityGroup.MEDIA,
+                                stringResource(R.string.capability_group_media),
+                                grouped[CapabilityGroup.MEDIA].orEmpty(),
+                        ),
+                        CapabilitySection(
+                                CapabilityGroup.OTHER,
+                                stringResource(R.string.capability_group_other),
+                                grouped[CapabilityGroup.OTHER].orEmpty(),
+                        ),
+                ).filter { it.entries.isNotEmpty() }
+
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val wideLayout = maxWidth >= 840.dp
+                Column(
+                        modifier =
+                                Modifier.align(Alignment.TopCenter)
+                                        .fillMaxWidth()
+                                        .widthIn(max = 1180.dp)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(
+                                                horizontal = if (wideLayout) 28.dp else 16.dp,
+                                                vertical = 20.dp,
+                                        ),
+                ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                        modifier = Modifier.size(56.dp),
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                        imageVector = Icons.Default.Extension,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(26.dp),
+                                                )
+                                        }
+                                }
+                                Spacer(Modifier.width(16.dp))
+                                Column {
+                                        Text(
+                                                text = stringResource(R.string.capability_center_title),
+                                                style = MaterialTheme.typography.headlineSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                        )
+                                        Text(
+                                                text = stringResource(R.string.capability_available_count, entries.size),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                }
+                        }
+                        Spacer(Modifier.height(24.dp))
+
+                        if (wideLayout) {
+                                Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                                        verticalAlignment = Alignment.Top,
+                                ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                                sections.filterIndexed { index, _ -> index % 2 == 0 }
+                                                        .forEach {
+                                                                CapabilitySectionCard(
+                                                                        section = it,
+                                                                        onNavigationEntrySelected = onNavigationEntrySelected,
+                                                                )
+                                                        }
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                                sections.filterIndexed { index, _ -> index % 2 == 1 }
+                                                        .forEach {
+                                                                CapabilitySectionCard(
+                                                                        section = it,
+                                                                        onNavigationEntrySelected = onNavigationEntrySelected,
+                                                                )
+                                                        }
+                                        }
+                                }
+                        } else {
+                                sections.forEach {
+                                        CapabilitySectionCard(
+                                                section = it,
+                                                onNavigationEntrySelected = onNavigationEntrySelected,
+                                        )
+                                }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                }
+        }
+}
+
+@Composable
+private fun ColumnScope.CapabilitySectionCard(
+        section: CapabilitySection,
+        onNavigationEntrySelected: (NavigationEntrySpec) -> Unit,
+) {
+        Text(
+                text = section.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+                Column {
+                        section.entries.forEachIndexed { index, entry ->
+                                ListItem(
+                                        modifier =
+                                                Modifier.fillMaxWidth()
+                                                        .clickable { onNavigationEntrySelected(entry) },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                        leadingContent = {
+                                                Surface(
+                                                        modifier = Modifier.size(40.dp),
+                                                        shape = CircleShape,
+                                                        color =
+                                                                if (section.group == CapabilityGroup.AGENT)
+                                                                        MaterialTheme.colorScheme.primaryContainer
+                                                                else MaterialTheme.colorScheme.secondaryContainer,
+                                                ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                                Icon(
+                                                                        imageVector = entry.icon,
+                                                                        contentDescription = null,
+                                                                        modifier = Modifier.size(20.dp),
+                                                                )
+                                                        }
+                                                }
+                                        },
+                                        headlineContent = {
+                                                Text(
+                                                        text = entry.title,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.Medium,
+                                                )
+                                        },
+                                        supportingContent =
+                                                entry.description?.takeIf { it.isNotBlank() }?.let { description ->
+                                                        {
+                                                                Text(
+                                                                        text = description,
+                                                                        maxLines = 2,
+                                                                        overflow = TextOverflow.Ellipsis,
+                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                )
+                                                        }
+                                                },
+                                        trailingContent = {
+                                                Icon(
+                                                        imageVector = Icons.Default.ChevronRight,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                        },
+                                )
+                                if (index != section.entries.lastIndex) {
+                                        HorizontalDivider(
+                                                modifier = Modifier.padding(start = 72.dp),
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                                        )
+                                }
+                        }
+                }
+        }
+        Spacer(Modifier.height(20.dp))
 }
 
 

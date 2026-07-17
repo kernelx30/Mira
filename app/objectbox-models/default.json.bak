@@ -242,10 +242,66 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "11:3712699051976894545",
+      "lastPropertyId": "9:6465928775145661644",
+      "name": "MemoryAutoSaveCandidate",
+      "properties": [
+        {
+          "id": "1:495208067701775288",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:6151990417112107897",
+          "name": "chatId",
+          "indexId": "13:8050158526538100522",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:9099854686500286805",
+          "name": "triggerMessageTimestamp",
+          "type": 6
+        },
+        {
+          "id": "4:810333269887080571",
+          "name": "createdAt",
+          "type": 10
+        },
+        {
+          "id": "5:3945441931776740581",
+          "name": "updatedAt",
+          "type": 10
+        },
+        {
+          "id": "6:1659223806310826159",
+          "name": "status",
+          "type": 9
+        },
+        {
+          "id": "7:2040478836168399127",
+          "name": "attemptCount",
+          "type": 5
+        },
+        {
+          "id": "8:1648692108346116178",
+          "name": "lastError",
+          "type": 9
+        },
+        {
+          "id": "9:6465928775145661644",
+          "name": "sourceType",
+          "type": 9
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "10:5349597594094633029",
-  "lastIndexId": "12:2680418358074816994",
+  "lastEntityId": "11:3712699051976894545",
+  "lastIndexId": "13:8050158526538100522",
   "lastRelationId": "10:1689903676451604172",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

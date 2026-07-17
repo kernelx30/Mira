@@ -67,6 +67,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.core.companion.CompanionReminderScheduler
 import com.ai.assistance.operit.data.model.ImportStrategy
 import com.ai.assistance.operit.data.model.PreferenceProfile
 import com.ai.assistance.operit.data.backup.OperitBackupDirs
@@ -1628,6 +1629,7 @@ private suspend fun importMemoriesFromUri(
         throw Exception(context.getString(R.string.backup_import_file_empty))
     }
 
-    memoryRepository.importMemoriesFromJson(jsonString, strategy)
+    val result = memoryRepository.importMemoriesFromJson(jsonString, strategy)
+    CompanionReminderScheduler.getInstance(context).syncAllProfiles()
+    result
 }
-

@@ -14,6 +14,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -23,6 +24,7 @@ import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.services.FloatingChatService
+import com.ai.assistance.operit.services.floating.MiraFloatingLayoutPolicy
 import com.ai.assistance.operit.services.floating.FloatingWindowState
 import com.ai.assistance.operit.ui.features.chat.components.ChatToastHost
 import com.ai.assistance.operit.ui.floating.ui.ball.FloatingChatBallMode
@@ -30,7 +32,7 @@ import com.ai.assistance.operit.ui.floating.ui.ball.FloatingResultDisplay
 import com.ai.assistance.operit.ui.floating.ui.ball.FloatingVoiceBallMode
 import com.ai.assistance.operit.ui.floating.ui.fullscreen.FloatingFullscreenMode
 import com.ai.assistance.operit.ui.floating.ui.screenocr.FloatingScreenOcrMode
-import com.ai.assistance.operit.ui.floating.ui.window.screen.FloatingChatWindowMode
+import com.ai.assistance.operit.ui.floating.ui.MiraQuickReplyCard
 
 /**
  * 悬浮聊天窗口的主要UI组件 - 重构版
@@ -85,6 +87,7 @@ fun FloatingChatWindow(
         currentY: Float = 0f,
         saveWindowState: (() -> Unit)? = null,
         onSendMessage: ((String, PromptFunctionType) -> Unit)? = null,
+        onSendMessageWithResult: ((String, PromptFunctionType, (Boolean) -> Unit) -> Boolean)? = null,
         onCancelMessage: (() -> Unit)? = null,
         onAttachmentRequest: ((String) -> Unit)? = null,
         attachments: List<AttachmentInfo> = emptyList(),
@@ -116,6 +119,7 @@ fun FloatingChatWindow(
                     currentY = currentY,
                     saveWindowState = saveWindowState,
                     onSendMessage = onSendMessage,
+                    onSendMessageWithResult = onSendMessageWithResult,
                     onCancelMessage = onCancelMessage,
                     onAttachmentRequest = onAttachmentRequest,
                     attachments = attachments,
@@ -130,6 +134,8 @@ fun FloatingChatWindow(
         chatCore?.getUiStateDelegate()?.toastEvent?.collectAsState(initial = null)
             ?: remember { mutableStateOf<String?>(null) }
     val toastEvent by toastEventState
+    val quickReplyWidth =
+        MiraFloatingLayoutPolicy.cardWidthDp(screenWidth.value.toInt()).dp
 
     // 将窗口缩放限制在合理范围内 - 已通过回调和状态源头处理，不再需要
     // LaunchedEffect(initialWindowScale) {
@@ -142,9 +148,7 @@ fun FloatingChatWindow(
         floatContext.onInputFocusRequest?.invoke(floatContext.showInputDialog)
 
         // 如果隐藏输入框，清空消息
-        if (!floatContext.showInputDialog) {
-            floatContext.userMessage = ""
-        }
+        // Keep the floating draft so the full chat can receive it.
     }
 
     // 根据currentMode参数渲染对应界面，使用AnimatedContent添加炫酷过渡动画
@@ -197,7 +201,7 @@ fun FloatingChatWindow(
             label = "mode_transition"
         ) { mode -> // 只接收 currentMode，不是整个 context
             when (mode) {
-                FloatingMode.WINDOW -> FloatingChatWindowMode(floatContext = floatContext)
+                FloatingMode.WINDOW -> MiraQuickReplyCard(floatContext = floatContext)
                 FloatingMode.BALL -> {
                     // 根据前一个模式决定显示哪种球
                     when (previousMode) {
@@ -215,9 +219,16 @@ fun FloatingChatWindow(
         ChatToastHost(
             message = toastEvent,
             onDismiss = { chatCore?.getUiStateDelegate()?.clearToastEvent() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier =
+                if (currentMode == FloatingMode.WINDOW) {
+                    Modifier
+                        .width(quickReplyWidth)
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                },
             maxWidth = 360.dp,
             maxHeight = 200.dp
         )

@@ -49,6 +49,10 @@ class WakeWordPreferences(private val context: Context) {
         private val KEY_PERSONAL_WAKE_TEMPLATES_JSON = stringPreferencesKey("personal_wake_templates_json")
         private val KEY_VOICE_CALL_INACTIVITY_TIMEOUT_SECONDS =
             intPreferencesKey("voice_call_inactivity_timeout_seconds")
+        private val KEY_VOICE_CALL_BARGE_IN_ENABLED =
+            booleanPreferencesKey("voice_call_barge_in_enabled")
+        private val KEY_VOICE_CALL_SILENCE_TIMEOUT_MS =
+            intPreferencesKey("voice_call_silence_timeout_ms")
         private val KEY_WAKE_GREETING_ENABLED = booleanPreferencesKey("wake_greeting_enabled")
         private val KEY_WAKE_GREETING_TEXT = stringPreferencesKey("wake_greeting_text")
 
@@ -65,6 +69,8 @@ class WakeWordPreferences(private val context: Context) {
         const val DEFAULT_ALWAYS_LISTENING_ENABLED = false
         const val DEFAULT_WAKE_RECOGNITION_MODE = "stt"
         const val DEFAULT_VOICE_CALL_INACTIVITY_TIMEOUT_SECONDS = 5
+        const val DEFAULT_VOICE_CALL_BARGE_IN_ENABLED = true
+        const val DEFAULT_VOICE_CALL_SILENCE_TIMEOUT_MS = 1_800
         const val DEFAULT_WAKE_GREETING_ENABLED = true
 
         const val DEFAULT_WAKE_CREATE_NEW_CHAT_ON_WAKE_ENABLED = false
@@ -173,6 +179,16 @@ class WakeWordPreferences(private val context: Context) {
         dataStore.data.map { prefs ->
             prefs[KEY_VOICE_CALL_INACTIVITY_TIMEOUT_SECONDS]
                 ?: DEFAULT_VOICE_CALL_INACTIVITY_TIMEOUT_SECONDS
+        }
+
+    val voiceCallBargeInEnabledFlow: Flow<Boolean> =
+        dataStore.data.map { prefs ->
+            prefs[KEY_VOICE_CALL_BARGE_IN_ENABLED] ?: DEFAULT_VOICE_CALL_BARGE_IN_ENABLED
+        }
+
+    val voiceCallSilenceTimeoutMsFlow: Flow<Int> =
+        dataStore.data.map { prefs ->
+            prefs[KEY_VOICE_CALL_SILENCE_TIMEOUT_MS] ?: DEFAULT_VOICE_CALL_SILENCE_TIMEOUT_MS
         }
 
     val wakeGreetingEnabledFlow: Flow<Boolean> =
@@ -285,6 +301,16 @@ class WakeWordPreferences(private val context: Context) {
     suspend fun saveVoiceCallInactivityTimeoutSeconds(seconds: Int) {
         dataStore.edit { prefs ->
             prefs[KEY_VOICE_CALL_INACTIVITY_TIMEOUT_SECONDS] = seconds
+        }
+    }
+
+    suspend fun saveVoiceCallBargeInEnabled(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[KEY_VOICE_CALL_BARGE_IN_ENABLED] = enabled }
+    }
+
+    suspend fun saveVoiceCallSilenceTimeoutMs(timeoutMs: Int) {
+        dataStore.edit { prefs ->
+            prefs[KEY_VOICE_CALL_SILENCE_TIMEOUT_MS] = timeoutMs.coerceIn(700, 4_000)
         }
     }
 

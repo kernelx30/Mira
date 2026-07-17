@@ -182,7 +182,7 @@ fun CodeEditor(
             }
 
             Surface(
-                modifier = Modifier.fillMaxWidth().height(40.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
                 color = theme.gutterBackground,
                 contentColor = theme.textColor,
                 shadowElevation = 4.dp
@@ -214,7 +214,7 @@ fun CodeEditor(
 private fun SymbolButton(symbol: String, theme: EditorTheme, onClick: () -> Unit) {
     Box(
         modifier =
-            Modifier.size(32.dp)
+            Modifier.size(48.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .border(width = 1.dp, color = theme.gutterBorder, shape = RoundedCornerShape(8.dp))
                 .clickable(onClick = onClick)

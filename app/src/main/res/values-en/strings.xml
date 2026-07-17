@@ -1,5 +1,6 @@
  <resources>
-    <string name="app_name">Operit AI</string>
+    <string name="app_name">Mira</string>
+    <string name="brand_tagline">Your private AI companion</string>
     <string name="accessibility_service_description">Used to obtain the UI hierarchy, providing faster interface analysis capabilities for AI assistants, and does not collect or store any personal information.</string>
     
     <!-- Model selector related -->
@@ -9,13 +10,208 @@
     <string name="model">Model</string>
     
     <!-- Navigation -->
-    <string name="nav_ai_chat">AI Chat</string>
+    <string name="nav_ai_chat">Companion</string>
+    <string name="mate_nav_companion">Chat</string>
+    <string name="mate_nav_persona">Characters</string>
+    <string name="mate_nav_memory">Memory</string>
+    <string name="mate_nav_capabilities">Capabilities</string>
+    <string name="mate_nav_me">Me</string>
+    <string name="mate_nav_more">More</string>
+    <string name="mate_attachment_do_together">Do something together</string>
+    <string name="mate_profile_local">Local profile</string>
+    <string name="mate_drawer_relationship">Companion &amp; relationship</string>
+    <string name="mate_drawer_device_extensions">Device &amp; extensions</string>
+    <string name="mate_default_companion">My companion</string>
+    <string name="mate_chat_status_ready">Here whenever you want to talk</string>
+    <string name="mate_chat_status_active">%1$d active conversations</string>
+    <string name="mate_persona_overview">Persona</string>
+    <string name="mate_persona_presence">Voice &amp; appearance</string>
+    <string name="mate_persona_proactive">Presence</string>
+    <string name="mate_persona_manage">Edit persona</string>
+    <string name="mate_persona_voice_appearance">Voice &amp; look</string>
+    <string name="mate_persona_group_active">A character group is active</string>
+    <string name="mate_persona_description_empty">Add a short description people will remember</string>
+    <string name="mate_persona_relationship">Relationship &amp; shared history</string>
+    <string name="mate_persona_relationship_empty">No relationship notes or shared history yet</string>
+    <string name="mate_persona_behavior">Personality &amp; interaction</string>
+    <string name="mate_persona_behavior_empty">No stable expression or interaction style is set</string>
+    <string name="mate_persona_opening">Opening &amp; atmosphere</string>
+    <string name="mate_persona_opening_empty">No opening message is set</string>
+    <string name="mate_persona_bindings">Memory &amp; capability access</string>
+    <string name="mate_persona_memory_fixed">Character memory</string>
+    <string name="mate_persona_memory_global">Global memory</string>
+    <string name="mate_persona_tools_custom">Role-scoped capabilities</string>
+    <string name="mate_persona_tools_global">Global capabilities</string>
+    <string name="mate_memory_archive_title">Relationship archive</string>
+    <string name="mate_memory_archive_subtitle">These memories help your companion recall your relationship and daily life at the right moment.</string>
+    <string name="mate_memory_archive_subtitle_with_count">Stored locally · %1$d shown</string>
+    <string name="mate_memory_count">%1$d items</string>
+    <string name="mate_memory_add">Add memory</string>
+    <string name="mate_memory_view_user">About me</string>
+    <string name="mira_memory_remembered_you">What %1$s remembers about you</string>
+    <string name="mira_memory_recent_us">Our recent moments</string>
+    <string name="mate_memory_view_relationship">Me &amp; %1$s</string>
+    <string name="mate_memory_category_timeline">Timeline</string>
+    <string name="mate_memory_category_relationship">Relations</string>
+    <string name="mate_memory_category_event">Events</string>
+    <string name="mate_memory_category_preference">Preferences</string>
+    <string name="mate_memory_category_world">World</string>
+    <string name="mate_memory_category_label">This memory belongs to</string>
+    <string name="mate_memory_type_label">Memory type</string>
+    <string name="mate_memory_scope_label">Memory owner</string>
+    <string name="mate_memory_scope_user">About me</string>
+    <string name="mate_memory_scope_companion">About %1$s</string>
+    <string name="mate_memory_scope_relationship">Me &amp; %1$s</string>
+    <string name="mate_memory_scope_character_world">Character &amp; world</string>
+    <string name="mate_memory_scope_user_desc">Your identity, preferences, habits, and durable life details.</string>
+    <string name="mate_memory_scope_relationship_desc">Shared experiences, relationship details, and promises with %1$s.</string>
+    <string name="mate_memory_scope_character_world_desc">Character lore, stories, and world-book facts used only by %1$s.</string>
+    <string name="mate_memory_current_character">current companion</string>
+    <string name="mate_memory_scope_badge_user">About the user</string>
+    <string name="mate_memory_scope_badge_relationship">Shared with %1$s</string>
+    <string name="mate_memory_scope_badge_world">%1$s character &amp; world</string>
+    <string name="mate_memory_scope_badge_legacy">Legacy memory · owner not set</string>
+    <string name="mate_memory_recall_enabled">Use in conversations</string>
+    <string name="mate_memory_recall_enabled_desc">When off, this remains on-device but the companion will not recall it.</string>
+    <string name="mate_memory_recall_paused_value">%1$s · recall paused</string>
+    <string name="mate_memory_empty_title">Nothing here yet</string>
+    <string name="mate_memory_empty_desc">Stable details learned in conversation appear here, and you can add entries manually.</string>
+    <string name="mate_memory_content_empty">No additional details</string>
+    <string name="mate_memory_important">Important</string>
+    <string name="mate_memory_source_chat">From conversations</string>
+    <string name="mate_memory_source_manual">Added manually</string>
+    <string name="mate_memory_source_import">Imported</string>
+    <string name="mate_memory_source_document">Lore and documents</string>
+    <string name="mate_memory_source_organized">Organized memory</string>
+    <string name="mate_memory_structured_source_explicit">Stated by you</string>
+    <string name="mate_memory_structured_source_review">Needs review</string>
+    <string name="mate_memory_structured_evidence">Source: %1$s</string>
+    <string name="mate_memory_structured_meta">%1$s · %2$s · %3$.0f%% confidence</string>
+    <string name="mate_memory_structured_source_manual">Saved manually</string>
+    <string name="mate_memory_structured_corrected">Corrected from an earlier version</string>
+    <string name="mate_memory_manual_create_title">Add companion memory</string>
+    <string name="mate_memory_manual_correct_title">Correct memory</string>
+    <string name="mate_memory_manual_scope_desc">Ownership controls which character and conversation can recall this memory.</string>
+    <string name="mate_memory_manual_topic">Topic</string>
+    <string name="mate_memory_manual_topic_required">Use a short topic such as “Birthday”, “Food preference”, or “Our promise”.</string>
+    <string name="mate_memory_manual_topic_optional">Leave this empty to keep the original topic and version chain.</string>
+    <string name="mate_memory_manual_content">Memory</string>
+    <string name="mate_memory_manual_create_desc">Manual entries are stored as explicit user facts with local evidence.</string>
+    <string name="mate_memory_manual_correct_desc">A correction creates a new version and preserves the superseded text.</string>
+    <string name="mate_memory_manual_cancel">Cancel</string>
+    <string name="mate_memory_manual_save_action">Save</string>
+    <string name="mate_memory_manual_correct_action">Confirm correction</string>
+    <string name="mate_memory_manual_edit_action">Correct</string>
+    <string name="mate_memory_manual_confirm_action">Confirm memory</string>
+    <string name="mate_memory_import_legacy_action">Move to companion memory</string>
+    <string name="mate_memory_manual_delete_action">Delete</string>
+    <string name="mate_memory_manual_delete_title">Delete this memory?</string>
+    <string name="mate_memory_manual_delete_message">This memory, its evidence, relations, and search index will be removed locally.</string>
+    <string name="mate_memory_manual_delete_confirm">Delete</string>
+    <string name="mate_memory_manual_save_failed">Memory could not be saved. Check the content and try again.</string>
+    <string name="mate_memory_scope_conversation">Current conversation</string>
+    <string name="mate_memory_type_identity">Identity</string>
+    <string name="mate_memory_type_preference">Preference</string>
+    <string name="mate_memory_type_fact">Fact</string>
+    <string name="mate_memory_type_event">Recent event</string>
+    <string name="mate_memory_type_routine">Routine</string>
+    <string name="mate_memory_type_boundary">Boundary</string>
+    <string name="mate_memory_type_commitment">Commitment</string>
+    <string name="mate_memory_type_relationship">Relationship</string>
+    <string name="mate_memory_type_summary">Conversation summary</string>
+    <string name="mate_memory_kind_promise">Promise</string>
+    <string name="mate_memory_kind_event">Event</string>
+    <string name="mate_memory_kind_anniversary">Anniversary</string>
+    <string name="mate_memory_kind_reminder">Reminder</string>
+    <string name="mate_memory_status_pending">Pending</string>
+    <string name="mate_memory_status_done">Done</string>
+    <string name="mate_memory_status_cancelled">Cancelled</string>
+    <string name="mate_memory_mark_done">Mark as done</string>
+    <string name="mate_memory_reopen_event">Reopen</string>
+    <string name="companion_reminder_channel_name">Companion reminders</string>
+    <string name="companion_reminder_channel_description">Reminders delivered by your characters at agreed times</string>
+    <string name="companion_reminder_title">%1$s wants to remind you</string>
+    <string name="companion_presence_title">How this character may reach out</string>
+    <string name="companion_presence_reminders">Allow character reminders</string>
+    <string name="companion_presence_intensity">Presence level</string>
+    <string name="companion_presence_intensity_explicit">Explicit only</string>
+    <string name="companion_presence_intensity_occasional">Occasional</string>
+    <string name="companion_presence_intensity_daily">Daily</string>
+    <string name="companion_presence_quiet_hours">Quiet hours</string>
+    <string name="companion_presence_quiet_start">Start</string>
+    <string name="companion_presence_quiet_end">End</string>
+    <string name="companion_presence_daily_limit">Maximum proactive messages per day</string>
+    <string name="companion_presence_keep_alive">Keep companion active</string>
+    <string name="companion_presence_keep_alive_desc">Runs an on-device service for reminders, local memory lookup, and proactive message generation</string>
+    <string name="companion_presence_exact_alarm">On-time reminders</string>
+    <string name="companion_presence_exact_alarm_granted">Exact alarms are allowed</string>
+    <string name="companion_presence_exact_alarm_fallback">Without permission, Android may delay reminder delivery</string>
+    <string name="companion_presence_exact_alarm_grant">Allow</string>
+    <string name="mira_companion_service_channel_name">Active companion</string>
+    <string name="mira_companion_service_channel_description">Keeps Mira on-device reminders and message generation available</string>
+    <string name="mira_companion_service_title">Mira is nearby</string>
+    <string name="mira_companion_service_text">Local memory and proactive reminders are active</string>
+    <string name="mira_companion_service_stop">Turn off</string>
+    <string name="mira_companion_service_start_failed">The companion service could not start because Android restricted background activity</string>
+    <string name="mate_memory_updated_value">Updated %1$s</string>
+    <string name="mate_memory_confidence_value">Confidence %1$d%%</string>
+    <string name="mate_memory_importance_value">Importance %1$d%%</string>
+    <string name="mate_memory_show_graph">Open advanced graph</string>
+    <string name="mate_memory_show_archive">Back to relationship archive</string>
+    <string name="mate_memory_import">Import material</string>
+    <string name="mate_memory_graph_title">Memory network</string>
+    <string name="mate_memory_graph_root">Mira long-term memory</string>
+    <string name="mate_memory_graph_empty_title">The memory network is empty</string>
+    <string name="mate_memory_graph_empty_desc">Long-term memories and their relationships will appear here as conversations develop.</string>
+    <string name="mate_memory_graph_node_title">Memory node</string>
+    <string name="mate_memory_graph_node_meta">Scope %1$s · Type %2$s · Confidence %3$d%%</string>
+    <string name="mate_memory_graph_edge_title">Memory relation</string>
+    <string name="mate_memory_graph_edge_category">Category</string>
+    <string name="mate_memory_graph_edge_scope">Scope</string>
+    <string name="mate_memory_graph_edge_domain">Memory domain</string>
+    <string name="mate_memory_status_review">Pending confirmation</string>
+    <string name="mate_empty_chat_message">I\'m here. What\'s on your mind today?</string>
+    <string name="mate_chat_starter_today">What should we talk about?</string>
+    <string name="mate_chat_starter_today_prompt">Stay with me and let us talk about whatever comes to mind.</string>
+    <string name="mate_chat_starter_relax">Help me sort out my thoughts</string>
+    <string name="mate_chat_starter_relax_prompt">My thoughts are messy. Help me sort them out.</string>
+    <string name="mate_chat_starter_plan">Talk with me before sleep</string>
+    <string name="mate_chat_starter_plan_prompt">Talk with me quietly for a while before sleep.</string>
+    <string name="mate_agreement_eyebrow">Clear boundaries before the first conversation</string>
+    <string name="mate_agreement_local_title">Local first</string>
+    <string name="mate_agreement_local_desc">Voice, persona profiles, and device capabilities stay on your phone whenever possible.</string>
+    <string name="mate_agreement_provider_title">Your model, your choice</string>
+    <string name="mate_agreement_provider_desc">Chats go directly to the AI provider you configure; Mira does not proxy provider-side storage.</string>
+    <string name="mate_agreement_permission_title">Capabilities are opt-in</string>
+    <string name="mate_agreement_permission_desc">Automation, Shizuku, location, and file access remain separately controllable.</string>
+    <string name="mate_onboarding_setup_label">First-time setup</string>
+    <string name="mate_onboarding_companion_label">Companion</string>
+    <string name="mate_onboarding_memory_label">Memory</string>
+    <string name="mate_onboarding_capability_label">Capabilities</string>
+    <string name="mate_onboarding_companion_point_1">Each persona has its own avatar, voice, model, tone, and memory profile.</string>
+    <string name="mate_onboarding_companion_point_2">Text, segmented replies, voice calls, and floating mode share one relationship context.</string>
+    <string name="mate_onboarding_companion_point_3">Switch between one-to-one companionship and group conversations at any time.</string>
+    <string name="mate_onboarding_memory_point_1">Long-term memory is separate from transcripts and remains searchable, editable, and removable.</string>
+    <string name="mate_onboarding_memory_point_2">Long sessions compact only old context while recent messages stay verbatim.</string>
+    <string name="mate_onboarding_memory_point_3">Personas can bind separate profiles so relationships do not blur together.</string>
+    <string name="mate_onboarding_capability_point_1">Skills, MCP, workflows, terminal, and map capabilities remain intact.</string>
+    <string name="mate_onboarding_capability_point_2">Accessibility, Shizuku, and root are opt-in instead of forced during setup.</string>
+    <string name="mate_onboarding_capability_point_3">Daily surfaces stay quiet while advanced tools live in the capability center.</string>
+    <string name="mate_permission_optional_desc">None of these permissions block chat. Enable what you need now and decide on the rest later.</string>
+    <string name="mate_permission_level_desc">Choose the device-control channel Mira may use now. Higher levels unlock more capability and can be changed later.</string>
+    <string name="capability_center_title">Capabilities</string>
+    <string name="capability_available_count">%1$d available</string>
+    <string name="capability_group_agent">Agent &amp; extensions</string>
+    <string name="capability_group_device">Device &amp; automation</string>
+    <string name="capability_group_workspace">Files &amp; workspace</string>
+    <string name="capability_group_media">Voice &amp; media</string>
+    <string name="capability_group_other">Other tools</string>
     <string name="nav_adb_commands">Permissions</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_tool_permissions">Tool Permissions</string>
     <string name="nav_about">About</string>
-    <string name="nav_packages">Packages</string>
-    <string name="nav_assistant_config">Assistant Config</string>
+    <string name="nav_packages">Extensions &amp; Skills</string>
+    <string name="nav_assistant_config">Characters &amp; Companion</string>
     <string name="nav_terminal">Terminal</string>
     <string name="nav_toolbox">Toolbox</string>
     <string name="nav_item_agreement">User Agreement</string>
@@ -127,7 +323,7 @@
     <string name="chathistory_external_storage">External storage</string>
 
     <string name="nav_workflow">Workflow</string>
-    <string name="nav_group_ai_features">AI Features</string>
+    <string name="nav_group_ai_features">Full Agent Capabilities</string>
     <string name="nav_group_tools">Tools</string>
     <string name="nav_group_system">System</string>
     <string name="menu">Menu</string>
@@ -535,7 +731,7 @@
     <string name="tool_permissions">Tool Permission Settings</string>
     <string name="about">About</string>
     <string name="terminal">Terminal</string>
-    <string name="toolbox">Toolbox</string>
+    <string name="toolbox">Capability Center</string>
     <string name="mcp">MCP</string>
     <string name="token_config_title">DeepSeek Token Configuration</string>
     <string name="character_card_change_title">Character Card Updated</string>
@@ -556,7 +752,7 @@
     <string name="danger_zone">Danger Zone</string>
     <string name="chat_statistics">Chat Statistics</string>
     <string name="current_chats">Currently %1$d chat records</string>
-    <string name="backup_location">Backup files are saved in the \"Download/Operit\" folder</string>
+    <string name="backup_location">Backup files are saved in the \"Download/Mira\" folder</string>
     <string name="faq_backup">FAQ</string>
     
     <!-- Terminal Screen -->
@@ -576,13 +772,14 @@
     <string name="termux_setup_guide">Termux Setup Guide</string>
     
     <!-- About Screen -->
-    <string name="about_title">About Operit AI</string>
+    <string name="about_title">About Mira</string>
     <string name="about_version">Version: %1$s</string>
-    <string name="about_description">Operit AI is an intelligent assistant application that helps users use their devices more efficiently, providing interface analysis, chat conversations, and more.</string>
-    <string name="about_developer">Developer: &lt;a href="https://github.com/AAswordman"&gt;AAswordman&lt;/a&gt;</string>
+    <string name="about_description">Mira is a local-first Android AI companion that grows with you, remembers what matters, speaks naturally, and can act through tools you control.</string>
+    <string name="about_developer">Mira maintainer: &lt;a href="https://github.com/kernelx30"&gt;kernelx30&lt;/a&gt;</string>
     <string name="about_contact">Contact Us: aaswordsman@foxmail.com</string>
-    <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
-    <string name="about_copyright">© 2025 - 2026 Operit. All Rights Reserved.</string>
+    <string name="about_website">&lt;a href="https://github.com/kernelx30/Mira"&gt;GitHub: https://github.com/kernelx30/Mira&lt;/a&gt;</string>
+    <string name="upstream_project">Upstream project: Operit</string>
+    <string name="about_copyright">Mira · Based on Operit · LGPLv3</string>
     <string name="star_on_github">Star on GitHub</string>
     <string name="update_log">Update Log</string>
     <string name="app_logo_description">App Logo</string>
@@ -604,7 +801,7 @@
     <string name="network_status_label">Network Status</string>
 
     <!-- Configuration Screen -->
-    <string name="config_title">Operit AI Assistant</string>
+    <string name="config_title">Mira Companion</string>
     <string name="config_description">We use DeepSeek API by default. For alternatives, click the custom option below</string>
     <string name="config_api_key_label">API Key</string>
     <string name="config_api_key_placeholder">DeepSeek API Key</string>
@@ -653,7 +850,7 @@
     
     <!-- Plugin Loading Screen -->
     <string name="plugin_skip">Skip</string>
-    <string name="plugin_app_name">OPERIT</string>
+    <string name="plugin_app_name">Mira</string>
     <string name="plugin_status">Started: %1$d / %2$d</string>
     <string name="plugin_loading_status_title">Plugin Loading Status</string>
     <string name="plugin_loading_success">Loading successful</string>
@@ -700,13 +897,13 @@
     <string name="plugin_pnpm_missing">pnpm not installed in terminal, please install it first</string>
 
     <!-- Permission Guide Screen -->
-    <string name="permission_guide_intro_1_title">Voice-Driven UI Automation</string>
-    <string name="permission_guide_intro_1_desc">Converse naturally with the AI using on-device speech recognition and synthesis. Your voice is the command, enabling it to perform screen taps, app navigations, and other complex tasks, completely hands-free.</string>
-    <string name="permission_guide_intro_2_title">A Powerful Toolbox for Geeks and Developers</string>
-    <string name="permission_guide_intro_2_desc">With over 40 built-in professional tools for file management, web requests, script execution, and system control. Combined with a robust plugin system, you can automate tasks, and take deep control of your device.</string>
-    <string name="permission_guide_intro_3_title">Unleash Creativity, Always on Standby</string>
-    <string name="permission_guide_intro_3_desc">Whether designing web pages, processing media files, or accessing the AI via its floating window, Operit provides a powerful, flexible, and secure environment for creation and assistance. Your data, your control.</string>
-    <string name="permission_guide_intro_page_indicator">Feature Tour %1$d/%2$d</string>
+    <string name="permission_guide_intro_1_title">Meet a companion built to stay</string>
+    <string name="permission_guide_intro_1_desc">The first destination is the persona you spend time with, not a toolbox. Name, avatar, tone, voice, and relationship context continue together.</string>
+    <string name="permission_guide_intro_2_title">Remember what matters without replaying everything</string>
+    <string name="permission_guide_intro_2_desc">Mira stores durable preferences and relationship facts in manageable long-term memory. Long sessions compact old context while recent conversation stays intact.</string>
+    <string name="permission_guide_intro_3_title">Power stays behind the conversation</string>
+    <string name="permission_guide_intro_3_desc">The original agent runtime remains intact. Skills, MCP, Shizuku, terminal, maps, workflows, and automation are available without taking over the companion interface.</string>
+    <string name="permission_guide_intro_page_indicator">Meet Mira %1$d/%2$d</string>
 
     <!-- Context Menu -->
     <string name="copy_message">Copy Message</string>
@@ -881,8 +1078,8 @@
     
     <!-- Settings Screen Sections -->
     <string name="settings_section_personalization">Personalization</string>
-    <string name="settings_user_preferences">User Preferences</string>
-    <string name="settings_user_preferences_desc">Configure personal information and preferences to help AI better understand you, including age, personality, identity, occupation, and expected AI style</string>
+    <string name="settings_user_preferences">My profile</string>
+    <string name="settings_user_preferences_desc">Set your avatar, name, preferred address, identity, and chat preferences</string>
     <string name="settings_configure_preferences">Configure Preferences</string>
     <string name="settings_model_prompts">Model Prompt Settings</string>
     <string name="settings_model_prompts_desc">Customize AI assistant\'s system prompts, including self-introduction and tone style, to better meet your expectations</string>
@@ -1046,7 +1243,7 @@
     <string name="copy_path">Copy Path</string>
     <string name="path_copied_to_clipboard">Path copied to clipboard</string>
     <string name="open_file_manager">Open File Manager</string>
-    <string name="navigate_to_external_files">Please navigate to Android/data/com.ai.assistance.operit/files/packages directory</string>
+    <string name="navigate_to_external_files">Please navigate to Android/data/com.ai.assistance.mira/files/packages directory</string>
     <string name="package_js_only">Only JavaScript (.js) and ToolPkg (.toolpkg) files are supported</string>
     <string name="pkg_toolpkg_subpackages">ToolPkg Subpackages</string>
     <string name="pkg_toolpkg_version">Version: %1$s</string>
@@ -1095,10 +1292,10 @@
     <string name="agreement_title">User Agreement and Privacy Policy</string>
     <string name="agreement_subtitle">Please read and agree to the following terms before use.</string>
     <string name="agreement_human_readable_title">Plain Language Version (Not a legal document)</string>
-    <string name="agreement_human_readable_content">Like you, we don\'t like long and tedious agreements. Simply put:\n\nOperitAI is a free and open-source software. Its automation features are powerful, so please use them only for personal learning and daily assistance, not for any commercial or prohibited purposes.\n\nYou are responsible for all your actions. We are not responsible for any extensions you add or modifications you make to the software.\n\nRegarding privacy: Your voice processing is done locally on your device, which is secure. AI chat data is sent directly to the AI service provider, and we do not handle it.</string>
+    <string name="agreement_human_readable_content">Mira is a free, open-source companion that retains the full device automation runtime. Use those capabilities only on devices and data you are authorized to control.\n\nYou are responsible for extensions you install, commands you execute, and operations you authorize.\n\nVoice and local profiles are processed on-device whenever possible. AI chats go directly to the model provider you configure; we do not proxy them.</string>
     <string name="agreement_serious_title">Formal Legal Agreement</string>
     <string name="agreement_serious_content"><![CDATA[
-        <p>Welcome to OperitAI. This software is modified and distributed under the terms of the GNU Lesser General Public License, version 3 (LGPLv3).</p>
+        <p>Welcome to Mira. This software is modified and distributed under the terms of the GNU Lesser General Public License, version 3 (LGPLv3).</p>
         <p><b>1. No Warranty</b><br>This software is provided "as is" without any warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement. The entire risk as to the quality and performance of the software is with you.</p>
         <p><b>2. Limitation of Liability</b><br>In no event unless required by applicable law or agreed to in writing will any contributor be liable to you for damages, including any general, special, incidental, or consequential damages arising out of the use or inability to use the software. <b>Furthermore, the development team is not responsible for any consequences arising from user-installed extension packages (such as MCPs) or from modifications made to this software.</b></p>
         <p><b>3. User Responsibility and Usage Restrictions</b><br>You are fully responsible for any operations conducted through this software and for all their consequences. You agree to use this software for lawful and proper personal purposes and agree that:<br>
@@ -1376,7 +1573,7 @@
     
     <!-- Chat History Selector -->
     <string name="chat_history">Chat History</string>
-    <string name="search_chat_history_hint">Search</string>
+    <string name="search_chat_history_hint">Search titles and messages</string>
     <string name="new_chat">New Chat</string>
     <string name="new_conversation">New Conversation</string>
     <string name="chat_shared_file_target_dialog_title">Choose a conversation</string>
@@ -1396,6 +1593,16 @@
     <string name="input_tokens">Input: %1$s</string>
     <string name="output_tokens">Output: %1$s</string>
     <string name="context_window">Context: %1$s</string>
+    <string name="context_capacity">Context capacity</string>
+    <string name="context_capacity_summary">%1$s/%2$s (%3$.1f%%)</string>
+    <string name="context_capacity_projected">About %1$s after sending</string>
+    <string name="context_capacity_messages">Messages</string>
+    <string name="context_capacity_system_tools">System tools</string>
+    <string name="context_capacity_skills">Skills</string>
+    <string name="context_capacity_system_prompt">System prompt</string>
+    <string name="context_capacity_other">Other</string>
+    <string name="context_capacity_breakdown_note">Categories are estimated from the final request shape; the total uses the model token count.</string>
+    <string name="context_capacity_calculating">Calculating the current request breakdown…</string>
     <string name="auto_approve">Auto-approve</string>
     <string name="auto_approve_desc">Safe tools will be executed automatically without prompting. For specific group approvals, please go to Settings - Tool Permission Management.</string>
     <string name="enabled">Enabled</string>
@@ -1539,7 +1746,7 @@
 
     <string name="developer">Developer</string>
     <string name="contact">Contact</string>
-    <string name="project_url">Project URL</string>
+    <string name="project_url">Upstream project</string>
     <string name="open_source_licenses">Open Source Licenses</string>
     <string name="license_format">License: %1$s</string>
     <string name="visit_project">Visit Project</string>
@@ -1554,7 +1761,7 @@
     <string name="accessibility_wizard_install_provider">Install Provider App</string>
     <string name="accessibility_wizard_enable_message">Now, enable the accessibility service in your device settings. This allows the provider app to analyze screen content.</string>
     <string name="accessibility_wizard_enable_note">Important Note:</string>
-    <string name="accessibility_wizard_enable_note_details">You must select and enable \"Operit Accessibility Provider\" from the list of services.</string>
+    <string name="accessibility_wizard_enable_note_details">Select and enable \"Mira Accessibility Provider\" from the service list.</string>
     <string name="accessibility_wizard_open_settings">Open Accessibility Settings</string>
     <string name="accessibility_wizard_success_message">Accessibility service is properly configured and ready to use!</string>
 
@@ -1589,6 +1796,7 @@
     <string name="message_info_model_name">Model</string>
     <string name="message_info_message_time">Message Time</string>
     <string name="message_info_sent_at">Sent At</string>
+    <string name="message_info_completed_at">Completed At</string>
     <string name="message_info_input_tokens">Input Tokens</string>
     <string name="message_info_cached_input_tokens">Cached Input Tokens</string>
     <string name="message_info_output_tokens">Output Tokens</string>
@@ -1791,7 +1999,7 @@
     <string name="external_http_chat_health_example">Health Check Example</string>
     <string name="external_http_chat_intent_title">Intent Calling Guide</string>
     <string name="external_http_chat_intent_desc">The broadcast entry is still available for local app integration, Tasker, or adb debugging</string>
-    <string name="external_http_chat_intent_overview">HTTP and Intent share the same parameter semantics. Only the entry method is different.\n\nRequest action: %1$s\nDefault result action: %2$s\n\nCommon extras: message, request_id, group, create_new_chat, chat_id, create_if_none, show_floating, return_tool_status, initial_mode, auto_exit_after_ms, stop_after, reply_action, reply_package\n\nAfter completion, Operit returns success, chat_id, ai_response, and error by broadcast. If the result should only be delivered to one app, set reply_package.</string>
+    <string name="external_http_chat_intent_overview">HTTP and Intent share the same parameter semantics. Only the entry method is different.\n\nRequest action: %1$s\nDefault result action: %2$s\n\nCommon extras: message, request_id, group, create_new_chat, chat_id, create_if_none, show_floating, return_tool_status, initial_mode, auto_exit_after_ms, stop_after, reply_action, reply_package\n\nAfter completion, Mira returns success, chat_id, ai_response, and error by broadcast. If the result should only be delivered to one app, set reply_package.</string>
     <string name="external_http_chat_copy_example">Copy Example</string>
     <string name="external_http_chat_example_copied">Example command copied</string>
     <string name="external_http_chat_service_enabled">Service enabled</string>
@@ -1884,7 +2092,7 @@
     <string name="action_retry">Retry</string>
     <string name="common_collapse">Collapse</string>
     <string name="common_expand_more">Expand More</string>
-    <string name="nav_memory_base">Memory Base</string>
+    <string name="nav_memory_base">Shared Memory</string>
     
     <!-- Manual Memory Update -->
     <string name="manual_memory_update">Manual Memory Save</string>
@@ -1964,7 +2172,7 @@
     <string name="tool_user_agreement">User Agreement</string>
     <string name="tool_user_agreement_desc">View the application\'s user agreement and privacy policy</string>
     <string name="tool_default_assistant_guide">Default Assistant Setup</string>
-    <string name="tool_default_assistant_guide_desc">Set Operit voice floating as system default assistant</string>
+    <string name="tool_default_assistant_guide_desc">Set Mira as the system default assistant</string>
     <string name="tool_terminal">Command Terminal</string>
     <string name="tool_terminal_desc">Powerful command-line terminal for executing system commands</string>
     <string name="tool_terminal_auto_config">Terminal Auto Configuration</string>
@@ -2817,6 +3025,7 @@
     <string name="function_type_ui_controller">UI Controller</string>
     <string name="function_type_grep">Grep Retrieval</string>
     <string name="function_type_role_response_planner">Group Planner</string>
+    <string name="function_type_next_user_message">Smart Reply Draft</string>
 
     <!-- Function Descriptions -->
     <string name="function_desc_chat">Main chat function for daily conversation interaction with users</string>
@@ -2827,6 +3036,7 @@
     <string name="function_desc_ui_controller">Used for automatic traversal and operation of UI interfaces. The corresponding UI controller model is only activated when the user explicitly requests to use an "agent" for control, for example by choosing dedicated models such as autoglm-phone-9b.</string>
     <string name="function_desc_grep">Used for grep_context planning and result filtering (multi-round grep_code)</string>
     <string name="function_desc_role_response_planner">Dynamically plans speaking order and skip decisions in groups, supports multi-turn discussions</string>
+    <string name="function_desc_next_user_message">Generates one likely next user message from the latest conversation and fills an empty composer. A fast, low-cost model is recommended.</string>
 
     <!-- Functional Prompt Config Screen -->
     <string name="advanced_config_notice">For advanced configurations like modifying system prompt templates, please go to the \"Manage All Prompts\" page.</string>
@@ -3049,6 +3259,7 @@
     <string name="functional_config_test_grep_candidates_digest">#1 [file: example.txt]\nHello world\n#2 [file: main.kt]\nfun main() {}</string>
     <string name="functional_config_test_ui_controller_prompt">Current UI State: [Button(label="OK", bounds="[0,0][100,50]")]\nTask Goal: Tap OK.\nExecution History: []</string>
     <string name="functional_config_test_memory_prompt">Conversation:\nUser: Connection test question.\nAssistant: Connection test answer.</string>
+    <string name="functional_config_test_empty_response">The model returned an empty response</string>
     <string name="tool_permission_instruction_title">Instructions</string>
     <string name="tool_permission_instruction_content">1. The \"Global Default Permission\" above controls the default behavior of all tools.\n2. Tools added to each group below set \"exception rules\" for that tool, which override the global default.\n3. Click the same tool in a group again, or uncheck it in the selection dialog to remove the tool\'s exception configuration and make it follow the global default again.</string>
     <string name="token_price_description">Set the RMB price per API request</string>
@@ -3432,15 +3643,37 @@
     <string name="long_press_manage">Long press to manage</string>
     
     <!-- Settings Screen Subtitles -->
-    <string name="settings_user_preferences_subtitle">Personal preferences and behavior settings</string>
+    <string name="settings_user_preferences_subtitle">Avatar, name, identity, and chat preferences</string>
     <string name="settings_language_subtitle">Interface language switching</string>
     <string name="settings_theme_subtitle">Theme and appearance customization</string>
     <string name="layout_adjustment">Layout Adjustment</string>
     <string name="layout_adjustment_subtitle">Adjust UI element positions and margins</string>
     <string name="settings_model_params_subtitle">Model parameters and API configuration</string>
     <string name="settings_functional_model_subtitle">Functional model specific configuration</string>
-    <string name="settings_speech_services">Speech Services Configuration</string>
-    <string name="settings_speech_services_subtitle">TTS/STT service settings</string>
+    <string name="settings_speech_services">Voice &amp; Calls</string>
+    <string name="settings_speech_services_subtitle">Character auto-read, voices, and speech services</string>
+    <string name="voice_call_section_character_voice">Character voice</string>
+    <string name="voice_call_character_auto_read">Auto-read for current character</string>
+    <string name="voice_call_character_auto_read_summary">%1$s · currently %2$s</string>
+    <string name="voice_call_effective_enabled">enabled</string>
+    <string name="voice_call_effective_disabled">disabled</string>
+    <string name="voice_call_override_inherit">Follow global</string>
+    <string name="voice_call_override_enabled">On</string>
+    <string name="voice_call_override_disabled">Off</string>
+    <string name="voice_call_global_default">Global default</string>
+    <string name="voice_call_global_default_desc">Used by new characters and characters following the global setting</string>
+    <string name="voice_call_section_voice_style">Reading style</string>
+    <string name="voice_call_current_voice">Current voice</string>
+    <string name="voice_call_default_voice">Default voice</string>
+    <string name="voice_call_rate_pitch">Speed and pitch</string>
+    <string name="voice_call_rate_pitch_summary">Speed %1$.1fx · pitch %2$.1fx</string>
+    <string name="voice_call_preview_voice">Preview current voice</string>
+    <string name="voice_call_preview_voice_desc">Open the existing TTS preview tool</string>
+    <string name="voice_call_section_services">Speech services</string>
+    <string name="voice_call_tts_service">Text to speech</string>
+    <string name="voice_call_stt_service">Speech recognition</string>
+    <string name="voice_call_advanced_services">Advanced speech services</string>
+    <string name="voice_call_advanced_services_desc">Configure MiniMax, MIMO, Doubao, OpenAI, VITS, and other services</string>
     <string name="settings_custom_headers">Custom Headers</string>
     <string name="settings_custom_headers_subtitle">API request header field configuration</string>
     <string name="headers_configured_count">%1$d configured</string>
@@ -3641,7 +3874,7 @@
     <string name="save_action">Save</string>
     <string name="clear_action">Clear</string>
     <string name="edit_profile">Edit Profile</string>
-    <string name="select_preference_profile">Please select preference profile</string>
+    <string name="select_preference_profile">Select a user profile</string>
     <string name="new_action">New</string>
     <string name="unnamed_profile">Unnamed Profile</string>
     <string name="select_config">Select Config</string>
@@ -3663,7 +3896,7 @@
     <string name="input_field_placeholder">Please enter %s information</string>
     <string name="not_set_field">%s not set</string>
 
-    <string name="new_preference_profile">New Preference Profile</string>
+    <string name="new_preference_profile">New user profile</string>
     <string name="create_new_profile_desc">Create a new preference profile to personalize your AI assistant experience</string>
     <string name="profile_name">Profile Name</string>
     <string name="profile_name_placeholder">e.g.: Work, Study, Entertainment...</string>
@@ -3997,8 +4230,8 @@
     <!-- Persona Card Generation and Waifu Mode Settings -->
     <string name="persona_card_generation">Persona Card Generation</string>
     <string name="persona_card_generation_desc">Enter AI conversation to generate personalized character cards</string>
-    <string name="waifu_mode_settings">Waifu Mode Settings</string>
-    <string name="waifu_mode_settings_desc">Configure AI response sentence-by-sentence sending mode</string>
+    <string name="waifu_mode_settings">Immersive Chat</string>
+    <string name="waifu_mode_settings_desc">Configure split replies, pacing, stickers, and character selfies</string>
     
     <!-- Tavern Character Card Import -->
     <string name="import_tavern_card">Import Tavern Card</string>
@@ -4010,14 +4243,15 @@
     <string name="tavern_card_parse_error">Error parsing tavern card: %1$s</string>
     
     <!-- Screen Titles -->
-    <string name="screen_title_memory_base">Memory Base</string>
+    <string name="screen_title_memory_base">Shared memories</string>
     <string name="screen_title_tool_permissions">Tool Permissions</string>
     <string name="screen_title_user_preferences_guide">User Preferences Guide</string>
-    <string name="screen_title_user_preferences_settings">User Preferences Settings</string>
+    <string name="screen_title_user_preferences_settings">My profile and preferences</string>
     <string name="screen_title_model_config">Model &amp; Parameters Configuration</string>
-    <string name="screen_title_speech_services_settings">Speech Services Settings</string>
+    <string name="screen_title_speech_services_settings">Voice &amp; Calls</string>
+    <string name="screen_title_speech_services_advanced">Advanced Speech Services</string>
     <string name="screen_title_persona_card_generation">Persona Card Generation</string>
-    <string name="screen_title_waifu_mode_settings">Waifu Mode Settings</string>
+    <string name="screen_title_waifu_mode_settings">Immersive Chat</string>
     <string name="screen_title_tag_market">Tag Market</string>
     <string name="screen_title_model_prompts_settings">Character Card Editor</string>
     <string name="screen_title_functional_config">Functional Model Configuration</string>
@@ -4029,6 +4263,7 @@
     <string name="screen_title_language_settings">Language Settings</string>
     <string name="screen_title_file_manager">File Manager</string>
     <string name="screen_title_terminal">Command Terminal</string>
+    <string name="screen_title_terminal_setup">Terminal &amp; Node.js</string>
     <string name="screen_title_terminal_auto_config">Terminal Auto Configuration</string>
     <string name="screen_title_app_permissions">App Permissions Manager</string>
     <string name="screen_title_ui_debugger">UI Debugger</string>
@@ -4108,9 +4343,9 @@
     <string name="close">Close</string>
     
     <!-- Waifu Mode Settings Screen -->
-    <string name="waifu_mode">Waifu Mode</string>
-    <string name="waifu_mode_description">When enabled, AI responses will be split by punctuation and sent sentence by sentence for a more natural conversation experience.</string>
-    <string name="enable_waifu_mode">Enable Waifu Mode</string>
+    <string name="waifu_mode">Immersive Chat</string>
+    <string name="waifu_mode_description">Let the character reply in separate messages with more natural pacing.</string>
+    <string name="enable_waifu_mode">Enable Immersive Chat</string>
     <string name="waifu_mode_toggle_desc">AI responses will be split and sent by sentences</string>
     <string name="waifu_merge_send">Merge Send</string>
     <string name="waifu_merge_send_desc">When several short messages are sent in a row, combine them into one message after a pause before sending to AI</string>
@@ -4125,12 +4360,12 @@
     <string name="current_delay_format">Current: %dms/character</string>
     <string name="remove_punctuation">Remove End Punctuation</string>
     <string name="remove_punctuation_desc">Remove periods, question marks, and exclamation marks at the end of sentences</string>
-    <string name="waifu_custom_prompt">Waifu Prompt</string>
-    <string name="waifu_custom_prompt_desc">Customize extra prompts for Waifu mode.</string>
+    <string name="waifu_custom_prompt">Immersive Chat Prompt</string>
+    <string name="waifu_custom_prompt_desc">Customize the extra rules used by immersive chat.</string>
     <string name="waifu_custom_prompt_placeholder">For example: Keep replies short and natural, no cutesy tone, no filler words, no action descriptions.</string>
-    <string name="waifu_custom_prompt_tip">This content is appended to the system prompt as an extra Waifu-mode rule.</string>
+    <string name="waifu_custom_prompt_tip">This content is appended to the system prompt as an extra immersive-chat rule.</string>
     <string name="enable_emoticons">Enable Emoticons</string>
-    <string name="emoticons_desc">Insert emotional state tags in conversations to enhance expression</string>
+    <string name="emoticons_desc">Let the character occasionally send one standalone sticker when it fits the reply</string>
     <string name="available_emoticons">Available emoticons: crying, like_you, happy, surprised, miss_you, speechless, angry, confused, sad</string>
     <string name="enable_selfie_feature">Enable Selfie Feature</string>
     <string name="selfie_feature_desc">Allow AI to generate character selfie images, requires appearance prompt configuration</string>
@@ -4140,7 +4375,7 @@
     <string name="appearance_prompt_placeholder">e.g.: long hair, purple eyes, sweater vest...</string>
     <string name="appearance_prompt_tip">Tip: Use English keywords to describe appearance features, separate multiple keywords with commas</string>
     <string name="feature_explanation">Feature Explanation</string>
-    <string name="waifu_mode_explanation">• Normal Mode: AI responses sent all at once\n• Waifu Mode: AI responses split by sentences, each in separate bubbles\n• Smart Delay: Calculate delay time based on sentence length\n• Merge Send: consecutive short user messages are combined into one message after a pause\n• Auto Cleanup: Remove status tags, show only plain text\n• Optional Features: merge send, remove end punctuation, edit Waifu prompt, enable emoticons\n• Use Case: Simulate more natural conversation rhythm\n• Note: This mode may not adapt well to tool calls</string>
+    <string name="waifu_mode_explanation">• Normal mode: AI responses are sent all at once\n• Immersive chat: replies are split into separate message bubbles\n• Smart delay: pacing follows message length\n• Merge send: consecutive short user messages are combined after a pause\n• Auto cleanup: status tags are hidden from the conversation\n• Optional features: merge send, punctuation cleanup, custom prompt, and stickers\n• Agent tools remain available with execution details collapsed</string>
     <string name="settings_saved_message">Settings saved</string>
 
     <string name="settings_section_account">Account</string>
@@ -4240,9 +4475,9 @@
     <string name="import_color_qr">Import Color QR</string>
     <string name="scan_color_qr">Scan Color QR</string>
     <string name="tavern_json">Tavern JSON</string>
-    <string name="export_tavern_json_desc">Export as .json and save to Download/Operit/exports</string>
+    <string name="export_tavern_json_desc">Export as .json and save to Download/Mira/exports</string>
     <string name="tavern_png">Tavern PNG</string>
-    <string name="export_tavern_png_desc">Export as image importable to Tavern and save to Download/Operit/exports</string>
+    <string name="export_tavern_png_desc">Export as image importable to Tavern and save to Download/Mira/exports</string>
     <string name="image_read_error">Cannot read image</string>
     <string name="image_parse_error">Cannot parse image</string>
     <string name="color_qr_not_recognized">Cannot recognize color QR code</string>
@@ -4587,7 +4822,7 @@
     <string name="select_category">Select Category</string>
     <string name="confirm_delete_category">Are you sure you want to delete category \"%1$s\" and all its emojis?</string>
     <string name="confirm_delete_emoji">Are you sure you want to delete this emoji?</string>
-    <string name="custom_emoji_desc">Add your favorite emoji images, AI will use them in Waifu mode</string>
+    <string name="custom_emoji_desc">Add JPG, PNG, GIF, or WebP stickers for the current character to use in immersive chat</string>
     <string name="emoji_added_success">Successfully added %1$d emojis</string>
     <string name="emoji_added_partial">Successfully added %1$d emojis, failed %2$d</string>
     <string name="emoji_add_failed">Failed to add, please check logs</string>
@@ -4609,7 +4844,7 @@
     <string name="custom">Custom</string>
 
     <!-- Voice Assistant Widget -->
-    <string name="voice_assistant_widget_description">Quick launch Operit voice assistant</string>
+    <string name="voice_assistant_widget_description">Quick launch Mira voice companion</string>
     <string name="voice_assistant_widget_title">Voice Assistant</string>
     <string name="toolpkg_widget_host_label">Custom Widget</string>
     <string name="toolpkg_widget_host_description">Add it and bind it to a widget page registered by a plugin</string>
@@ -4694,15 +4929,15 @@
 
     <!-- Default Assistant Setup Guide -->
     <string name="default_assistant_guide_title">Set Default Voice Assistant</string>
-    <string name="default_assistant_guide_subtitle">Make Operit Your Smart Assistant</string>
-    <string name="default_assistant_guide_intro">After setting Operit as the default system assistant, you can quickly launch the Operit voice assistant by long-pressing the Home button or using voice wake-up, providing a more convenient AI interaction experience.</string>
+    <string name="default_assistant_guide_subtitle">Keep Mira within reach</string>
+    <string name="default_assistant_guide_intro">Set Mira as the system default assistant to open voice companionship from the Home button or your device wake phrase.</string>
     <string name="default_assistant_guide_steps_title">Setup Steps</string>
     
     <!-- Step 1 -->
     <string name="default_assistant_guide_step1_title">Open System Settings</string>
     <string name="default_assistant_guide_step1_desc">First, you need to enter the Android system settings interface</string>
     <string name="default_assistant_guide_step1_detail1">• Open System Settings → Apps → Default apps → Digital assistant app</string>
-    <string name="default_assistant_guide_step1_detail2">• Find and select "Operit AI" in the assistant app list</string>
+    <string name="default_assistant_guide_step1_detail2">• Find and select "Mira" in the assistant app list</string>
     <string name="default_assistant_guide_step1_detail_android12">Android 12+: Settings → Apps → Default apps → Digital assistant app → Default digital assistant app</string>
     <string name="default_assistant_guide_open_settings">Open Settings</string>
     
@@ -4717,24 +4952,24 @@
     <string name="default_assistant_guide_step2_detail_android12">Android 12+: Settings → Apps → Default apps → Digital assistant app → Default digital assistant app</string>
     
     <!-- Step 3 -->
-    <string name="default_assistant_guide_step3_title">Select Operit</string>
-    <string name="default_assistant_guide_step3_desc">Choose Operit AI from the assistant app list</string>
-    <string name="default_assistant_guide_step3_detail1">• Find \"Operit AI\" in the available assistant apps list</string>
-    <string name="default_assistant_guide_step3_detail2">• Tap to select, and the system will set Operit as the default assistant</string>
+    <string name="default_assistant_guide_step3_title">Select Mira</string>
+    <string name="default_assistant_guide_step3_desc">Choose Mira from the assistant app list</string>
+    <string name="default_assistant_guide_step3_detail1">• Find \"Mira\" in the available assistant apps list</string>
+    <string name="default_assistant_guide_step3_detail2">• Tap to set Mira as the default assistant</string>
     <string name="default_assistant_guide_step3_detail3">• You can try speaking or typing to interact with the assistant</string>
     
     <!-- Step 4 -->
     <string name="default_assistant_guide_step4_title">Test Voice Assistant</string>
     <string name="default_assistant_guide_step4_desc">After setup, test if it can be launched normally</string>
-    <string name="default_assistant_guide_step4_detail1">• Long-press the Home button (home screen button) should invoke Operit voice assistant</string>
-    <string name="default_assistant_guide_step4_detail2">• If voice wake-up is supported, saying \"Hey Google\" or your device\'s designated wake word may also trigger Operit</string>
+    <string name="default_assistant_guide_step4_detail1">• Long-press the Home button to invoke Mira</string>
+    <string name="default_assistant_guide_step4_detail2">• If voice wake-up is supported, saying \"Hey Google\" or your device\'s wake phrase may also trigger Mira</string>
     
     <!-- Troubleshooting -->
     <string name="default_assistant_guide_troubleshooting_title">Having Problems?</string>
-    <string name="default_assistant_guide_troubleshooting_content">If you can\'t find Operit in the list, please ensure:\n\n• The app is properly installed and not disabled\n• Necessary permissions have been granted (microphone, overlay, etc.)\n• Try restarting the device and setting it up again\n\nSome custom systems may restrict third-party apps from being set as default assistants. If you encounter this situation, you can still use Operit through the in-app floating window feature.</string>
+    <string name="default_assistant_guide_troubleshooting_content">If you can\'t find Mira in the list, make sure the app is installed and enabled, required permissions are granted, and then try restarting the device. Some systems restrict third-party default assistants; the in-app floating window remains available.</string>
 
     <!-- Voice Interaction Service -->
-    <string name="voice_interaction_service_name">Operit AI Assistant</string>
+    <string name="voice_interaction_service_name">Mira</string>
     <string name="voice_interaction_service_summary">Intelligent voice assistant service</string>
 
     <!-- Tool Permission Settings -->
@@ -4830,8 +5065,8 @@
     <string name="microphone_permission_denied_toast">Microphone permission denied</string>
     <string name="executing_tool">Executing tool: %1$s</string>
     <string name="processing_tool_result">Processing tool result: %1$s</string>
-    <string name="input_question_hint">Enter your question...</string>
-    <string name="input_question_with_workspace">Enter question, use @ to reference files</string>
+    <string name="input_question_hint">Say what\'s on your mind...</string>
+    <string name="input_question_with_workspace">Talk, or use @ to reference a file</string>
     <string name="add_attachment">Add Attachment</string>
     <string name="user_uploaded_image">User uploaded image</string>
     <string name="decode_image_failed">Failed to decode image: %1$s</string>
@@ -4989,11 +5224,15 @@
     <string name="show_message_token_stats_description">Show compact token upload, output, and cache info below AI messages</string>
     <string name="show_message_timing_stats">Show Message Timing Summary</string>
     <string name="show_message_timing_stats_description">Show first-token and generation timing below AI messages</string>
-    <string name="show_message_timestamp">Show Message Time</string>
-    <string name="show_message_timestamp_description">Show the time of that AI message below it</string>
+    <string name="show_message_timestamp">Show Chat Time</string>
+    <string name="show_message_timestamp_description">Show centered times when the date changes or messages are five minutes apart</string>
     <string name="chat_message_token_stats_compact">token: %1$d ↑ %3$d (cache: %2$d) ↓ %4$d</string>
     <string name="chat_message_timing_stats_compact">usage: %1$s (first %2$s out %3$s)</string>
     <string name="chat_message_timestamp_compact">time: %1$s</string>
+    <string name="chat_time_today">Today %1$s</string>
+    <string name="chat_time_yesterday">Yesterday %1$s</string>
+    <string name="chat_time_month_day">%1$d/%2$d %3$s</string>
+    <string name="chat_time_year_month_day">%1$d/%2$d/%3$d %4$s</string>
     <string name="global_user_name">Global User Name</string>
     <string name="system_display_settings">System Display Settings</string>
     <string name="show_fps_counter_description">Display frame rate performance metrics on screen</string>
@@ -5013,7 +5252,7 @@
     <string name="start_with_new_chat_description">When enabled, each app launch opens a new blank chat instead of reopening the previous conversation.</string>
     <string name="software_identity_title">Software Identity</string>
     <string name="software_identity_description">Change the software identity shown at the top of the sidebar.</string>
-    <string name="software_identity_option_operit">Operit AI</string>
+    <string name="software_identity_option_operit">Mira</string>
     <string name="software_identity_option_lingshu">Lingshu AI</string>
     <string name="reset_all_display_settings">Reset All Display Settings</string>
     
@@ -5073,8 +5312,8 @@
     <string name="status_info_block">Status Info</string>
     <string name="html_content_block">HTML Content</string>
     <string name="mood_tag_block">Mood Tag</string>
-    <string name="thinking_tools_group_title_with_count">Thinking &amp; Tool Calls (%1$d)</string>
-    <string name="tools_group_title_with_count">Tool Calls (%1$d)</string>
+    <string name="thinking_tools_group_title_with_count">Thinking &amp; activity (%1$d steps)</string>
+    <string name="tools_group_title_with_count">Activity (%1$d steps)</string>
     
     <!-- Backup Settings Screen -->
     <string name="backup_data_overview">Data Overview</string>
@@ -5084,14 +5323,14 @@
     <string name="backup_memory_link_count">Memory Links</string>
     
     <string name="backup_files_statistics">Backup Files Statistics</string>
-    <string name="backup_files_statistics_subtitle">Backup files in Operit export directory</string>
+    <string name="backup_files_statistics_subtitle">Backup files in Mira export directory</string>
     <string name="backup_refresh">Refresh</string>
     <string name="backup_scanning">Scanning</string>
     <string name="backup_chat_files">Chat History</string>
     <string name="backup_memory_files">Memory</string>
     <string name="backup_model_config_files">Model Config</string>
     <string name="backup_room_db_files">Database</string>
-    <string name="backup_files_location_hint">Tip: backup files are saved in Download/Operit folder</string>
+    <string name="backup_files_location_hint">Tip: backup files are saved in Download/Mira folder</string>
 
     <string name="backup_room_db_title">Database (Auto + Manual Backup)</string>
     <string name="backup_room_db_subtitle">Daily backup of Room SQLite database, keep up to %1$d backups (older ones will be deleted automatically)</string>
@@ -5183,7 +5422,7 @@
     <string name="backup_faq_why">Why backup data?</string>
     <string name="backup_faq_why_answer">Backing up chat history prevents important content loss when the app is uninstalled or data is lost. Regular backups are a good habit!</string>
     <string name="backup_faq_where">Where are exported files saved?</string>
-    <string name="backup_faq_where_answer">Exported backup files are saved in the \"Download/Operit\" folder on your phone, with filenames containing the data type, date and time.</string>
+    <string name="backup_faq_where_answer">Exported backup files are saved in the \"Download/Mira\" folder on your phone, with filenames containing the data type, date and time.</string>
     <string name="backup_faq_duplicate">Will importing create duplicate data?</string>
     <string name="backup_faq_duplicate_answer">The system uses record IDs to determine duplicates. Records with the same ID will be updated rather than duplicated. Records with different IDs will be added as new entries.</string>
     
@@ -5218,7 +5457,7 @@
 
     <string name="backup_character_cards_title">Character Cards</string>
     <string name="backup_character_cards_subtitle">Backup and restore character card settings</string>
-    <string name="backup_character_cards_current_count">Currently %1$d character card(s). Exported files will be saved in the "Download/Operit" folder.</string>
+    <string name="backup_character_cards_current_count">Currently %1$d character card(s). Exported files will be saved in the "Download/Mira" folder.</string>
     <string name="backup_character_card_count">Character Cards</string>
     <string name="backup_character_card_files">Character Cards</string>
 
@@ -5364,7 +5603,7 @@
 
     <!-- Logcat -->
     <string name="logcat_no_logs_to_save">No logs to save</string>
-    <string name="logcat_header">=== Operit Logs ===</string>
+    <string name="logcat_header">=== Mira Logs ===</string>
     <string name="logcat_date">Date: %1$s</string>
     <string name="logcat_total_count">Total count: %1$d</string>
     <string name="logcat_save_failed">Save failed: %1$s</string>
@@ -6769,6 +7008,7 @@
     <string name="chat_selected_messages_no_user_for_memory">The selected messages do not contain any user messages that can be saved to memory</string>
     <string name="chat_selected_messages_added_to_memory_queue">Added %1$d user message(s) to the autosummary memory queue</string>
     <string name="chat_selected_messages_add_to_memory_queue_failed">Failed to add to autosummary memory queue: %1$s</string>
+    <string name="chat_delete_selected_messages_confirmation">Delete the selected %1$d messages? This action cannot be undone.</string>
     <string name="chat_memory_manually_updated">Memory has been manually updated</string>
     <string name="chat_manual_update_memory_failed">Manual memory update failed: %1$s</string>
     <string name="chat_auto_update_memory_failed">Automatic memory update failed: %1$s</string>
@@ -6780,15 +7020,15 @@
     <string name="chat_summarize_generation_failed">Summary generation failed: %1$s</string>
 
     <!-- AIForegroundService (新增) -->
-    <string name="service_operit_running">Operit is running</string>
+    <string name="service_operit_running">Mira is running</string>
     <string name="service_chat_complete_reminder">Chat completion reminder</string>
     <string name="service_chat_complete_reminder_sound">Chat completion reminder (sound)</string>
     <string name="service_chat_complete_reminder_vibration">Chat completion reminder (vibration)</string>
     <string name="service_chat_complete_reminder_sound_vibration">Chat completion reminder (sound and vibration)</string>
-    <string name="service_keep_background">Keep Operit running in the background.</string>
+    <string name="service_keep_background">Keep Mira running in the background.</string>
     <string name="service_notify_when_complete">Notify you when the conversation is complete.</string>
-    <string name="service_running_wake_pause">Operit is running (wake paused)</string>
-    <string name="service_running_wake_listening">Operit is running (wake listening)</string>
+    <string name="service_running_wake_pause">Mira is running (wake paused)</string>
+    <string name="service_running_wake_listening">Mira is running (wake listening)</string>
     <string name="service_running_stats">Conversations %1$d · Tools %2$d</string>
     <string name="service_running_http_listening">External HTTP listening on port %1$d</string>
     <string name="service_running_with_http">%1$s · HTTP %2$d</string>
@@ -6835,7 +7075,7 @@
     <string name="html_export_updated">Updated</string>
     <string name="html_export_group">Group</string>
     <string name="html_export_message_count">Message Count</string>
-    <string name="html_export_footer">Exported from Operit AI Assistant</string>
+    <string name="html_export_footer">Exported from Mira</string>
 
     <!-- MnnModelDownloadManager -->
     <string name="mnn_no_cache_data">No cache data</string>
@@ -7224,7 +7464,7 @@
     <string name="markdown_export_total_messages">**Total Messages:** %1$d</string>
 
     <!-- WakeWordPreferences -->
-    <string name="wake_word_default">O</string>
+    <string name="wake_word_default">Mira</string>
     <string name="wake_word_response">I\'m here</string>
     <string name="wake_word_global_assistant">Global Assistant</string>
     <string name="wake_word_screen">Screen</string>
@@ -7430,6 +7670,8 @@
     <string name="click_to_manage_missing_group">Tap to manage missing character group entries</string>
     <string name="enable_enter_to_send">Press Enter to Send</string>
     <string name="enable_enter_to_send_description">When enabled, pressing Enter in the chat input sends the message directly, and the keyboard send key will also show Send.</string>
+    <string name="enable_ai_input_suggestion">Smart Reply Draft</string>
+    <string name="enable_ai_input_suggestion_description">After an AI reply, generate one message you may want to send next. It only fills an empty composer and never sends automatically.</string>
     <string name="missing_character_group_id">Missing character group (%1$s)</string>
     <string name="missing_group_entry_action_message">There are %2$d chats under "%1$s". Please choose an action:</string>
     <string name="missing_group_entry_action_title">Missing Character Group Entry</string>
@@ -7919,4 +8161,141 @@
     <string name="ai_message_use_package_failed">use_package call failed: %1$s</string>
     <string name="ai_message_use_package_empty">use_package returned empty.</string>
     <string name="ai_message_package_warmup_item">%1$d. Package %2$s (hit %3$d times)</string>
+    <string name="settings_section_companion">Companion &amp; Characters</string>
+    <string name="settings_section_character_voice">Characters &amp; voice</string>
+    <string name="settings_section_chat_memory">Chat &amp; memory</string>
+    <string name="settings_section_proactive_companion">Proactive companion</string>
+    <string name="settings_section_models_api">Models &amp; API</string>
+    <string name="settings_section_privacy_advanced">Privacy &amp; advanced</string>
+    <string name="settings_section_memory_conversation">Memory &amp; Conversations</string>
+    <string name="settings_section_appearance">Appearance &amp; Interaction</string>
+    <string name="settings_section_capabilities">Models &amp; Capabilities</string>
+    <string name="settings_section_data_privacy">Data &amp; Privacy</string>
+    <string name="update_source_not_configured">No update source is configured for this build</string>
+    <string name="temporary_conversation">Temporary chat</string>
+    <string name="mira_session_list">Conversations</string>
+    <string name="mira_switch_character">Switch character</string>
+    <string name="mira_current_model_value">Current model · %1$s</string>
+    <string name="mira_model_not_configured">Model not configured</string>
+    <string name="mira_voice_call">Voice call</string>
+    <string name="mira_save_memory_now">Save this turn to memory</string>
+    <string name="mira_session_controls">Current conversation</string>
+    <string name="mira_active_skill">Active Skill · %1$s</string>
+    <string name="mira_session_model">Current model</string>
+    <string name="mira_session_memory">Use relationship memory</string>
+    <string name="mira_session_auto_read">Auto read</string>
+    <string name="mira_session_thinking">Thinking mode</string>
+    <string name="mira_thinking_level_value">Thinking depth · %1$d</string>
+    <string name="mira_session_context">Context</string>
+    <string name="mira_context_standard">Standard · %1$dK</string>
+    <string name="mira_context_max">Maximum · %1$dK</string>
+    <string name="mira_manage_models_api">Manage models and API</string>
+    <string name="mira_select_model">Choose conversation model</string>
+    <string name="mira_follow_character_model">Follow character or default model</string>
+    <string name="mira_follow_character_model_desc">Do not override the model for this conversation</string>
+    <string name="mira_new_chat_model">Using: %1$s</string>
+    <string name="mira_new_chat_memory_inherit">Memory: inherit your profile and relationship memory</string>
+    <string name="mira_new_chat_memory_off">Memory: writing disabled for this conversation</string>
+    <string name="mira_create_chat">Create conversation</string>
+    <string name="mira_temporary_chat">Temporary conversation</string>
+    <string name="mira_temporary_chat_desc">Does not write long-term memory, is stored separately, and can be deleted at any time.</string>
+    <string name="mira_start_temporary_chat">Start temporary chat</string>
+    <string name="mira_advanced_features">Advanced features</string>
+    <string name="mira_new_chat_draft_title">You have an unsent draft</string>
+    <string name="mira_new_chat_draft_message">The draft will stay in the composer and move to the new conversation.</string>
+    <string name="mira_save_draft_and_new">Keep draft and create</string>
+    <string name="mira_stay_current_chat">Stay here</string>
+    <string name="mira_mode_chat_only">Chat only</string>
+    <string name="mira_mode_attachments">Chat with attachments</string>
+    <string name="mira_mode_device_assist">Device assist</string>
+    <string name="mira_reply_mode">Response mode</string>
+    <string name="mira_reply_light">Quick</string>
+    <string name="mira_reply_smart">Smart</string>
+    <string name="mira_reply_deep">Deep</string>
+    <string name="mira_thinking_off">Thinking off</string>
+    <string name="mira_thinking_gear_status">Thinking level %1$d</string>
+    <string name="mira_thinking_gear">Thinking level</string>
+    <string name="mira_thinking_gear_short">L%1$d</string>
+    <string name="mira_max_context_summary">Standard %1$sK · Max %2$sK</string>
+    <string name="mira_export_chat">Export conversation</string>
+    <string name="mira_delete_chat">Delete conversation</string>
+    <string name="mira_delete_chat_message">This conversation will be deleted from this device.</string>
+    <string name="mira_export_chat_success">Conversation exported to: %1$s</string>
+    <string name="mira_export_chat_failed">Conversation export failed</string>
+    <string name="mira_conversations">Conversations</string>
+    <string name="mira_pinned_chats">Pinned</string>
+    <string name="mira_recent_chats">Recent</string>
+    <string name="mira_archived_chats">Archived</string>
+    <string name="mira_no_recent_chats">No recent conversations</string>
+    <string name="mira_no_archived_chats">No archived conversations</string>
+    <string name="mira_rename_chat">Rename</string>
+    <string name="mira_archive_chat">Archive conversation</string>
+    <string name="mira_unarchive_chat">Unarchive conversation</string>
+    <string name="mira_chat_archived">Conversation archived</string>
+    <string name="mira_chat_unarchived">Conversation restored</string>
+    <string name="mira_archive_chat_busy">Wait for the current reply to finish before archiving</string>
+    <string name="mira_chat_action_failed">Conversation action failed. Try again.</string>
+    <string name="mate_memory_relations_open">View relationship network</string>
+    <string name="mate_memory_relations_title">Relationship network</string>
+    <string name="mate_memory_relations_empty">This memory has no links yet.</string>
+    <string name="mate_memory_relations_add">Add relationship</string>
+    <string name="mate_memory_relations_type">Relationship type</string>
+    <string name="mate_memory_relations_choose">Choose a memory to link</string>
+    <string name="mate_memory_relations_delete">Delete relationship</string>
+    <string name="mate_memory_edge_about">About</string>
+    <string name="mate_memory_edge_supports">Supports</string>
+    <string name="mate_memory_edge_contradicts">Contradicts</string>
+    <string name="mate_memory_edge_supersedes">Supersedes</string>
+    <string name="mate_memory_edge_followed_by">Followed by</string>
+    <string name="mate_memory_edge_occurred_during">Occurred during</string>
+    <string name="mate_memory_edge_caused_by">Caused by</string>
+    <string name="mate_memory_edge_promises">Promises</string>
+    <string name="mate_memory_edge_prefers">Prefers</string>
+    <string name="mate_memory_edge_avoids">Avoids</string>
+    <string name="mate_memory_edge_relates_to">Related to</string>
+    <string name="mira_first_response_timeout">The model returned no content within two minutes. Check the network or model service, then retry.</string>
+    <string name="mira_voice_send_failed">The message was not sent. Listening has resumed; please try again.</string>
+    <string name="mira_voice_response_start_timeout">The model did not start responding. Listening has resumed.</string>
+    <string name="mira_voice_response_timeout">This response timed out and was stopped. Listening has resumed.</string>
+    <string name="currently_reading_segment">Reading: %1$s</string>
+    <string name="search_voice_hint">Search voice name or voice_type</string>
+    <string name="manage_character_group_chat">Create / manage group chat</string>
+    <string name="mira_memory_saved_receipt">Remembered: %1$s</string>
+    <string name="voice_call_expressive_tts">Expressive speech</string>
+    <string name="voice_call_expressive_tts_desc">Adjust emotion, pace, and pauses to match each reply</string>
+    <string name="voice_call_expression_restrained">Restrained</string>
+    <string name="voice_call_expression_natural">Natural</string>
+    <string name="voice_call_expression_vivid">Vivid</string>
+    <string name="voice_call_section_interaction">Call interaction</string>
+    <string name="voice_call_barge_in">Allow voice interruption</string>
+    <string name="voice_call_barge_in_desc">Keep listening while Mira speaks, then stop playback when your voice is detected</string>
+    <string name="voice_call_silence_rhythm">Send after a pause</string>
+    <string name="voice_call_silence_rhythm_desc">Choose how long Mira waits before treating your sentence as complete</string>
+    <string name="voice_call_silence_fast">Fast</string>
+    <string name="voice_call_silence_natural">Natural</string>
+    <string name="voice_call_silence_relaxed">Relaxed</string>
+    <string name="tts_preview_daily">Everyday</string>
+    <string name="tts_preview_comfort">Comfort</string>
+    <string name="tts_preview_teasing">Teasing</string>
+    <string name="tts_preview_daily_text">How was your day? Take your time, I am listening.</string>
+    <string name="tts_preview_comfort_text">It is okay. I am here. Take a breath, and we will handle the rest together.</string>
+    <string name="tts_preview_teasing_text">All right, keep pretending. I caught you again this time.</string>
+    <string name="mira_my_profile">My profile</string>
+    <string name="mira_user_avatar">User avatar</string>
+    <string name="mira_change_avatar">Change avatar</string>
+    <string name="mira_remove_avatar">Remove avatar</string>
+    <string name="mira_name_not_set">Name not set</string>
+    <string name="mira_address_not_set">How your companion should address you is not set</string>
+    <string name="mira_my_name">My name</string>
+    <string name="mira_my_name_hint">For example: Alex</string>
+    <string name="mira_preferred_address">How my companion should address me</string>
+    <string name="mira_preferred_address_hint">For example: Alex, boss, sis</string>
+    <string name="mira_pronouns">Pronouns or preferred terms</string>
+    <string name="mira_pronouns_hint">For example: she / her, or leave blank</string>
+    <string name="mira_pronouns_value">Preferred terms: %1$s</string>
+    <string name="mira_user_identity">My identity</string>
+    <string name="mira_profile_config_name">Profile · %1$s</string>
+    <string name="profile_display_name_value">Name: %1$s</string>
+    <string name="profile_preferred_address_value">Preferred address: %1$s</string>
+    <string name="profile_pronouns_value">Pronouns or terms: %1$s</string>
 </resources>

@@ -204,7 +204,7 @@ private fun ThemeSettingsBasicColorPanel(
     val chatHeaderTransparent by preferencesManager.chatHeaderTransparent.collectAsState(initial = false)
     val chatHeaderOverlayMode by preferencesManager.chatHeaderOverlayMode.collectAsState(initial = false)
     val chatInputTransparent by preferencesManager.chatInputTransparent.collectAsState(initial = false)
-    val chatInputFloating by preferencesManager.chatInputFloating.collectAsState(initial = false)
+    val chatInputFloating by preferencesManager.chatInputFloating.collectAsState(initial = true)
     val chatInputLiquidGlass by preferencesManager.chatInputLiquidGlass.collectAsState(initial = false)
     val chatInputWaterGlass by preferencesManager.chatInputWaterGlass.collectAsState(initial = false)
     val forceAppBarContentColor by preferencesManager.forceAppBarContentColor.collectAsState(initial = false)
@@ -461,4 +461,3 @@ private fun saveSelectedThemeColor(
         }
     }
 }
-

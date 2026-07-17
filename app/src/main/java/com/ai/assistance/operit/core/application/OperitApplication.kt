@@ -23,8 +23,10 @@ import java.util.concurrent.TimeUnit
 import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.chat.AIMessageManager
+import com.ai.assistance.operit.core.companion.CompanionReminderScheduler
 import com.ai.assistance.operit.api.chat.AIForegroundService
 import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveScheduler
+import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveWorkScheduler
 import com.ai.assistance.operit.plugins.PluginRegistry
 import com.ai.assistance.operit.plugins.lifecycle.AppLifecycleEvent
 import com.ai.assistance.operit.plugins.lifecycle.AppLifecycleHookParams
@@ -212,7 +214,12 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
 
         memoryAutoSaveScheduler = MemoryAutoSaveScheduler(applicationContext, applicationScope)
             .also { it.start() }
+        MemoryAutoSaveWorkScheduler.ensureScheduled(applicationContext)
         AppLogger.d(TAG, "【启动计时】长期记忆自动保存轮询器启动完成 - ${System.currentTimeMillis() - startTime}ms")
+
+        applicationScope.launch {
+            CompanionReminderScheduler.getInstance(applicationContext).syncAllProfiles()
+        }
 
         // 初始化功能提示词管理器
         applicationScope.launch {
@@ -566,10 +573,16 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
 
     override fun attachBaseContext(base: Context) {
         configureOpenMpEnvironment()
-        // 在基础上下文附加前应用语言设置
+        // DataStore requires an attached application context, which is not available here.
+        // Use the base configuration for startup; the persisted app language is applied in onCreate.
         try {
-            val code = LocaleUtils.getCurrentLanguage(base)
-            val locale = LocaleUtils.getLocaleForLanguageCode(code, base)
+            val locale =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    base.resources.configuration.locales[0]
+                } else {
+                    @Suppress("DEPRECATION")
+                    base.resources.configuration.locale
+                }
             val config = Configuration(base.resources.configuration)
 
             // 设置语言配置
@@ -585,7 +598,7 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
             // 使用createConfigurationContext创建新的上下文
             val context = base.createConfigurationContext(config)
             super.attachBaseContext(context)
-            AppLogger.d(TAG, "成功应用基础上下文语言: $code")
+            AppLogger.d(TAG, "成功应用基础上下文语言: ${locale.toLanguageTag()}")
         } catch (e: Exception) {
             AppLogger.e(TAG, "应用基础上下文语言失败", e)
             super.attachBaseContext(base)

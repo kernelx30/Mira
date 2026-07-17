@@ -53,8 +53,8 @@ import com.ai.assistance.operit.util.stream.stream
 private const val TOOL_PARAM_TOKEN_THRESHOLD = 50
 
 class CustomXmlRenderer(
-    private val showThinkingProcess: Boolean = true,
-    private val showStatusTags: Boolean = true,
+    private val showThinkingProcess: Boolean = false,
+    private val showStatusTags: Boolean = false,
     private val initialThinkingExpanded: Boolean = false,
     private val allowExpandedThinkingFullHeight: Boolean = false,
     private val enableDialogs: Boolean = true,  // 新增参数：是否启用弹窗功能，默认启用
@@ -62,7 +62,7 @@ class CustomXmlRenderer(
 ) : XmlContentRenderer {
     // 定义渲染器能够处理的内置标签集合
     private val builtInTags =
-            setOf("think", "thinking", "search", "tool", "status", "tool_result", "html", "mood", "font", "details", "detail", "meta")
+            setOf("think", "thinking", "search", "tool", "status", "tool_result", "html", "mood", "font", "details", "detail", "meta", "speech")
 
     private data class ToolRequestRenderState(
         val rawToolName: String,
@@ -103,6 +103,7 @@ class CustomXmlRenderer(
             "mood" -> stringResource(R.string.mood_tag_block)
             "font" -> stringResource(R.string.xml_block)
             "details", "detail" -> stringResource(R.string.xml_block)
+            "speech" -> stringResource(R.string.xml_block)
             else -> stringResource(R.string.tool_call_block)
         }
         
@@ -169,7 +170,10 @@ class CustomXmlRenderer(
         // 根据新规则处理未闭合的标签
         val isClosed = isXmlFullyClosed(trimmedContent)
         if (!isClosed) {
-            if (resolvedTagName in builtInTags && resolvedTagName != "tool" && resolvedTagName != "think" && resolvedTagName != "thinking" && resolvedTagName != "search") {
+            if (resolvedTagName == "speech") {
+                renderSpeechContent(trimmedContent, modifier, textColor)
+                return
+            } else if (resolvedTagName in builtInTags && resolvedTagName != "tool" && resolvedTagName != "think" && resolvedTagName != "thinking" && resolvedTagName != "search") {
                 // 是内置标签但未闭合，则不显示任何内容，等待其闭合
                 return
             } else if (resolvedTagName !in builtInTags) {
@@ -191,8 +195,23 @@ class CustomXmlRenderer(
             "mood" -> renderMoodTag(trimmedContent, Modifier, textColor)
             "font" -> FontTagRenderer.Render(trimmedContent, Modifier, textColor)
             "details", "detail" -> DetailsTagRenderer.Render(trimmedContent, Modifier, textColor, enableDialogs = enableDialogs)
+            "speech" -> renderSpeechContent(trimmedContent, Modifier, textColor)
             else -> fallback.RenderXmlContent(trimmedContent, Modifier, textColor, xmlStream, renderInstanceKey)
         }
+    }
+
+    @Composable
+    private fun renderSpeechContent(content: String, modifier: Modifier, textColor: Color) {
+        val visibleText = extractContentFromXml(content, "speech").trim()
+        if (visibleText.isBlank()) return
+        StreamMarkdownRenderer(
+            content = visibleText,
+            modifier = modifier.fillMaxWidth(),
+            textColor = textColor,
+            backgroundColor = Color.Transparent,
+            enableDialogs = enableDialogs,
+            fillMaxWidth = true,
+        )
     }
 
     /** 从XML字符串中提取第一个标签的名称。 例如: "<think>...</think>" -> "think" */

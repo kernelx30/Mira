@@ -21,6 +21,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -28,6 +29,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
+@OptIn(ExperimentalSerializationApi::class)
 class OpenAIVoiceProvider(
     private val context: Context,
     private val endpointUrl: String,
@@ -35,6 +37,14 @@ class OpenAIVoiceProvider(
     private val model: String,
     initialVoiceId: String
 ) : VoiceService {
+
+    override val capabilities: VoiceCapabilities
+        get() =
+            VoiceCapabilities(
+                supportsStyleInstruction = supportsInstructions(model),
+                supportsRate = true,
+                supportsPitch = false,
+            )
 
     companion object {
         private const val TAG = "OpenAIVoiceProvider"
@@ -56,7 +66,8 @@ class OpenAIVoiceProvider(
         val input: String,
         val voice: String,
         val response_format: String? = null,
-        val speed: Double? = null
+        val speed: Double? = null,
+        val instructions: String? = null,
     )
 
     private val httpClient: OkHttpClient by lazy {
@@ -144,16 +155,20 @@ class OpenAIVoiceProvider(
                     extraParams["response_format"]?.takeIf { it.isNotBlank() } ?: "mp3"
                 val speed = (extraParams["speed"]?.toDoubleOrNull() ?: effectiveRate.toDouble())
                     .coerceIn(0.25, 4.0)
+                val instructions =
+                    extraParams["instruction"]
+                        ?.takeIf { it.isNotBlank() && supportsInstructions(requestModel) }
 
                 val payload = OpenAiSpeechRequest(
                     model = requestModel,
                     input = text,
                     voice = requestVoice,
                     response_format = responseFormat,
-                    speed = speed
+                    speed = speed,
+                    instructions = instructions,
                 )
 
-                val bodyJson = Json.encodeToString(payload)
+                val bodyJson = Json { explicitNulls = false }.encodeToString(payload)
 
                 val requestBody = bodyJson.toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
@@ -199,6 +214,9 @@ class OpenAIVoiceProvider(
             }
         }
     }
+
+    private fun supportsInstructions(modelName: String): Boolean =
+        modelName.contains("gpt-4o-mini-tts", ignoreCase = true)
 
      private suspend fun playAudioFileAndAwait(file: File): Boolean {
          val done = CompletableDeferred<Boolean>()

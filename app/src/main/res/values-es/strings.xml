@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Operit AI</string>
+    <string name="app_name">Mira</string>
     <string name="accessibility_service_description">Se utiliza para obtener la jerarquía de la interfaz de usuario, proporcionando al asistente de IA capacidades de análisis de interfaz más rápidas. No recopilará ni almacenará ninguna información personal.</string>
 
     <!-- Navigation -->
@@ -59,7 +59,7 @@
     <string name="danger_zone">Zona peligrosa</string>
     <string name="chat_statistics">Estadísticas del historial de chat</string>
     <string name="current_chats">Actualmente hay %1$d registros de chat</string>
-    <string name="backup_location">Los archivos de copia de seguridad se guardan en la carpeta "Descargas/Operit"</string>
+    <string name="backup_location">Los archivos de copia de seguridad se guardan en la carpeta "Descargas/Mira"</string>
     <string name="faq_backup">Preguntas frecuentes</string>
 
     <string name="lock_chat">Bloquear chat</string>
@@ -83,13 +83,13 @@
     <string name="termux_wizard_title">Asistente de configuración de Termux</string>
 
     <!-- About Screen -->
-    <string name="about_title">Acerca de Operit AI</string>
+    <string name="about_title">Acerca de Mira</string>
     <string name="about_version">Versión: %1$s</string>
-    <string name="about_description">Operit AI es una aplicación de asistente inteligente que ayuda a los usuarios a utilizar sus dispositivos de manera más eficiente, proporcionando funciones como análisis de interfaz y chat.</string>
+    <string name="about_description">Mira es una aplicación de asistente inteligente que ayuda a los usuarios a utilizar sus dispositivos de manera más eficiente, proporcionando funciones como análisis de interfaz y chat.</string>
     <string name="about_developer">Desarrollador: &lt;a href="https://github.com/AAswordman"&gt;AAswordman&lt;/a&gt;</string>
     <string name="about_contact">Contáctenos: aaswordsman@foxmail.com</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
-    <string name="about_copyright">© 2025 - 2026 Operit. Todos los derechos reservados.</string>
+    <string name="about_copyright">Mira · Based on Operit · LGPLv3</string>
 
     <!-- AI Chat Screen -->
     <string name="configure_ai">Configurar interfaz AI</string>
@@ -228,7 +228,7 @@
     <string name="copy_path">Copiar ruta</string>
     <string name="path_copied_to_clipboard">Ruta copiada al portapapeles</string>
     <string name="open_file_manager">Abrir gestor de archivos</string>
-    <string name="navigate_to_external_files">Navegue a Android/data/com.ai.assistance.operit/files/packages</string>
+    <string name="navigate_to_external_files">Navegue a Android/data/com.ai.assistance.mira/files/packages</string>
 
     <!-- OperScript Execution -->
     <string name="run_script">Ejecutar script</string>
@@ -476,10 +476,10 @@
     <!-- Agreement Screen -->
     <string name="agreement_subtitle">Por favor lea cuidadosamente y acepte los siguientes términos antes de usar.</string>
     <string name="agreement_human_readable_title">Acuerdo en lenguaje simple (versión no legal)</string>
-    <string name="agreement_human_readable_content">Al igual que usted, no nos gustan los acuerdos largos y aburridos. En pocas palabras:\n\nOperitAI es un software gratuito y de código abierto. Sus funciones de automatización y otras son muy potentes, por favor úselo solo para aprendizaje personal y asistencia diaria, no para ningún uso comercial o irregular.\n\nUsted es responsable de todas sus acciones. No somos responsables de las extensiones que agregue o modificaciones al software.\n\nEn cuanto a la privacidad: Su procesamiento de voz se completa localmente en su teléfono, es muy seguro. Los datos de chat de IA se envían directamente a las empresas de IA, nosotros no los manejamos.</string>
+    <string name="agreement_human_readable_content">Al igual que usted, no nos gustan los acuerdos largos y aburridos. En pocas palabras:\n\nMira es un software gratuito y de código abierto. Sus funciones de automatización y otras son muy potentes, por favor úselo solo para aprendizaje personal y asistencia diaria, no para ningún uso comercial o irregular.\n\nUsted es responsable de todas sus acciones. No somos responsables de las extensiones que agregue o modificaciones al software.\n\nEn cuanto a la privacidad: Su procesamiento de voz se completa localmente en su teléfono, es muy seguro. Los datos de chat de IA se envían directamente a las empresas de IA, nosotros no los manejamos.</string>
     <string name="agreement_serious_title">Acuerdo legal riguroso</string>
     <string name="agreement_serious_content"><![CDATA[
-        <p>Bienvenido a OperitAI. Este software se modifica y distribuye bajo los términos de la Licencia Pública General Menor de GNU versión 3 (LGPLv3).</p>
+        <p>Bienvenido a Mira. Este software se modifica y distribuye bajo los términos de la Licencia Pública General Menor de GNU versión 3 (LGPLv3).</p>
         <p><b>1. Exención de garantía</b><br>Este software se proporciona "tal como está", sin garantías de ningún tipo, expresas o implícitas, incluyendo pero no limitándose a garantías de comerciabilidad, idoneidad para un propósito particular o no infracción. Todos los riesgos relacionados con la calidad y rendimiento del software son asumidos por usted.</p>
         <p><b>2. Limitación de responsabilidad</b><br>En ninguna circunstancia, excepto cuando lo requiera la ley aplicable o acordado por escrito, ningún contribuyente será responsable de daños directos, indirectos, incidentales, especiales, punitivos o consecuenciales causados por el uso o la incapacidad de usar este software (incluyendo pero no limitándose a la adquisición de bienes o servicios sustitutos, pérdida de datos o ganancias, o interrupción de negocios). <b>Además, el equipo de desarrollo no es responsable de las consecuencias de cualquier paquete de extensión (como MCP) instalado por el usuario o modificaciones realizadas a este software.</b></p>
         <p><b>3. Responsabilidad del usuario y limitaciones de uso</b><br>Usted es completamente responsable de cualquier operación realizada a través de este software y todas sus consecuencias. Se compromete a usar este software para uso personal legal y apropiado, y acepta:<br>
@@ -1827,7 +1827,7 @@
     <string name="app_logo_description">Icono de la aplicación</string>
     <string name="github_star_description">Estrella de GitHub</string>
     <string name="network_status_label">Estado de red</string>
-    <string name="config_title">Asistente Operit AI</string>
+    <string name="config_title">Asistente Mira</string>
     <string name="config_description">Usamos la API de DeepSeek por defecto. Si desea cambiarla, haga clic en la opción personalizada a continuación.</string>
     <string name="config_api_key_label">Clave API</string>
     <string name="config_api_key_placeholder">Clave API de DeepSeek</string>
@@ -1866,7 +1866,7 @@
     <string name="free_usage_first_tip">Es la primera vez que lo usas, después tendrás que esperar 1 día para volver a usarlo~</string>
     <string name="free_usage_later_tip">Aprovecharse también tiene límites, necesitas esperar %1$d días más para seguir aprovechándote (๑•̀ㅂ•́)و✧</string>
     <string name="plugin_skip">Saltar</string>
-    <string name="plugin_app_name">OPERIT</string>
+    <string name="plugin_app_name">Mira</string>
     <string name="plugin_status">Iniciados: %1$d / %2$d</string>
     <string name="plugin_loading_status_title">Estado de carga de plugins</string>
     <string name="plugin_loading_success">Carga exitosa</string>
@@ -2011,7 +2011,7 @@
     <string name="permission_guide_intro_2_title">Potente caja de herramientas para geeks y desarrolladores</string>
     <string name="permission_guide_intro_2_desc">Incluye más de 40 herramientas profesionales que abarcan gestión de archivos, solicitudes de red, ejecución de scripts y control del sistema. Combinado con un potente sistema de complementos, puede automatizar tareas y tener un control profundo de su dispositivo.</string>
     <string name="permission_guide_intro_3_title">Libere su creatividad, siempre disponible</string>
-    <string name="permission_guide_intro_3_desc">Ya sea diseñando páginas web, procesando archivos multimedia o despertando a la IA en cualquier momento a través de una ventana flotante, Operit le ofrece un entorno de creación y asistencia potente, flexible y seguro. Sus datos, bajo su control.</string>
+    <string name="permission_guide_intro_3_desc">Ya sea diseñando páginas web, procesando archivos multimedia o despertando a la IA en cualquier momento a través de una ventana flotante, Mira le ofrece un entorno de creación y asistencia potente, flexible y seguro. Sus datos, bajo su control.</string>
     <string name="permission_guide_intro_page_indicator">Introducción de funciones %1$d/%2$d</string>
     <string name="debugger_accessibility_fallback_title">Plan de aceleración de accesibilidad (alto riesgo)</string>
     <string name="debugger_accessibility_fallback_description">El modo de depuración ejecuta operaciones de UI a través de Shell de forma predeterminada. Habilitar el servicio de accesibilidad puede acelerar significativamente la automatización de la UI, pero aumenta considerablemente el riesgo de ser detectado por algunas aplicaciones y de que la cuenta sea suspendida. A menos que busque la máxima velocidad de operación, no se recomienda activarlo.</string>
@@ -2022,6 +2022,7 @@
     <string name="message_info_model_name">Modelo</string>
     <string name="message_info_message_time">Hora del mensaje</string>
     <string name="message_info_sent_at">Hora de envío</string>
+    <string name="message_info_completed_at">Hora de finalización</string>
     <string name="message_info_input_tokens">Tokens de entrada</string>
     <string name="message_info_cached_input_tokens">Tokens de entrada en caché</string>
     <string name="message_info_output_tokens">Tokens de salida</string>
@@ -2656,7 +2657,7 @@
     <string name="tts_debug_params_with_service">Parámetros de solicitud: texto=\'%1$s\', velocidad=%2$sx, tono=%3$sx\nTipo de servicio: %4$s</string>
     <string name="tts_usage_instructions_content">1. Ingrese el texto a convertir en voz en el cuadro de entrada\n2. Ajuste la velocidad y el tono\n3. Haga clic en «Reproducir voz» para iniciar la reproducción\n4. Haga clic en «Detener reproducción» para detener\n5. Si ocurre un error, consulte los detalles del error y la información de depuración\n6. Use el botón «Limpiar mensaje de error» para borrar la visualización de errores</string>
     <string name="tool_default_assistant_guide">Configuración del asistente predeterminado</string>
-    <string name="tool_default_assistant_guide_desc">Establecer el flotante de voz de Operit como asistente predeterminado del sistema</string>
+    <string name="tool_default_assistant_guide_desc">Establecer el flotante de voz de Mira como asistente predeterminado del sistema</string>
     <string name="tool_terminal_auto_config_under_construction">La función de configuración automática del terminal está siendo reestructurada...</string>
     <string name="ui_debugger_title">Herramienta de depuración de UI</string>
     <string name="ui_debugger_description">Haga clic en el botón en la esquina inferior derecha para iniciar la ventana flotante y depurar la UI</string>
@@ -3911,9 +3912,9 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="import_color_qr">Importar código QR de color</string>
     <string name="scan_color_qr">Escanear código QR de color</string>
     <string name="tavern_json">JSON de Tavern</string>
-    <string name="export_tavern_json_desc">Exportar como .json y guardar en Download/Operit/exports</string>
+    <string name="export_tavern_json_desc">Exportar como .json y guardar en Download/Mira/exports</string>
     <string name="tavern_png">PNG de Tavern</string>
-    <string name="export_tavern_png_desc">Exportar como imagen importable a Tavern y guardar en Download/Operit/exports</string>
+    <string name="export_tavern_png_desc">Exportar como imagen importable a Tavern y guardar en Download/Mira/exports</string>
     <string name="image_read_error">No se puede leer la imagen</string>
     <string name="image_parse_error">No se puede analizar la imagen</string>
     <string name="color_qr_not_recognized">No se puede reconocer el código QR de color</string>
@@ -4164,7 +4165,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="emoji_preview">Vista previa del emoji</string>
     <string name="create_group">Crear grupo</string>
     <string name="custom">Personalizado</string>
-    <string name="voice_assistant_widget_description">Inicio rápido del asistente de voz Operit</string>
+    <string name="voice_assistant_widget_description">Inicio rápido del asistente de voz Mira</string>
     <string name="voice_assistant_widget_title">Asistente de voz</string>
     <string name="screen_title_mnn_model_download">Descarga de modelo MNN</string>
     <string name="mnn_model_download">Descargar modelo MNN</string>
@@ -4475,16 +4476,16 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="default_assistant_guide_step2_note">Nota: los gestos pueden variar según la marca del teléfono. Consulte las opciones disponibles en la configuración del sistema.</string>
     <string name="default_assistant_guide_step4_title">Probar el asistente de voz</string>
     <string name="default_assistant_guide_step4_desc">Una vez configurado, compruebe si se inicia correctamente.</string>
-    <string name="default_assistant_guide_step4_detail1">• Mantener presionado el botón de inicio debería abrir el asistente de voz Operit.</string>
-    <string name="default_assistant_guide_step4_detail2">• Si el dispositivo admite activación por voz, decir "Hey Google" o la palabra de activación especificada también puede activar Operit.</string>
+    <string name="default_assistant_guide_step4_detail1">• Mantener presionado el botón de inicio debería abrir el asistente de voz Mira.</string>
+    <string name="default_assistant_guide_step4_detail2">• Si el dispositivo admite activación por voz, decir "Hey Google" o la palabra de activación especificada también puede activar Mira.</string>
     <string name="default_assistant_guide_step3_title">Probar la función del asistente</string>
-    <string name="default_assistant_guide_step3_desc">Una vez configurado, compruebe si Operit se activa correctamente.</string>
+    <string name="default_assistant_guide_step3_desc">Una vez configurado, compruebe si Mira se activa correctamente.</string>
     <string name="default_assistant_guide_step3_detail1">• Use el gesto configurado (como mantener presionado el botón de inicio) para activar el asistente.</string>
-    <string name="default_assistant_guide_step3_detail2">• Si tiene éxito, debería ver la interfaz del asistente de voz de Operit.</string>
+    <string name="default_assistant_guide_step3_detail2">• Si tiene éxito, debería ver la interfaz del asistente de voz de Mira.</string>
     <string name="default_assistant_guide_step3_detail3">• Puede intentar hablar o escribir texto para interactuar con el asistente.</string>
     <string name="default_assistant_guide_troubleshooting_title">¿Problemas?</string>
-    <string name="default_assistant_guide_troubleshooting_content">Si no encuentra Operit en la lista, asegúrese de que:\n\n• La aplicación esté instalada correctamente y no esté deshabilitada.\n• Se hayan concedido los permisos necesarios (micrófono, ventana flotante, etc.).\n• Intente reiniciar el dispositivo y configurarlo de nuevo.\n\nAlgunos sistemas personalizados pueden restringir aplicaciones de terceros como asistente predeterminado. En ese caso, aún puede usar Operit mediante la función de ventana flotante dentro de la aplicación.</string>
-    <string name="voice_interaction_service_name">Asistente Operit AI</string>
+    <string name="default_assistant_guide_troubleshooting_content">Si no encuentra Mira en la lista, asegúrese de que:\n\n• La aplicación esté instalada correctamente y no esté deshabilitada.\n• Se hayan concedido los permisos necesarios (micrófono, ventana flotante, etc.).\n• Intente reiniciar el dispositivo y configurarlo de nuevo.\n\nAlgunos sistemas personalizados pueden restringir aplicaciones de terceros como asistente predeterminado. En ese caso, aún puede usar Mira mediante la función de ventana flotante dentro de la aplicación.</string>
+    <string name="voice_interaction_service_name">Asistente Mira</string>
     <string name="voice_interaction_service_summary">Servicio de asistente de voz inteligente</string>
     <string name="tool_permissions_title">Permisos de herramientas</string>
     <string name="tool_permissions_description">De forma predeterminada, todas las herramientas requieren su "consulta". Puede agregar excepciones a continuación.</string>
@@ -4697,18 +4698,18 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="time_hours_ago">Hace %1$d horas</string>
     <string name="time_days_ago">Hace %1$d días</string>
     <string name="default_assistant_guide_title">Configurar asistente de voz predeterminado</string>
-    <string name="default_assistant_guide_subtitle">Haz de Operit tu asistente inteligente</string>
-    <string name="default_assistant_guide_intro">Al configurar Operit como asistente predeterminado del sistema, puedes iniciar rápidamente el asistente de voz de Operit manteniendo presionado el botón de inicio o usando activación por voz, obteniendo una experiencia de interacción con IA más conveniente.</string>
+    <string name="default_assistant_guide_subtitle">Haz de Mira tu asistente inteligente</string>
+    <string name="default_assistant_guide_intro">Al configurar Mira como asistente predeterminado del sistema, puedes iniciar rápidamente el asistente de voz de Mira manteniendo presionado el botón de inicio o usando activación por voz, obteniendo una experiencia de interacción con IA más conveniente.</string>
     <string name="default_assistant_guide_steps_title">Pasos de configuración</string>
     <string name="default_assistant_guide_step1_title">Configurar como asistente predeterminado</string>
-    <string name="default_assistant_guide_step1_desc">Configurar Operit como la aplicación de asistente digital predeterminada del sistema</string>
+    <string name="default_assistant_guide_step1_desc">Configurar Mira como la aplicación de asistente digital predeterminada del sistema</string>
     <string name="default_assistant_guide_step1_detail1">• Abre Configuración del sistema → Aplicaciones → Aplicaciones predeterminadas → Aplicación de asistente digital</string>
-    <string name="default_assistant_guide_step1_detail2">• En la lista de aplicaciones de asistente, busca y selecciona "Operit AI"</string>
+    <string name="default_assistant_guide_step1_detail2">• En la lista de aplicaciones de asistente, busca y selecciona "Mira"</string>
     <string name="default_assistant_guide_step1_detail_android12">Android 12+: Configuración → Aplicaciones → Aplicaciones predeterminadas → Aplicación de asistente digital → Aplicación de asistente digital predeterminada</string>
     <string name="default_assistant_guide_open_settings">Abrir configuración del asistente</string>
     <string name="default_assistant_guide_open_gesture_settings">Abrir configuración de gestos</string>
     <string name="default_assistant_guide_step2_title">Configurar gesto de activación</string>
-    <string name="default_assistant_guide_step2_desc">Configurar cómo invocar rápidamente al asistente Operit</string>
+    <string name="default_assistant_guide_step2_desc">Configurar cómo invocar rápidamente al asistente Mira</string>
     <string name="default_assistant_guide_step2_detail1">• Mantener presionado el botón de inicio: la forma más común, disponible en la mayoría de dispositivos</string>
     <string name="default_assistant_guide_step2_detail2">• Deslizar hacia arriba desde la parte inferior de la pantalla: en algunos dispositivos con gestos de pantalla completa</string>
     <string name="default_assistant_guide_step2_detail_android12">Android 12+: Configuración → Aplicaciones → Aplicaciones predeterminadas → Aplicación de asistente digital → Aplicación de asistente digital predeterminada</string>
@@ -4811,7 +4812,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="keep_screen_on_description">Mantener la pantalla encendida para evitar que se bloquee automáticamente durante la conversación</string>
     <string name="software_identity_title">Identidad del software</string>
     <string name="software_identity_description">Cambiar la identidad del software que se muestra en la parte superior de la barra lateral.</string>
-    <string name="software_identity_option_operit">Operit AI</string>
+    <string name="software_identity_option_operit">Mira</string>
     <string name="software_identity_option_lingshu">Lingshu AI</string>
     <string name="reset_all_display_settings">Restablecer toda la configuración de pantalla</string>
     <string name="ui_accessibility_mode">Modo de accesibilidad</string>
@@ -4875,7 +4876,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="backup_memory_count">Entradas de memoria</string>
     <string name="backup_memory_link_count">Vínculos de memoria</string>
     <string name="backup_files_statistics">Estadísticas de archivos de respaldo</string>
-    <string name="backup_files_statistics_subtitle">Archivos de respaldo en el directorio de exportación de Operit</string>
+    <string name="backup_files_statistics_subtitle">Archivos de respaldo en el directorio de exportación de Mira</string>
     <string name="backup_refresh">Actualizar</string>
     <string name="backup_scanning">Escaneando</string>
     <string name="backup_chat_files">Registros de chat</string>
@@ -4909,7 +4910,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="backup_room_db_restart_later">Más tarde</string>
     <string name="backup_room_db_last_success">Último respaldo exitoso: %1$s</string>
     <string name="backup_room_db_last_error">Último error: %1$s</string>
-    <string name="backup_files_location_hint">Sugerencia: los archivos de respaldo se guardan en la carpeta Download/Operit</string>
+    <string name="backup_files_location_hint">Sugerencia: los archivos de respaldo se guardan en la carpeta Download/Mira</string>
     <string name="backup_raw_snapshot_title">Respaldo de instantánea de archivos (experimental)</string>
     <string name="backup_raw_snapshot_subtitle">Respaldo y restauración comprimidos completos por archivo/directorio</string>
     <string name="backup_raw_snapshot_desc">Empaqueta los directorios files/shared_prefs/datastore/databases del directorio de datos internos de la aplicación (el entorno Linux de terminal es grande, no se respalda por defecto). La restauración sobrescribirá los datos actuales y requerirá reiniciar la aplicación para que surta efecto. Algunos datos cifrados pueden no funcionar después de cambiar de dispositivo o reinstalar.</string>
@@ -4964,7 +4965,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="backup_faq_why">¿Por qué hacer una copia de seguridad de los datos?</string>
     <string name="backup_faq_why_answer">Hacer una copia de seguridad del historial de chat evita que pierda contenido importante al desinstalar la aplicación o en caso de pérdida de datos. ¡Hacer copias de seguridad periódicas es un buen hábito!</string>
     <string name="backup_faq_where">¿Dónde se guardan los archivos exportados?</string>
-    <string name="backup_faq_where_answer">Los archivos de copia de seguridad exportados se guardan en la carpeta «Descargas/Operit» de su teléfono. El nombre del archivo incluye el tipo de datos exportados, la fecha y la hora.</string>
+    <string name="backup_faq_where_answer">Los archivos de copia de seguridad exportados se guardan en la carpeta «Descargas/Mira» de su teléfono. El nombre del archivo incluye el tipo de datos exportados, la fecha y la hora.</string>
     <string name="backup_faq_duplicate">¿Aparecerán datos duplicados después de la importación?</string>
     <string name="backup_faq_duplicate_answer">El sistema juzga según el ID del registro. Los registros con el mismo ID se actualizarán en lugar de importarse duplicados. Los registros con ID diferente se agregarán como nuevos registros.</string>
     <string name="backup_select_export_format">Seleccionar formato de exportación</string>
@@ -4993,7 +4994,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="backup_export_result_success">Exportación exitosa a: %1$s</string>
     <string name="backup_character_cards_title">Tarjetas de personaje</string>
     <string name="backup_character_cards_subtitle">Copia de seguridad y restauración de la configuración de tarjetas de personaje.</string>
-    <string name="backup_character_cards_current_count">Actualmente hay %1$d tarjetas de personaje. Los archivos exportados se guardarán en la carpeta «Descargas/Operit».</string>
+    <string name="backup_character_cards_current_count">Actualmente hay %1$d tarjetas de personaje. Los archivos exportados se guardarán en la carpeta «Descargas/Mira».</string>
     <string name="backup_character_card_count">Tarjetas de personaje</string>
     <string name="backup_character_card_files">Tarjetas de personaje</string>
     <string name="backup_character_cards_export_result_success">Exportación exitosa de %1$d tarjetas de personaje a:\n%2$s</string>
@@ -5074,7 +5075,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="uidebugger_element_info_package_name">nombre del paquete: %1$s</string>
     <string name="uidebugger_element_info_size_px">tamaño: %1$d×%2$dpx</string>
     <string name="logcat_no_logs_to_save">no hay registros para guardar</string>
-    <string name="logcat_header">=== Registros de Operit ===</string>
+    <string name="logcat_header">=== Registros de Mira ===</string>
     <string name="logcat_date">fecha: %1$s</string>
     <string name="logcat_total_count">total: %1$d</string>
     <string name="logcat_save_failed">error al guardar: %1$s</string>
@@ -6127,15 +6128,15 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="chat_ai_service_unavailable_summarize">El servicio de IA no está disponible, no se puede resumir</string>
     <string name="chat_summarize_failed_no_valid_summary">Error al resumir: no se pudo generar un resumen válido</string>
     <string name="chat_summarize_generation_failed">Error al generar el resumen: %1$s</string>
-    <string name="service_operit_running">Operit está en ejecución</string>
+    <string name="service_operit_running">Mira está en ejecución</string>
     <string name="service_chat_complete_reminder">Recordatorio de conversación completada</string>
     <string name="service_chat_complete_reminder_sound">Recordatorio de conversación completada (sonido)</string>
     <string name="service_chat_complete_reminder_vibration">Recordatorio de conversación completada (vibración)</string>
     <string name="service_chat_complete_reminder_sound_vibration">Recordatorio de conversación completada (sonido y vibración)</string>
-    <string name="service_keep_background">Mantener Operit ejecutándose en segundo plano.</string>
+    <string name="service_keep_background">Mantener Mira ejecutándose en segundo plano.</string>
     <string name="service_notify_when_complete">Notificarle cuando la conversación esté completa.</string>
-    <string name="service_running_wake_pause">Operit está en ejecución (pausa de activación)</string>
-    <string name="service_running_wake_listening">Operit está en ejecución (escuchando activación)</string>
+    <string name="service_running_wake_pause">Mira está en ejecución (pausa de activación)</string>
+    <string name="service_running_wake_listening">Mira está en ejecución (escuchando activación)</string>
     <string name="service_running_stats">Ejecutando conversaciones %1$d · herramientas invocadas %2$d</string>
     <string name="service_running_http_listening">HTTP externo escuchando en el puerto %1$d</string>
     <string name="service_running_with_http">%1$s · HTTP externo %2$d</string>
@@ -6176,7 +6177,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="html_export_updated">Actualizado</string>
     <string name="html_export_group">Grupo</string>
     <string name="html_export_message_count">Mensajes</string>
-    <string name="html_export_footer">Exportado desde Operit AI Assistant</string>
+    <string name="html_export_footer">Exportado desde Mira</string>
     <string name="mnn_no_cache_data">Sin datos en caché</string>
     <string name="mnn_response_empty">El cuerpo de la respuesta está vacío</string>
     <string name="mnn_fetch_repo_files_failed">Error al obtener la lista de archivos del repositorio: %1$s</string>
@@ -6688,7 +6689,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="markdown_export_export_time">**Fecha de exportación:** %1$s</string>
     <string name="markdown_export_conversation_count">**Número de conversaciones:** %1$d</string>
     <string name="markdown_export_total_messages">**Total de mensajes:** %1$d</string>
-    <string name="wake_word_default">Xiao Ou</string>
+    <string name="wake_word_default">Mira</string>
     <string name="wake_word_response">Estoy aquí</string>
     <string name="wake_word_global_assistant">Asistente global</string>
     <string name="wake_word_screen">Pantalla</string>
@@ -7013,9 +7014,13 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="attachment_package_search_empty">No se encontraron paquetes coincidentes</string>
     <string name="attachment_package_added">Paquete añadido: %1$s</string>
     <string name="attachment_package_failed">Error al añadir paquete: %1$s</string>
-    <string name="show_message_timestamp">Mostrar hora del mensaje</string>
-    <string name="show_message_timestamp_description">Muestra la hora de cada mensaje en la parte inferior de los mensajes de IA</string>
+    <string name="show_message_timestamp">Mostrar hora del chat</string>
+    <string name="show_message_timestamp_description">Muestra horas centradas al cambiar la fecha o tras cinco minutos</string>
     <string name="chat_message_timestamp_compact">hora: %1$s</string>
+    <string name="chat_time_today">Hoy %1$s</string>
+    <string name="chat_time_yesterday">Ayer %1$s</string>
+    <string name="chat_time_month_day">%2$d/%1$d %3$s</string>
+    <string name="chat_time_year_month_day">%3$d/%2$d/%1$d %4$s</string>
     <string name="memory_auto_save_settings_title">Guardado automático de memoria</string>
     <string name="memory_auto_save_interval_minutes">Intervalo de guardado automático (minutos)</string>
     <string name="character_card_memory_switch_confirm_title">Modificar vinculación de configuración de memoria de la tarjeta de personaje</string>
@@ -7283,4 +7288,11 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="ai_message_use_package_failed">Error al llamar a use_package: %1$s</string>
     <string name="ai_message_use_package_empty">use_package devolvió un resultado vacío.</string>
     <string name="ai_message_package_warmup_item">%1$d. Kit %2$s (usado %3$d veces)</string>
+    <string name="settings_section_companion">Compañía y personajes</string>
+    <string name="settings_section_memory_conversation">Memoria y conversaciones</string>
+    <string name="settings_section_appearance">Apariencia e interacción</string>
+    <string name="settings_section_capabilities">Modelos y capacidades</string>
+    <string name="settings_section_data_privacy">Datos y privacidad</string>
+    <string name="update_source_not_configured">No se ha configurado una fuente de actualizaciones para esta compilación</string>
+    <string name="mira_memory_saved_receipt">Recordado: %1$s</string>
 </resources>

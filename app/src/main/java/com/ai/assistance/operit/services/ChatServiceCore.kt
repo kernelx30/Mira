@@ -5,10 +5,13 @@ import com.ai.assistance.operit.util.AppLogger
 import androidx.compose.ui.text.input.TextFieldValue
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.AttachmentInfo
+import com.ai.assistance.operit.data.model.ContextWindowUsage
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatTurnOptions
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.PromptFunctionType
+import com.ai.assistance.operit.data.preferences.WaifuPreferences
+import com.ai.assistance.operit.data.preferences.resolveAutoReadEnabled
 import com.ai.assistance.operit.services.core.ApiConfigDelegate
 import com.ai.assistance.operit.services.core.AttachmentDelegate
 import com.ai.assistance.operit.services.core.ChatSelectionMode
@@ -23,8 +26,10 @@ import com.ai.assistance.operit.util.stream.SharedStream
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * 聊天服务核心类
@@ -52,6 +57,7 @@ class ChatServiceCore(
     private lateinit var attachmentDelegate: AttachmentDelegate
     private lateinit var uiStateDelegate: UiStateDelegate
     private lateinit var messageCoordinationDelegate: MessageCoordinationDelegate
+    private lateinit var effectiveEnableAutoRead: StateFlow<Boolean>
 
     // 初始化状态
     private var initialized = false
@@ -89,6 +95,18 @@ class ChatServiceCore(
                 AppLogger.d(TAG, "EnhancedAIService 已更新")
             }
         )
+
+        effectiveEnableAutoRead =
+            combine(
+                apiConfigDelegate.enableAutoRead,
+                WaifuPreferences.getInstance(context).autoReadOverrideFlow,
+            ) { globalEnabled, override ->
+                resolveAutoReadEnabled(globalEnabled, override)
+            }.stateIn(
+                scope = coroutineScope,
+                started = SharingStarted.Eagerly,
+                initialValue = false,
+            )
 
         // 初始化 Token 统计委托
         tokenStatisticsDelegate = TokenStatisticsDelegate(
@@ -206,7 +224,7 @@ class ChatServiceCore(
                 )
             },
             getIsAutoReadEnabled = {
-                apiConfigDelegate.enableAutoRead.value
+                effectiveEnableAutoRead.value
             },
             speakMessageHandler = { text, _ ->
                 AppLogger.d(TAG, "朗读消息: $text")
@@ -259,9 +277,10 @@ class ChatServiceCore(
         proxySenderNameOverride: String? = null,
         chatModelConfigIdOverride: String? = null,
         chatModelIndexOverride: Int? = null,
-        turnOptions: ChatTurnOptions = ChatTurnOptions()
-    ) {
-        messageCoordinationDelegate.sendUserMessage(
+        turnOptions: ChatTurnOptions = ChatTurnOptions(),
+        onDispatchResolved: ((Boolean) -> Unit)? = null,
+    ): Boolean {
+        return messageCoordinationDelegate.sendUserMessage(
             promptFunctionType = promptFunctionType,
             roleCardIdOverride = roleCardIdOverride,
             chatIdOverride = chatIdOverride,
@@ -269,7 +288,8 @@ class ChatServiceCore(
             proxySenderNameOverride = proxySenderNameOverride,
             chatModelConfigIdOverride = chatModelConfigIdOverride,
             chatModelIndexOverride = chatModelIndexOverride,
-            turnOptions = turnOptions
+            turnOptions = turnOptions,
+            onDispatchResolved = onDispatchResolved,
         )
     }
 
@@ -447,7 +467,7 @@ class ChatServiceCore(
         get() = apiConfigDelegate.enableMemoryAutoUpdate
 
     val enableAutoRead: StateFlow<Boolean>
-        get() = apiConfigDelegate.enableAutoRead
+        get() = effectiveEnableAutoRead
 
     val contextLength: StateFlow<Float>
         get() = apiConfigDelegate.effectiveContextLength
@@ -470,6 +490,9 @@ class ChatServiceCore(
 
     val currentWindowSizeFlow: StateFlow<Long>
         get() = tokenStatisticsDelegate.currentWindowSizeFlow
+
+    val contextWindowUsageFlow: StateFlow<ContextWindowUsage>
+        get() = tokenStatisticsDelegate.contextWindowUsageFlow
 
     val perRequestTokenCountFlow: StateFlow<Pair<Int, Int>?>
         get() = tokenStatisticsDelegate.perRequestTokenCountFlow
@@ -521,7 +544,7 @@ class ChatServiceCore(
         }
     }
 
-    fun setSpeakMessageHandler(handler: (String, Boolean) -> Unit) {
+    fun setSpeakMessageHandler(handler: suspend (String, Boolean) -> Unit) {
         if (::messageProcessingDelegate.isInitialized) {
             messageProcessingDelegate.setSpeakMessageHandler(handler)
         }

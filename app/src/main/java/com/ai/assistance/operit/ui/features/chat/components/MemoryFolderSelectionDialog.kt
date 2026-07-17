@@ -257,6 +257,7 @@ private fun FolderTreeItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .padding(vertical = 4.dp, horizontal = 8.dp)
             .padding(start = indent),
         verticalAlignment = Alignment.CenterVertically
@@ -265,7 +266,7 @@ private fun FolderTreeItem(
         if (hasChildren) {
             IconButton(
                 onClick = onToggleExpanded,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = if (isExpanded) {
@@ -280,7 +281,7 @@ private fun FolderTreeItem(
             }
         } else {
             // 占位符，保持对齐
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(modifier = Modifier.width(48.dp))
         }
         
         Spacer(modifier = Modifier.width(4.dp))
@@ -289,7 +290,7 @@ private fun FolderTreeItem(
         Checkbox(
             checked = isSelected,
             onCheckedChange = { onToggleSelection() },
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(48.dp)
         )
         
         Spacer(modifier = Modifier.width(8.dp))
@@ -408,4 +409,3 @@ private suspend fun loadFolderPaths(context: Context): List<String> = withContex
         throw e
     }
 }
-

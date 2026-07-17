@@ -1317,7 +1317,15 @@ fun SpeechServicesSettingsScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 var doubaoVoiceDropdownExpanded by remember { mutableStateOf(false) }
+                                var doubaoVoiceQuery by remember { mutableStateOf("") }
                                 val doubaoVoices = remember { DoubaoVoiceProvider.AVAILABLE_VOICES }
+                                val filteredDoubaoVoices = remember(doubaoVoices, doubaoVoiceQuery) {
+                                    val query = doubaoVoiceQuery.trim()
+                                    if (query.isEmpty()) doubaoVoices else doubaoVoices.filter { voice ->
+                                        voice.name.contains(query, ignoreCase = true) ||
+                                            voice.id.contains(query, ignoreCase = true)
+                                    }
+                                }
                                 val selectedDoubaoVoiceName = remember(ttsVoiceIdInput) {
                                     doubaoVoices.find { it.id == ttsVoiceIdInput }?.name
                                         ?: context.getString(R.string.speech_services_doubao_voice_custom)
@@ -1339,14 +1347,27 @@ fun SpeechServicesSettingsScreen(
                                     )
                                     ExposedDropdownMenu(
                                         expanded = doubaoVoiceDropdownExpanded,
-                                        onDismissRequest = { doubaoVoiceDropdownExpanded = false }
+                                        onDismissRequest = {
+                                            doubaoVoiceDropdownExpanded = false
+                                            doubaoVoiceQuery = ""
+                                        },
+                                        modifier = Modifier.heightIn(max = 520.dp),
                                     ) {
-                                        doubaoVoices.forEach { voice ->
+                                        OutlinedTextField(
+                                            value = doubaoVoiceQuery,
+                                            onValueChange = { doubaoVoiceQuery = it },
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                            singleLine = true,
+                                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                            placeholder = { Text(stringResource(R.string.search_voice_hint)) },
+                                        )
+                                        filteredDoubaoVoices.forEach { voice ->
                                             DropdownMenuItem(
                                                 text = { Text("${voice.name} (${voice.id})") },
                                                 onClick = {
                                                     ttsVoiceIdInput = voice.id
                                                     doubaoVoiceDropdownExpanded = false
+                                                    doubaoVoiceQuery = ""
                                                 }
                                             )
                                         }

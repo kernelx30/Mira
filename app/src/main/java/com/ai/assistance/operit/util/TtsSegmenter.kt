@@ -2,6 +2,8 @@ package com.ai.assistance.operit.util
 
 object TtsSegmenter {
     const val MAX_SEGMENT_LENGTH = 50
+    const val MIN_NATURAL_BLOCK_LENGTH = 48
+    const val MAX_NATURAL_BLOCK_LENGTH = 160
     const val END_CHARS = "!?;:。！？；：\n"
 
     fun findFirstEndCharIndex(text: CharSequence): Int {
@@ -42,6 +44,14 @@ object TtsSegmenter {
         return segments
     }
 
+    fun splitNaturalBlocks(text: String): List<String> {
+        val buffer = TtsNaturalBlockBuffer()
+        val blocks = mutableListOf<String>()
+        split(text).forEach { segment -> blocks += buffer.append(segment) }
+        buffer.flush()?.let(blocks::add)
+        return blocks
+    }
+
     private fun isSegmentEndingChar(text: CharSequence, index: Int): Boolean {
         val current = text[index]
         if (END_CHARS.indexOf(current) >= 0) {
@@ -75,5 +85,47 @@ object TtsSegmenter {
             return null
         }
         return this[index]
+    }
+}
+
+class TtsNaturalBlockBuffer(
+    private val minBlockLength: Int = TtsSegmenter.MIN_NATURAL_BLOCK_LENGTH,
+    private val maxBlockLength: Int = TtsSegmenter.MAX_NATURAL_BLOCK_LENGTH,
+    private val minSegmentCount: Int = 2,
+) {
+    private val buffer = StringBuilder()
+    private var segmentCount = 0
+
+    fun append(segment: String): List<String> {
+        val trimmed = segment.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        val emitted = mutableListOf<String>()
+        val separatorLength = if (buffer.isEmpty()) 0 else 1
+        val projectedLength = buffer.length + separatorLength + trimmed.length
+        if (buffer.isNotEmpty() && projectedLength > maxBlockLength) {
+            flush()?.let(emitted::add)
+        }
+
+        if (buffer.isNotEmpty()) buffer.append(' ')
+        buffer.append(trimmed)
+        segmentCount += 1
+
+        if (buffer.length >= minBlockLength || segmentCount >= minSegmentCount) {
+            flush()?.let(emitted::add)
+        }
+        return emitted
+    }
+
+    fun flush(): String? {
+        val block = buffer.toString().trim().takeIf { it.isNotEmpty() }
+        buffer.clear()
+        segmentCount = 0
+        return block
+    }
+
+    fun clear() {
+        buffer.clear()
+        segmentCount = 0
     }
 }

@@ -14,8 +14,7 @@ class StreamingJsonXmlConverterFlushTest {
 
     @Test fun flush_afterPrimitiveEmitsClosingContent() {
         val converter = StreamingJsonXmlConverter()
-        converter.feed("{\"a\":1")
-        val output = render(converter.flush())
+        val output = render(converter.feed("{\"a\":1") + converter.flush())
         assertEquals("\n  <param name=\"a\">1</param>", output)
     }
 

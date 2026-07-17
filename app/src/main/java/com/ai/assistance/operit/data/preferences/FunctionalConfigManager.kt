@@ -45,6 +45,12 @@ class FunctionalConfigManager(private val context: Context) {
     // 获取ModelConfigManager实例用于配置查询
     private val modelConfigManager = ModelConfigManager(context)
 
+    private fun <T> Map<FunctionType, T>.withDefaultMappings(defaultValue: T): Map<FunctionType, T> =
+        FunctionType.values().associateWith { this[it] ?: defaultValue }
+
+    private fun parseFunctionType(raw: String): FunctionType? =
+        runCatching { FunctionType.valueOf(raw) }.getOrNull()
+
     // 获取功能配置映射（保持向后兼容）
     val functionConfigMappingFlow: Flow<Map<FunctionType, String>> =
             context.functionalConfigDataStore.data.map { preferences ->
@@ -55,12 +61,16 @@ class FunctionalConfigManager(private val context: Context) {
                     try {
                         // 尝试新格式（包含modelIndex）
                         val rawMap = json.decodeFromString<Map<String, FunctionConfigMapping>>(mappingJson)
-                        rawMap.entries.associate { FunctionType.valueOf(it.key) to it.value.configId }
+                        rawMap.entries.mapNotNull { entry ->
+                            parseFunctionType(entry.key)?.let { it to entry.value.configId }
+                        }.toMap().withDefaultMappings(DEFAULT_CONFIG_ID)
                     } catch (e: Exception) {
                         try {
                             // 回退到旧格式（只有configId）
                             val rawMap = json.decodeFromString<Map<String, String>>(mappingJson)
-                            rawMap.entries.associate { FunctionType.valueOf(it.key) to it.value }
+                            rawMap.entries.mapNotNull { entry ->
+                                parseFunctionType(entry.key)?.let { it to entry.value }
+                            }.toMap().withDefaultMappings(DEFAULT_CONFIG_ID)
                         } catch (e2: Exception) {
                             FunctionType.values().associateWith { DEFAULT_CONFIG_ID }
                         }
@@ -77,14 +87,16 @@ class FunctionalConfigManager(private val context: Context) {
                 } else {
                     try {
                         val rawMap = json.decodeFromString<Map<String, FunctionConfigMapping>>(mappingJson)
-                        rawMap.entries.associate { FunctionType.valueOf(it.key) to it.value }
+                        rawMap.entries.mapNotNull { entry ->
+                            parseFunctionType(entry.key)?.let { it to entry.value }
+                        }.toMap().withDefaultMappings(FunctionConfigMapping(DEFAULT_CONFIG_ID, 0))
                     } catch (e: Exception) {
                         try {
                             // 从旧格式迁移
                             val rawMap = json.decodeFromString<Map<String, String>>(mappingJson)
-                            rawMap.entries.associate { 
-                                FunctionType.valueOf(it.key) to FunctionConfigMapping(it.value, 0) 
-                            }
+                            rawMap.entries.mapNotNull { entry ->
+                                parseFunctionType(entry.key)?.let { it to FunctionConfigMapping(entry.value, 0) }
+                            }.toMap().withDefaultMappings(FunctionConfigMapping(DEFAULT_CONFIG_ID, 0))
                         } catch (e2: Exception) {
                             FunctionType.values().associateWith { FunctionConfigMapping(DEFAULT_CONFIG_ID, 0) }
                         }

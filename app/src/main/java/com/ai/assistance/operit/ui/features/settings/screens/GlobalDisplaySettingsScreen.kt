@@ -1,5 +1,11 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.AIForegroundService
 import com.ai.assistance.operit.core.tools.system.AndroidPermissionLevel
@@ -44,14 +51,42 @@ fun GlobalDisplaySettingsScreen(
     val userPreferences = remember { UserPreferencesManager.getInstance(context) }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    var notificationPermissionGranted by
+        remember {
+            mutableStateOf(
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            notificationPermissionGranted = isGranted
+            if (isGranted) {
+                scope.launch {
+                    displayPreferencesManager.saveDisplaySettings(enableReplyNotification = true)
+                }
+            } else {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.notification_permission_denied),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
 
     val toolCollapseMode by displayPreferencesManager.toolCollapseMode.collectAsState(initial = ToolCollapseMode.ALL)
     val showFpsCounter by displayPreferencesManager.showFpsCounter.collectAsState(initial = false)
-    val enableReplyNotification by displayPreferencesManager.enableReplyNotification.collectAsState(initial = true)
+    val enableReplyNotification by displayPreferencesManager.enableReplyNotification.collectAsState(initial = false)
+    val replyNotificationsOperational = enableReplyNotification && notificationPermissionGranted
     val enableReplyNotificationSound by displayPreferencesManager.enableReplyNotificationSound.collectAsState(initial = false)
     val enableReplyNotificationVibration by displayPreferencesManager.enableReplyNotificationVibration.collectAsState(initial = false)
     val enableEnterToSend by displayPreferencesManager.enableEnterToSend.collectAsState(initial = false)
-    val enableNavigationAnimation by displayPreferencesManager.enableNavigationAnimation.collectAsState(initial = true)
+    val enableAiInputSuggestion by
+        displayPreferencesManager.enableAiInputSuggestion.collectAsState(initial = true)
+    val enableNavigationAnimation by displayPreferencesManager.enableNavigationAnimation.collectAsState(initial = false)
     val startWithNewChat by displayPreferencesManager.startWithNewChat.collectAsState(initial = false)
     val enableBackgroundKeepAlive by displayPreferencesManager.enableBackgroundKeepAlive.collectAsState(initial = false)
     val enableExperimentalVirtualDisplay by displayPreferencesManager.enableExperimentalVirtualDisplay.collectAsState(initial = true)
@@ -282,10 +317,25 @@ fun GlobalDisplaySettingsScreen(
             DisplayToggleItem(
                 title = stringResource(R.string.enable_reply_notification),
                 subtitle = stringResource(R.string.enable_reply_notification_description),
-                checked = enableReplyNotification,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(enableReplyNotification = it)
+                checked = replyNotificationsOperational,
+                onCheckedChange = { enabled ->
+                    if (!enabled) {
+                        scope.launch {
+                            displayPreferencesManager.saveDisplaySettings(enableReplyNotification = false)
+                        }
+                    } else if (
+                        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS,
+                            ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationPermissionGranted = true
+                        scope.launch {
+                            displayPreferencesManager.saveDisplaySettings(enableReplyNotification = true)
+                        }
+                    } else {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                 },
                 backgroundColor = componentBackgroundColor
@@ -322,6 +372,20 @@ fun GlobalDisplaySettingsScreen(
                 onCheckedChange = {
                     scope.launch {
                         displayPreferencesManager.saveDisplaySettings(enableEnterToSend = it)
+                    }
+                },
+                backgroundColor = componentBackgroundColor
+            )
+
+            DisplayToggleItem(
+                title = stringResource(R.string.enable_ai_input_suggestion),
+                subtitle = stringResource(R.string.enable_ai_input_suggestion_description),
+                checked = enableAiInputSuggestion,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        displayPreferencesManager.saveDisplaySettings(
+                            enableAiInputSuggestion = enabled
+                        )
                     }
                 },
                 backgroundColor = componentBackgroundColor

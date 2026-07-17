@@ -10,6 +10,12 @@ class MiniMaxVoiceProvider(
     private val config: SpeechServicesPreferences.TtsHttpConfig
 ) : VoiceService {
 
+    override val capabilities =
+        VoiceCapabilities(
+            supportsRate = true,
+            supportsPitch = false,
+        )
+
     companion object {
         const val DEFAULT_ENDPOINT_URL = "https://api.minimaxi.com/v1/t2a_v2"
         const val DEFAULT_MODEL_NAME = "speech-2.8-hd"

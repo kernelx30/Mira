@@ -44,7 +44,8 @@ data class SerializableMemory(
     val createdAt: Date,
     @Serializable(with = DateSerializer::class)
     val updatedAt: Date,
-    val tagNames: List<String> // 标签名称列表
+    val tagNames: List<String>, // 标签名称列表
+    val propertyValues: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -70,7 +71,7 @@ data class MemoryExportData(
     val links: List<SerializableLink>,
     @Serializable(with = DateSerializer::class)
     val exportDate: Date,
-    val version: String = "1.0" // 数据格式版本
+    val version: String = "1.1" // 数据格式版本
 )
 
 /**
@@ -104,4 +105,3 @@ data class MemoryImportResult(
     val skippedMemories: Int = 0,  // 跳过的记忆数
     val newLinks: Int = 0          // 新创建的链接数
 )
-

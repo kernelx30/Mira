@@ -265,7 +265,7 @@ class ChatHistoryDelegate(
 
     private suspend fun loadLatestCurrentChatDisplayWindow(
         chatId: String,
-        pageCount: Int = 1,
+        pageCount: Int = MAX_DISPLAY_PAGE_COUNT,
     ): List<ChatMessage> {
         return applyCurrentChatDisplayWindow(
             chatId = chatId,
@@ -617,7 +617,8 @@ class ChatHistoryDelegate(
 
     private suspend fun loadChatMessages(chatId: String) {
         try {
-            val initialPageCount = latestDisplayPageCountByChatId[chatId] ?: 1
+            val initialPageCount =
+                latestDisplayPageCountByChatId[chatId] ?: MAX_DISPLAY_PAGE_COUNT
             val messages = loadLatestCurrentChatDisplayWindow(chatId, pageCount = initialPageCount)
             AppLogger.d(TAG, "加载聊天 $chatId 的消息：${messages.size} 条")
 
@@ -778,7 +779,13 @@ class ChatHistoryDelegate(
         group: String? = null,
         inheritGroupFromCurrent: Boolean = true,
         setAsCurrentChat: Boolean = true,
-        characterCardId: String? = null
+        characterCardId: String? = null,
+        chatModelConfigId: String? = null,
+        chatModelIndex: Int = 0,
+        memoryAutoUpdateOverride: Boolean? = null,
+        autoReadOverride: Boolean? = null,
+        isTemporary: Boolean = false,
+        onCreated: ((ChatHistory) -> Unit)? = null,
     ) {
         coroutineScope.launch {
             val (inputTokens, outputTokens, windowSize) = getChatStatistics()
@@ -821,6 +828,11 @@ class ChatHistoryDelegate(
                 inheritGroupFromChatId = inheritGroupFromChatId,
                 characterCardName = effectiveCharacterCardName,
                 characterGroupId = characterGroupId,
+                chatModelConfigId = chatModelConfigId,
+                chatModelIndex = chatModelIndex,
+                memoryAutoUpdateOverride = memoryAutoUpdateOverride,
+                autoReadOverride = autoReadOverride,
+                isTemporary = isTemporary,
                 setAsCurrentChat = shouldSyncCurrentChatToGlobal
             )
 
@@ -850,6 +862,9 @@ class ChatHistoryDelegate(
                 if (selectionMode == ChatSelectionMode.FOLLOW_GLOBAL) {
                     // FOLLOW_GLOBAL 由 currentChatId 的 collector 负责驱动切换与加载。
                     chatHistoryManager.setCurrentChatId(newChat.id)
+                    withTimeoutOrNull(5_000L) {
+                        _currentChatId.first { currentId -> currentId == newChat.id }
+                    }
                 } else {
                     // LOCAL_ONLY 不写回全局 currentChatId，只切换悬浮窗自己的本地会话。
                     _currentChatId.value = newChat.id
@@ -857,6 +872,7 @@ class ChatHistoryDelegate(
                 }
                 onTokenStatisticsLoaded(newChat.id, 0, 0, 0)
             }
+            onCreated?.invoke(newChat)
         }
     }
 
@@ -1297,6 +1313,40 @@ class ChatHistoryDelegate(
                 }
             }
             _chatHistories.value = updatedHistories
+        }
+    }
+
+    fun updateChatSessionControls(
+        chatId: String,
+        modelConfigId: String?,
+        modelIndex: Int,
+        memoryAutoUpdateOverride: Boolean?,
+        autoReadOverride: Boolean?,
+        isTemporary: Boolean,
+    ) {
+        coroutineScope.launch {
+            chatHistoryManager.updateChatSessionControls(
+                chatId = chatId,
+                modelConfigId = modelConfigId,
+                modelIndex = modelIndex,
+                memoryAutoUpdateOverride = memoryAutoUpdateOverride,
+                autoReadOverride = autoReadOverride,
+                isTemporary = isTemporary,
+            )
+            _chatHistories.value = _chatHistories.value.map { history ->
+                if (history.id == chatId) {
+                    history.copy(
+                        chatModelConfigId = modelConfigId,
+                        chatModelIndex = modelIndex.coerceAtLeast(0),
+                        memoryAutoUpdateOverride = memoryAutoUpdateOverride,
+                        autoReadOverride = autoReadOverride,
+                        isTemporary = isTemporary,
+                        updatedAt = LocalDateTime.now(),
+                    )
+                } else {
+                    history
+                }
+            }
         }
     }
 

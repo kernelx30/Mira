@@ -59,10 +59,16 @@ fun WaifuModeSettingsScreen(
 
     // 状态
     var showSaveSuccess by remember { mutableStateOf(false) }
-    val isWaifuModeEnabled = waifuPreferences.enableWaifuModeFlow.collectAsState(initial = false).value
+    val isWaifuModeEnabled =
+        waifuPreferences.enableWaifuModeFlow
+            .collectAsState(initial = WaifuPreferences.DEFAULT_ENABLE_WAIFU_MODE)
+            .value
     val charDelay = waifuPreferences.waifuCharDelayFlow.collectAsState(initial = 250).value
     val removePunctuation = waifuPreferences.waifuRemovePunctuationFlow.collectAsState(initial = false).value
-    val enableEmoticons = waifuPreferences.waifuEnableEmoticonsFlow.collectAsState(initial = false).value
+    val enableEmoticons =
+        waifuPreferences.waifuEnableEmoticonsFlow
+            .collectAsState(initial = WaifuPreferences.DEFAULT_WAIFU_ENABLE_EMOTICONS)
+            .value
     val enableSelfie = waifuPreferences.waifuEnableSelfieFlow.collectAsState(initial = false).value
     val enableMergeSend = waifuPreferences.waifuEnableMergeSendFlow.collectAsState(initial = false).value
     val mergeSendDelayMs =

@@ -32,9 +32,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,74 +46,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.core.tools.AIToolHandler
-import com.ai.assistance.operit.core.tools.packTool.PackageManager
-import com.ai.assistance.operit.core.tools.system.AndroidPermissionLevel
-import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
-import com.ai.assistance.operit.core.tools.system.action.ActionListenerFactory
-import com.ai.assistance.operit.data.preferences.UserPreferencesManager
-import com.ai.assistance.operit.data.preferences.androidPermissionPreferences
-import com.ai.assistance.operit.data.repository.WorkflowRepository
+import com.ai.assistance.operit.ui.common.MiraLogo
 import com.ai.assistance.operit.ui.common.NavItem
 import com.ai.assistance.operit.ui.main.screens.ScreenRouteRegistry
 import com.ai.assistance.operit.ui.main.navigation.NavigationEntrySpec
 import com.ai.assistance.operit.ui.main.screens.Screen
 import com.ai.assistance.operit.ui.theme.liquidGlass
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-private data class SidebarPermissionStatus(
-        val badgeTextResId: Int
-)
-
-private suspend fun resolveSidebarPermissionStatus(
-        context: android.content.Context,
-        preferredPermissionLevel: AndroidPermissionLevel?
-): SidebarPermissionStatus {
-        return when (preferredPermissionLevel) {
-                null,
-                AndroidPermissionLevel.STANDARD ->
-                        SidebarPermissionStatus(
-                                badgeTextResId = R.string.sidebar_status_normal
-                        )
-                AndroidPermissionLevel.DEBUGGER ->
-                        when {
-                                !ShizukuAuthorizer.isShizukuInstalled(context) ->
-                                        SidebarPermissionStatus(
-                                                badgeTextResId = R.string.status_not_installed
-                                        )
-                                !ShizukuAuthorizer.isShizukuServiceRunning() ->
-                                        SidebarPermissionStatus(
-                                                badgeTextResId = R.string.status_not_running
-                                        )
-                                ShizukuAuthorizer.hasShizukuPermission() ->
-                                        SidebarPermissionStatus(
-                                                badgeTextResId = R.string.sidebar_status_normal
-                                        )
-                                else ->
-                                        SidebarPermissionStatus(
-                                                badgeTextResId = R.string.unauthorized
-                                        )
-                        }
-                AndroidPermissionLevel.ACCESSIBILITY,
-                AndroidPermissionLevel.ADMIN,
-                AndroidPermissionLevel.ROOT -> {
-                        val permissionStatus =
-                                ActionListenerFactory.getListener(context, preferredPermissionLevel)
-                                        .hasPermission()
-                        SidebarPermissionStatus(
-                                badgeTextResId =
-                                        if (permissionStatus.granted) {
-                                                R.string.sidebar_status_normal
-                                        } else {
-                                                R.string.unauthorized
-                                        }
-                        )
-                }
-        }
-}
 
 /** Content for the expanded navigation drawer */
 @Composable
@@ -135,19 +72,7 @@ fun DrawerContent(
         onNavigationEntrySelected: (NavigationEntrySpec) -> Unit
 ) {
         val context = LocalContext.current
-        val userPreferencesManager = remember(context) { UserPreferencesManager.getInstance(context) }
-        val softwareIdentity by
-                userPreferencesManager.softwareIdentity.collectAsState(
-                        initial = UserPreferencesManager.SOFTWARE_IDENTITY_OPERIT
-                )
-        val preferredPermissionLevel by
-                androidPermissionPreferences.preferredPermissionLevelFlow.collectAsState(initial = null)
-        val drawerBrandName =
-                if (softwareIdentity == UserPreferencesManager.SOFTWARE_IDENTITY_LINGSHU) {
-                        context.getString(R.string.software_identity_option_lingshu)
-                } else {
-                        context.getString(R.string.software_identity_option_operit)
-                }
+        val drawerBrandName = context.getString(R.string.app_name)
         val bottomInset =
                 WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val resolvedTopContentPadding =
@@ -157,49 +82,12 @@ fun DrawerContent(
                 setOf(NavItem.Settings, NavItem.Help, NavItem.About)
         }
         val quickActionItems = remember {
-                setOf(NavItem.Packages, NavItem.Workflow)
+                setOf(NavItem.AssistantConfig, NavItem.MemoryBase, NavItem.Toolbox)
         }
-        val packageManager = remember(context) {
-                PackageManager.getInstance(context, AIToolHandler.getInstance(context))
-        }
-        val workflowRepository = remember(context) { WorkflowRepository(context) }
-        val activePackageCount by
-                produceState(initialValue = 0, selectedRouteId) {
-                        value =
-                                withContext(Dispatchers.IO) {
-                                        packageManager.getEnabledPackageNames().size
-                                }
-                }
-        val workflowCount by
-                produceState(initialValue = 0, selectedRouteId) {
-                        value =
-                                withContext(Dispatchers.IO) {
-                                        workflowRepository.getAllWorkflows().getOrDefault(emptyList()).size
-                                }
-                }
-        val permissionStatus by
-                produceState(
-                        initialValue =
-                                SidebarPermissionStatus(
-                                        badgeTextResId = R.string.sidebar_status_normal
-                                ),
-                        selectedRouteId,
-                        preferredPermissionLevel
-                ) {
-                        value =
-                                withContext(Dispatchers.IO) {
-                                        resolveSidebarPermissionStatus(
-                                                context = context,
-                                                preferredPermissionLevel = preferredPermissionLevel
-                                        )
-                                }
-                }
         val primaryNavItems =
                 remember(navItems) {
                         navItems.filterNot {
-                                it in fixedBottomItems ||
-                                        it in quickActionItems ||
-                                        it == NavItem.ShizukuCommands
+                                it in fixedBottomItems || it in quickActionItems
                         }
                 }
         val handleScreenSelection: (Screen) -> Unit = { screen ->
@@ -250,9 +138,6 @@ fun DrawerContent(
                                 networkType = networkType,
                                 appearance = appearance,
                                 navItems = primaryNavItems,
-                                activePackageCount = activePackageCount,
-                                workflowCount = workflowCount,
-                                permissionStatus = permissionStatus,
                                 onNavItemClick = handleNavItemClick,
                                 onNavigationEntryClick = handleNavigationEntryClick
                         )
@@ -298,7 +183,7 @@ fun CollapsedDrawerContent(
 
                 Surface(
                         modifier =
-                                Modifier.size(44.dp)
+                                Modifier.size(48.dp)
                                         .liquidGlass(
                                                 enabled = appearance.buttonLiquidGlassEnabled,
                                                 shape = CircleShape,
@@ -313,7 +198,7 @@ fun CollapsedDrawerContent(
                         color = Color.Transparent,
                         shape = CircleShape
                 ) {
-                        IconButton(onClick = { }) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Icon(
                                         imageVector =
                                                 if (isNetworkAvailable) Icons.Default.Wifi
@@ -342,7 +227,7 @@ fun CollapsedDrawerContent(
                         Surface(
                                 modifier =
                                         Modifier.padding(vertical = 8.dp)
-                                                .size(44.dp)
+                                                .size(48.dp)
                                                 .liquidGlass(
                                                         enabled = appearance.buttonLiquidGlassEnabled,
                                                         shape = CircleShape,
@@ -403,7 +288,7 @@ fun CollapsedDrawerContent(
                                 Surface(
                                         modifier =
                                                 Modifier.padding(vertical = 8.dp)
-                                                        .size(44.dp)
+                                                        .size(48.dp)
                                                         .liquidGlass(
                                                                 enabled = appearance.buttonLiquidGlassEnabled,
                                                                 shape = CircleShape,
@@ -455,13 +340,10 @@ private fun NewSidebarTopContent(
         networkType: String,
         appearance: NavigationDrawerAppearance,
         navItems: List<NavItem>,
-        activePackageCount: Int,
-        workflowCount: Int,
-        permissionStatus: SidebarPermissionStatus,
         onNavItemClick: (NavItem) -> Unit,
         onNavigationEntryClick: (NavigationEntrySpec) -> Unit
 ) {
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         SidebarInfoCard(
                 brandName = brandName,
@@ -470,56 +352,12 @@ private fun NewSidebarTopContent(
                 appearance = appearance
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Row(
-                modifier =
-                        Modifier.fillMaxWidth()
-                                .padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-                SidebarQuickActionCard(
-                        modifier = Modifier.weight(1f),
-                        icon = NavItem.Packages.icon,
-                        label = stringResource(id = NavItem.Packages.titleResId),
-                        badgeText = activePackageCount.toString(),
-                        selected = selectedItem == NavItem.Packages,
-                        appearance = appearance,
-                        onClick = { onNavItemClick(NavItem.Packages) }
-                )
-                SidebarQuickActionCard(
-                        modifier = Modifier.weight(1f),
-                        icon = NavItem.ShizukuCommands.icon,
-                        label = stringResource(id = R.string.sidebar_permission_short),
-                        badgeText = stringResource(id = permissionStatus.badgeTextResId),
-                        selected = selectedItem == NavItem.ShizukuCommands,
-                        appearance = appearance,
-                        onClick = { onNavItemClick(NavItem.ShizukuCommands) }
-                )
-                SidebarQuickActionCard(
-                        modifier = Modifier.weight(1f),
-                        icon = NavItem.Workflow.icon,
-                        label = stringResource(id = NavItem.Workflow.titleResId),
-                        badgeText = workflowCount.toString(),
-                        selected = selectedItem == NavItem.Workflow,
-                        appearance = appearance,
-                        onClick = { onNavItemClick(NavItem.Workflow) }
-                )
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Text(
-                text = stringResource(id = R.string.nav_group_ai_features),
-                style = MaterialTheme.typography.titleSmall,
-                color = appearance.titleColor.copy(alpha = 0.82f),
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 28.dp, end = 20.dp, bottom = 2.dp)
+        Spacer(modifier = Modifier.height(18.dp))
+        SidebarSectionTitle(
+                text = stringResource(R.string.mate_drawer_relationship),
+                appearance = appearance
         )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        navItems.forEach { item ->
+        listOf(NavItem.AiChat, NavItem.AssistantConfig, NavItem.MemoryBase).forEach { item ->
                 CompactNavigationDrawerItem(
                         icon = item.icon,
                         label = stringResource(id = item.titleResId),
@@ -528,16 +366,28 @@ private fun NewSidebarTopContent(
                         onClick = { onNavItemClick(item) }
                 )
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        SidebarSectionTitle(
+                text = stringResource(R.string.mate_drawer_device_extensions),
+                appearance = appearance
+        )
+        (listOf(NavItem.Toolbox) + navItems.filterNot { it == NavItem.AiChat }).forEach { item ->
+                CompactNavigationDrawerItem(
+                        icon = item.icon,
+                        label = stringResource(id = item.titleResId),
+                        selected = selectedItem == item,
+                        appearance = appearance,
+                        onClick = { onNavItemClick(item) }
+                )
+        }
+
         if (pluginEntries.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(14.dp))
-                Text(
+                SidebarSectionTitle(
                         text = stringResource(id = R.string.nav_group_plugins),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = appearance.titleColor.copy(alpha = 0.82f),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 28.dp, end = 20.dp, bottom = 2.dp)
+                        appearance = appearance
                 )
-                Spacer(modifier = Modifier.height(6.dp))
                 pluginEntries.forEach { entry ->
                         CompactNavigationDrawerItem(
                                 icon = entry.icon,
@@ -551,55 +401,66 @@ private fun NewSidebarTopContent(
 }
 
 @Composable
+private fun SidebarSectionTitle(
+        text: String,
+        appearance: NavigationDrawerAppearance
+) {
+        Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                color = appearance.titleColor.copy(alpha = 0.68f),
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 28.dp, end = 20.dp, bottom = 6.dp)
+        )
+}
+
+@Composable
 private fun SidebarInfoCard(
         brandName: String,
         isNetworkAvailable: Boolean,
         networkType: String,
         appearance: NavigationDrawerAppearance
 ) {
-        Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)
+        Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-                Text(
-                        text = brandName,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                                letterSpacing = 0.5.sp
-                        ),
-                        color = appearance.titleColor,
-                        fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(10.dp))
                 Surface(
-                        shape = RoundedCornerShape(50),
-                        color = appearance.statusAvailableColor.copy(alpha = 0.12f)
+                        modifier = Modifier.size(42.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary
                 ) {
-                        Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
+                        MiraLogo(modifier = Modifier.fillMaxSize())
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                                text = brandName,
+                                style = MaterialTheme.typography.titleLarge.copy(letterSpacing = 0.sp),
+                                color = appearance.titleColor,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
-                                        modifier = Modifier
-                                                .size(6.dp)
-                                                .clip(CircleShape)
-                                                .background(
-                                                        if (isNetworkAvailable) Color(0xFF4CAF50)
-                                                        else Color(0xFFEF5350)
-                                                )
+                                        modifier =
+                                                Modifier
+                                                        .size(7.dp)
+                                                        .clip(CircleShape)
+                                                        .background(
+                                                                if (isNetworkAvailable) Color(0xFF3F8F6B)
+                                                                else MaterialTheme.colorScheme.error
+                                                        )
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Icon(
-                                        imageVector =
-                                                if (isNetworkAvailable) Icons.Default.Wifi else Icons.Default.WifiOff,
-                                        contentDescription = stringResource(id = R.string.network_status_label),
-                                        tint = appearance.statusAvailableColor,
-                                        modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                         text = networkType,
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = appearance.statusAvailableColor,
-                                        fontWeight = FontWeight.Medium
+                                        color = appearance.itemColor.copy(alpha = 0.76f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                 )
                         }
                 }
@@ -611,7 +472,7 @@ private fun SidebarQuickActionCard(
         modifier: Modifier = Modifier,
         icon: androidx.compose.ui.graphics.vector.ImageVector,
         label: String,
-        badgeText: String,
+        badgeText: String? = null,
         selected: Boolean,
         appearance: NavigationDrawerAppearance,
         onClick: () -> Unit
@@ -662,14 +523,16 @@ private fun SidebarQuickActionCard(
                                                 .background(accentColor.copy(alpha = 0.7f))
                                 )
                         }
-                        SidebarQuickActionBadge(
-                                text = badgeText,
-                                appearance = appearance,
-                                selected = selected,
-                                modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 6.dp, end = 6.dp)
-                        )
+                        if (!badgeText.isNullOrBlank()) {
+                                SidebarQuickActionBadge(
+                                        text = badgeText,
+                                        appearance = appearance,
+                                        selected = selected,
+                                        modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 6.dp, end = 6.dp)
+                                )
+                        }
                         Column(
                                 modifier = Modifier
                                         .align(Alignment.Center)
@@ -689,7 +552,7 @@ private fun SidebarQuickActionCard(
                                 Text(
                                         text = label,
                                         style = MaterialTheme.typography.labelMedium.copy(
-                                                letterSpacing = 0.2.sp
+                                                letterSpacing = 0.sp
                                         ),
                                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                                         color =
@@ -724,7 +587,7 @@ private fun SidebarQuickActionBadge(
                 Text(
                         text = text,
                         style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 0.3.sp
+                                letterSpacing = 0.sp
                         ),
                         color =
                                 if (selected) appearance.selectedContentColor
@@ -743,26 +606,23 @@ private fun DrawerBottomShortcutRow(
         onNavItemClick: (NavItem) -> Unit
 ) {
         Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
         ) {
                 BottomShortcutDrawerItem(
-                        modifier = Modifier.weight(1f),
                         item = NavItem.About,
                         selected = selectedItem == NavItem.About,
                         appearance = appearance,
                         onClick = { onNavItemClick(NavItem.About) }
                 )
                 BottomShortcutDrawerItem(
-                        modifier = Modifier.weight(1f),
                         item = NavItem.Help,
                         selected = selectedItem == NavItem.Help,
                         appearance = appearance,
                         onClick = { onNavItemClick(NavItem.Help) }
                 )
                 BottomShortcutDrawerItem(
-                        modifier = Modifier.weight(1f),
                         item = NavItem.Settings,
                         selected = selectedItem == NavItem.Settings,
                         appearance = appearance,
@@ -779,83 +639,21 @@ private fun BottomShortcutDrawerItem(
         appearance: NavigationDrawerAppearance,
         onClick: () -> Unit
 ) {
-        val itemShape = RoundedCornerShape(14.dp)
-        val selectedGlassOverlayColor =
-                if (selected) {
-                        appearance.selectedContainerColor.copy(alpha = 0.18f)
-                } else {
-                        Color.Transparent
-                }
-        val accentColor = appearance.selectedContentColor
-
         Surface(
-                modifier =
-                        modifier
-                                .height(68.dp)
-                                .liquidGlass(
-                                        enabled = appearance.buttonLiquidGlassEnabled,
-                                        shape = itemShape,
-                                        containerColor = appearance.buttonContainerColor,
-                                        shadowElevation = if (selected) 6.dp else 4.dp,
-                                        borderWidth = 0.5.dp,
-                                        blurRadius = 12.dp,
-                                        overlayAlphaBoost = 0.04f,
-                                        enableLens = false
-                                )
-                                .clip(itemShape)
-                                .background(selectedGlassOverlayColor),
+                modifier = modifier.size(48.dp),
                 onClick = onClick,
-                color =
-                        if (appearance.buttonLiquidGlassEnabled) {
-                                Color.Transparent
-                        } else if (selected) {
-                                appearance.selectedContainerColor
-                        } else {
-                                Color.Transparent
-                        },
-                shape = itemShape
+                color = if (selected) appearance.selectedContainerColor else Color.Transparent,
+                shape = CircleShape
         ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                        if (selected) {
-                                Box(
-                                        modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .fillMaxWidth(0.4f)
-                                                .height(2.5.dp)
-                                                .padding(top = 4.dp)
-                                                .clip(RoundedCornerShape(2.dp))
-                                                .background(accentColor.copy(alpha = 0.7f))
-                                )
-                        }
-                        Column(
-                                modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                        ) {
-                                Icon(
-                                        imageVector = item.icon,
-                                        contentDescription = null,
-                                        tint =
-                                                if (selected) appearance.selectedContentColor
-                                                else appearance.itemColor,
-                                        modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.height(5.dp))
-                                Text(
-                                        text = stringResource(id = item.titleResId),
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                                letterSpacing = 0.1.sp
-                                        ),
-                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                        textAlign = TextAlign.Center,
-                                        color =
-                                                if (selected) appearance.selectedContentColor
-                                                else appearance.itemColor,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.fillMaxWidth()
-                                )
-                        }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                                imageVector = item.icon,
+                                contentDescription = stringResource(id = item.titleResId),
+                                tint =
+                                        if (selected) appearance.selectedContentColor
+                                        else appearance.itemColor,
+                                modifier = Modifier.size(21.dp)
+                        )
                 }
         }
 }

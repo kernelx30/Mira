@@ -21,6 +21,7 @@ data class HttpTtsResponsePipelineStep(
         const val TYPE_HTTP_GET = "http_get"
         const val TYPE_HTTP_REQUEST_FROM_OBJECT = "http_request_from_object"
         const val TYPE_BASE64_DECODE = "base64_decode"
+        const val TYPE_JSON_LINES_BASE64_CONCAT = "json_lines_base64_concat"
 
         val SUPPORTED_TYPES: Set<String> =
             setOf(
@@ -29,7 +30,8 @@ data class HttpTtsResponsePipelineStep(
                 TYPE_PARSE_JSON_STRING,
                 TYPE_HTTP_GET,
                 TYPE_HTTP_REQUEST_FROM_OBJECT,
-                TYPE_BASE64_DECODE
+                TYPE_BASE64_DECODE,
+                TYPE_JSON_LINES_BASE64_CONCAT
             )
 
         private val editableJson =

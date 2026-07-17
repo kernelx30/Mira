@@ -5,9 +5,26 @@ import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.ChatMarkupRegex
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.llmprovider.AIService
+import com.ai.assistance.operit.core.companion.CompanionReminderScheduler
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.data.db.AppDatabase
+import com.ai.assistance.operit.data.model.ActivePrompt
+import com.ai.assistance.operit.data.model.CompanionEventKind
+import com.ai.assistance.operit.data.model.CompanionEventStatus
+import com.ai.assistance.operit.data.model.CompanionMemoryKeys
+import com.ai.assistance.operit.data.model.CompanionMemoryMetadata
+import com.ai.assistance.operit.data.model.CompanionMemoryOwnership
+import com.ai.assistance.operit.data.model.CompanionMemoryOwnershipKeys
+import com.ai.assistance.operit.data.model.CompanionMemoryRecallPolicy
+import com.ai.assistance.operit.data.model.CompanionMemoryScope
+import com.ai.assistance.operit.data.model.CompanionMemoryTarget
 import com.ai.assistance.operit.data.model.Memory
+import com.ai.assistance.operit.data.model.companionMetadata
+import com.ai.assistance.operit.data.model.companionOwnership
+import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.preferences.ApiPreferences
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.CharacterGroupCardManager
 import com.ai.assistance.operit.data.preferences.MemorySearchSettingsPreferences
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.MemoryRepository
@@ -27,6 +44,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * 记忆库管理类 - 提供分析对话内容并存储为结构化记忆图谱的功能。
@@ -44,13 +63,21 @@ object MemoryLibrary {
     private data class ParsedEntity(val title: String, val content: String, val tags: List<String>, val aliasFor: String?, val folderPath: String?)
     private data class ParsedUpdate(val titleToUpdate: String, val newContent: String, val reason: String, val newCredibility: Float?, val newImportance: Float?)
     private data class ParsedMerge(val sourceTitles: List<String>, val newTitle: String, val newContent: String, val newTags: List<String>, val folderPath: String, val reason: String)
+    private data class ParsedCompanionEvent(
+        val title: String,
+        val kind: String,
+        val eventAt: String?,
+        val status: String,
+        val reminderText: String,
+    )
     private data class ParsedAnalysis(
         val mainProblem: ParsedEntity?,
         val extractedEntities: List<ParsedEntity> = emptyList(),
         val links: List<ParsedLink> = emptyList(),
         val updatedEntities: List<ParsedUpdate> = emptyList(),
         val mergedEntities: List<ParsedMerge> = emptyList(),
-        val userPreferences: String = ""
+        val userPreferences: String = "",
+        val companionEvents: List<ParsedCompanionEvent> = emptyList(),
     )
 
 
@@ -87,6 +114,7 @@ object MemoryLibrary {
             content: String,
             aiService: AIService,
             profileIdOverride: String? = null,
+            chatIdOverride: String? = null,
             onSuccess: (suspend () -> Unit)? = null,
             onError: (suspend (Exception) -> Unit)? = null
     ) {
@@ -100,7 +128,8 @@ object MemoryLibrary {
                     conversationHistory,
                     content,
                     aiService,
-                    profileIdOverride = profileIdOverride
+                    profileIdOverride = profileIdOverride,
+                    chatIdOverride = chatIdOverride,
                 )
                 onSuccess?.invoke()
             } catch (e: CancellationException) {
@@ -118,7 +147,8 @@ object MemoryLibrary {
         conversationHistory: List<Pair<String, String>>,
         content: String,
         aiService: AIService,
-        profileIdOverride: String? = null
+        profileIdOverride: String? = null,
+        chatIdOverride: String? = null,
     ) {
         saveMemory(
             context = context,
@@ -126,7 +156,8 @@ object MemoryLibrary {
             conversationHistory = conversationHistory,
             content = content,
             aiService = aiService,
-            profileIdOverride = profileIdOverride
+            profileIdOverride = profileIdOverride,
+            chatIdOverride = chatIdOverride,
         )
     }
 
@@ -272,11 +303,14 @@ object MemoryLibrary {
             conversationHistory: List<Pair<String, String>>,
             content: String,
             aiService: AIService,
-            profileIdOverride: String? = null
+            profileIdOverride: String? = null,
+            chatIdOverride: String? = null,
     ) {
         mutex.withLock {
             val profileId = profileIdOverride ?: preferencesManager.activeProfileIdFlow.first()
             val memoryRepository = MemoryRepository(context, profileId)
+            val companionIdentity = resolveCompanionIdentity(context, chatIdOverride)
+            val companionTarget = companionIdentity.toMemoryTarget()
 
             // Prune tool results to reduce token usage
             val prunedContent =
@@ -317,11 +351,18 @@ object MemoryLibrary {
                 solution = prunedContent,
                 conversationHistory = processedHistory,
                 memoryRepository = memoryRepository,
-                profileId = profileId
+                profileId = profileId,
+                companionTarget = companionTarget,
             )
 
             // If analysis is empty (trivial conversation), abort early.
-            if (analysis.mainProblem == null && analysis.extractedEntities.isEmpty() && analysis.updatedEntities.isEmpty() && analysis.mergedEntities.isEmpty()) {
+            if (
+                analysis.mainProblem == null &&
+                    analysis.extractedEntities.isEmpty() &&
+                    analysis.updatedEntities.isEmpty() &&
+                    analysis.mergedEntities.isEmpty() &&
+                    analysis.companionEvents.isEmpty()
+            ) {
                 AppLogger.d(TAG, "分析结果为空，判断为无需记忆的对话，跳过保存。")
                 return@withLock
             }
@@ -351,7 +392,13 @@ object MemoryLibrary {
             if (analysis.updatedEntities.isNotEmpty()) {
                 AppLogger.d(TAG, "开始更新 ${analysis.updatedEntities.size} 个现有记忆...")
                 analysis.updatedEntities.forEach { update ->
-                    val memoryToUpdate = memoryRepository.findMemoryByTitle(update.titleToUpdate)
+                    val memoryToUpdate =
+                        findMemoryForCompanion(
+                            repository = memoryRepository,
+                            title = update.titleToUpdate,
+                            profileId = profileId,
+                            target = companionTarget,
+                        )
                     if (memoryToUpdate != null) {
                         AppLogger.d(TAG, "正在更新记忆: '${update.titleToUpdate}'. 原因: ${update.reason}")
                         val updatedMemory = memoryRepository.updateMemory(
@@ -388,6 +435,22 @@ object MemoryLibrary {
 
             // Save the graph structure to the MemoryRepository
             if (analysis.mainProblem == null) {
+                applyCompanionOwnership(
+                    profileId = profileId,
+                    identity = companionIdentity,
+                    memories = createdMemories.values,
+                    companionEventTitles = analysis.companionEvents.mapTo(hashSetOf()) { it.title },
+                    memoryRepository = memoryRepository,
+                )
+                applyCompanionEvents(
+                    context = context,
+                    profileId = profileId,
+                    chatId = chatIdOverride,
+                    identity = companionIdentity,
+                    events = analysis.companionEvents,
+                    createdMemories = createdMemories,
+                    memoryRepository = memoryRepository,
+                )
                 AppLogger.w(TAG, "分析结果中缺少main_problem，跳过保存记忆图谱")
                 return@withLock
             }
@@ -399,7 +462,13 @@ object MemoryLibrary {
             try {
                 // 1. Create main problem memory
                 val mainProblemMemory = analysis.mainProblem?.let { mainProblem ->
-                    val existingMemory = memoryRepository.findMemoryByTitle(mainProblem.title)
+                    val existingMemory =
+                        findMemoryForCompanion(
+                            repository = memoryRepository,
+                            title = mainProblem.title,
+                            profileId = profileId,
+                            target = companionTarget,
+                        )
                     if (existingMemory != null) {
                         AppLogger.d(TAG, "1. 发现同名核心记忆，更新内容: '${mainProblem.title}'")
                         existingMemory.content = mainProblem.content
@@ -434,7 +503,14 @@ object MemoryLibrary {
                         // This entity is an alias for an existing one, as determined by the LLM.
                         AppLogger.d(TAG, "   -> LLM 识别此实体为 '${entity.aliasFor}' 的别名。")
                         // Try to find the canonical memory, first in the ones we just created, then in the DB.
-                        memory = createdMemories[entity.aliasFor] ?: memoryRepository.findMemoryByTitle(entity.aliasFor)
+                        memory =
+                            createdMemories[entity.aliasFor]
+                                ?: findMemoryForCompanion(
+                                    repository = memoryRepository,
+                                    title = entity.aliasFor,
+                                    profileId = profileId,
+                                    target = companionTarget,
+                                )
 
                         if (memory != null) {
                             AppLogger.d(TAG, "   -> 复用已存在的记忆节点 (ID: ${memory.id}).")
@@ -469,12 +545,24 @@ object MemoryLibrary {
                 AppLogger.d(TAG, "3. 开始创建记忆链接...")
                 analysis.links.forEach { link ->
                     // Try to find source: first in newly created/updated memories, then in existing DB
-                    val source = createdMemories[link.sourceTitle] 
-                        ?: memoryRepository.findMemoryByTitle(link.sourceTitle)
+                    val source =
+                        createdMemories[link.sourceTitle]
+                            ?: findMemoryForCompanion(
+                                repository = memoryRepository,
+                                title = link.sourceTitle,
+                                profileId = profileId,
+                                target = companionTarget,
+                            )
                     
                     // Try to find target: first in newly created/updated memories, then in existing DB
-                    val target = createdMemories[link.targetTitle] 
-                        ?: memoryRepository.findMemoryByTitle(link.targetTitle)
+                    val target =
+                        createdMemories[link.targetTitle]
+                            ?: findMemoryForCompanion(
+                                repository = memoryRepository,
+                                title = link.targetTitle,
+                                profileId = profileId,
+                                target = companionTarget,
+                            )
                     
                     if (source != null && target != null) {
                         AppLogger.d(TAG, "   -> 正在链接: '${link.sourceTitle}' --(${link.type}, weight=${link.weight})--> '${link.targetTitle}'")
@@ -485,6 +573,23 @@ object MemoryLibrary {
                         if (target == null) AppLogger.w(TAG, "      目标节点 '${link.targetTitle}' 未找到")
                     }
                 }
+
+                applyCompanionOwnership(
+                    profileId = profileId,
+                    identity = companionIdentity,
+                    memories = createdMemories.values,
+                    companionEventTitles = analysis.companionEvents.mapTo(hashSetOf()) { it.title },
+                    memoryRepository = memoryRepository,
+                )
+                applyCompanionEvents(
+                    context = context,
+                    profileId = profileId,
+                    chatId = chatIdOverride,
+                    identity = companionIdentity,
+                    events = analysis.companionEvents,
+                    createdMemories = createdMemories,
+                    memoryRepository = memoryRepository,
+                )
 
                 AppLogger.d(TAG, "成功从对话中提取并保存了记忆图谱")
 
@@ -504,7 +609,8 @@ object MemoryLibrary {
         solution: String,
         conversationHistory: List<Pair<String, String>>,
         memoryRepository: MemoryRepository,
-        profileId: String
+        profileId: String,
+        companionTarget: CompanionMemoryTarget,
     ): ParsedAnalysis {
         try {
             val useEnglish = LocaleUtils.getCurrentLanguage(context).lowercase().startsWith("en")
@@ -520,14 +626,24 @@ object MemoryLibrary {
             // 1. Use a compact search query (question-focused) for rough candidate selection.
             val contextQuery = buildCandidateSearchQuery(query, solution)
             val searchConfig = MemorySearchSettingsPreferences(context, profileId).load()
-            val candidateMemories = memoryRepository.searchMemories(
-                query = contextQuery,
-                scoreMode = searchConfig.scoreMode,
-                keywordWeight = searchConfig.keywordWeight,
-                tagWeight = searchConfig.tagWeight,
-                semanticWeight = searchConfig.vectorWeight,
-                edgeWeight = searchConfig.edgeWeight
-            ).take(15)
+            val candidateMemories =
+                memoryRepository.searchMemories(
+                    query = contextQuery,
+                    scoreMode = searchConfig.scoreMode,
+                    keywordWeight = searchConfig.keywordWeight,
+                    tagWeight = searchConfig.tagWeight,
+                    semanticWeight = searchConfig.vectorWeight,
+                    edgeWeight = searchConfig.edgeWeight,
+                ).asSequence()
+                    .filter { memory ->
+                        CompanionMemoryRecallPolicy.canRecall(
+                            memory = memory,
+                            profileId = profileId,
+                            target = companionTarget,
+                        )
+                    }
+                    .take(15)
+                    .toList()
 
             AppLogger.d(
                 TAG,
@@ -557,7 +673,14 @@ object MemoryLibrary {
             }
 
             // 2. Proactively find duplicates among candidates and instruct LLM to merge them
-            val duplicatesPromptPart = findAndDescribeDuplicates(candidateMemories, memoryRepository, useEnglish)
+            val duplicatesPromptPart =
+                findAndDescribeDuplicates(
+                    candidateMemories = candidateMemories,
+                    memoryRepository = memoryRepository,
+                    profileId = profileId,
+                    companionTarget = companionTarget,
+                    useEnglish = useEnglish,
+                )
 
             val existingMemoriesPrompt = if (candidateMemories.isNotEmpty()) {
                 FunctionalPrompts.knowledgeGraphExistingMemoriesPrefix(useEnglish) +
@@ -578,6 +701,7 @@ object MemoryLibrary {
                 existingMemoriesPrompt = existingMemoriesPrompt,
                 existingFoldersPrompt = existingFoldersPrompt,
                 currentPreferences = currentPreferences,
+                currentDateTime = ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
                 useEnglish = useEnglish
             )
 
@@ -680,12 +804,25 @@ object MemoryLibrary {
     /**
      * Finds duplicates within a list of candidate memories and creates a prompt instruction for the LLM.
      */
-    private suspend fun findAndDescribeDuplicates(candidateMemories: List<Memory>, memoryRepository: MemoryRepository, useEnglish: Boolean): String {
+    private suspend fun findAndDescribeDuplicates(
+        candidateMemories: List<Memory>,
+        memoryRepository: MemoryRepository,
+        profileId: String,
+        companionTarget: CompanionMemoryTarget,
+        useEnglish: Boolean,
+    ): String {
         val titles = candidateMemories.map { it.title }.distinct()
         val duplicatesFound = mutableListOf<String>()
 
         for (title in titles) {
-            val memoriesWithSameTitle = memoryRepository.findMemoriesByTitle(title)
+            val memoriesWithSameTitle =
+                memoryRepository.findMemoriesByTitle(title).filter { memory ->
+                    CompanionMemoryRecallPolicy.canRecall(
+                        memory = memory,
+                        profileId = profileId,
+                        target = companionTarget,
+                    )
+                }
             if (memoriesWithSameTitle.size > 1) {
                 duplicatesFound.add(
                     FunctionalPrompts.knowledgeGraphDuplicateTitleInstruction(
@@ -837,18 +974,231 @@ object MemoryLibrary {
                 parseUserPreferences(context, it)
             } ?: ""
 
+            val companionEvents = json.optJSONArray("companion")?.let { eventsArray ->
+                List(eventsArray.length()) { index ->
+                    val event = eventsArray.getJSONObject(index)
+                    ParsedCompanionEvent(
+                        title = event.getString("title"),
+                        kind = event.getString("kind"),
+                        eventAt =
+                            if (event.isNull("event_at")) {
+                                null
+                            } else {
+                                event.optString("event_at").takeIf { it.isNotBlank() }
+                            },
+                        status = event.optString("status", CompanionEventStatus.PENDING.storageValue),
+                        reminderText = event.optString("reminder_text", ""),
+                    )
+                }
+            } ?: emptyList()
+
             ParsedAnalysis(
                 mainProblem = mainProblem,
                 extractedEntities = extractedEntities,
                 links = links,
                 updatedEntities = updatedEntities,
                 mergedEntities = mergedEntities,
-                userPreferences = userPreferences
+                userPreferences = userPreferences,
+                companionEvents = companionEvents,
             )
         } catch (e: Exception) {
             AppLogger.e(TAG, "解析分析结果失败: $jsonString", e)
             ParsedAnalysis(null)
         }
+    }
+
+    private suspend fun findMemoryForCompanion(
+        repository: MemoryRepository,
+        title: String,
+        profileId: String,
+        target: CompanionMemoryTarget,
+    ): Memory? =
+        repository.findMemoriesByTitle(title).firstOrNull { memory ->
+            CompanionMemoryRecallPolicy.canRecall(
+                memory = memory,
+                profileId = profileId,
+                target = target,
+            )
+        }
+
+    private suspend fun applyCompanionOwnership(
+        profileId: String,
+        identity: CompanionIdentity,
+        memories: Collection<Memory>,
+        companionEventTitles: Set<String>,
+        memoryRepository: MemoryRepository,
+    ) {
+        val target = identity.toMemoryTarget()
+        memories.distinctBy { it.uuid }.forEach { memory ->
+            if (memory.companionOwnership() != null) return@forEach
+
+            val scope = inferCompanionMemoryScope(memory, companionEventTitles)
+            val ownership =
+                if (scope == CompanionMemoryScope.USER) {
+                    CompanionMemoryOwnership(
+                        scope = scope,
+                        profileId = profileId,
+                    )
+                } else {
+                    CompanionMemoryOwnership(
+                        scope = scope,
+                        profileId = profileId,
+                        characterId = target.characterId,
+                        characterName = target.characterName,
+                        characterGroupId = target.characterGroupId,
+                        characterGroupName = target.characterGroupName,
+                    )
+                }
+            memoryRepository.setMemoryProperties(
+                memory = memory,
+                values = ownership.toPropertyValues(),
+                removeKeys = CompanionMemoryOwnershipKeys.ALL,
+            )
+        }
+    }
+
+    private fun inferCompanionMemoryScope(
+        memory: Memory,
+        companionEventTitles: Set<String>,
+    ): CompanionMemoryScope {
+        if (memory.title in companionEventTitles) return CompanionMemoryScope.RELATIONSHIP
+
+        val tags = memory.tags.map { it.name.trim().lowercase() }
+        return when {
+            tags.any { tag ->
+                tag == "world" || tag == "lore" || tag == "story" ||
+                    "世界" in tag || "剧情" in tag || "设定" in tag
+            } -> CompanionMemoryScope.CHARACTER_WORLD
+            tags.any { tag ->
+                tag == "relationship" || tag == "relation" || tag == "shared" ||
+                    "关系" in tag || "共同" in tag || "约定" in tag
+            } -> CompanionMemoryScope.RELATIONSHIP
+            else -> CompanionMemoryScope.USER
+        }
+    }
+
+    private suspend fun applyCompanionEvents(
+        context: Context,
+        profileId: String,
+        chatId: String?,
+        identity: CompanionIdentity,
+        events: List<ParsedCompanionEvent>,
+        createdMemories: Map<String, Memory>,
+        memoryRepository: MemoryRepository,
+    ) {
+        if (events.isEmpty()) return
+        val companionTarget = identity.toMemoryTarget()
+        val reminderScheduler = CompanionReminderScheduler.getInstance(context)
+
+        events.forEach { event ->
+            val kind = CompanionEventKind.fromStorageValue(event.kind)
+            if (kind == null) {
+                AppLogger.w(TAG, "Ignored companion metadata with unknown kind: ${event.kind}")
+                return@forEach
+            }
+            val memory =
+                createdMemories[event.title]
+                    ?: findMemoryForCompanion(
+                        repository = memoryRepository,
+                        title = event.title,
+                        profileId = profileId,
+                        target = companionTarget,
+                    )
+            if (memory == null) {
+                AppLogger.w(TAG, "Ignored companion metadata because memory was not found: ${event.title}")
+                return@forEach
+            }
+            val eventAtMs = CompanionMemoryMetadata.parseEventAt(event.eventAt)
+            if (!event.eventAt.isNullOrBlank() && eventAtMs == null) {
+                AppLogger.w(TAG, "Ignored invalid companion event time for '${event.title}': ${event.eventAt}")
+            }
+            val existingMetadata = memory.companionMetadata()
+            val status = CompanionEventStatus.fromStorageValue(event.status)
+            val reminderText = event.reminderText.ifBlank { existingMetadata?.reminderText.orEmpty() }
+            val effectiveEventAtMs = eventAtMs ?: existingMetadata?.eventAtMs
+            val shouldResetDelivery =
+                status == CompanionEventStatus.PENDING &&
+                    (existingMetadata == null ||
+                        existingMetadata.status != CompanionEventStatus.PENDING ||
+                        existingMetadata.eventAtMs != effectiveEventAtMs ||
+                        existingMetadata.reminderText != reminderText)
+            val metadata =
+                CompanionMemoryMetadata(
+                    kind = kind,
+                    eventAtMs = effectiveEventAtMs,
+                    status = status,
+                    reminderText = reminderText,
+                    characterId = identity.characterId.ifBlank { existingMetadata?.characterId.orEmpty() },
+                    characterName = identity.displayName.ifBlank { existingMetadata?.characterName.orEmpty() },
+                    characterGroupId = identity.characterGroupId.ifBlank { existingMetadata?.characterGroupId.orEmpty() },
+                    chatId = chatId.orEmpty().ifBlank { existingMetadata?.chatId.orEmpty() },
+                    notifiedAtMs = if (shouldResetDelivery) null else existingMetadata?.notifiedAtMs,
+                    nextAttemptAtMs = if (shouldResetDelivery) null else existingMetadata?.nextAttemptAtMs,
+                )
+            val updatedMemory =
+                memoryRepository.setMemoryProperties(
+                    memory = memory,
+                    values = metadata.toPropertyValues(),
+                    removeKeys = CompanionMemoryKeys.ALL,
+                )
+            memoryRepository.addTagToMemory(updatedMemory, "MiraCompanion")
+            memoryRepository.addTagToMemory(updatedMemory, "Companion:${kind.storageValue}")
+            reminderScheduler.sync(profileId, updatedMemory)
+        }
+    }
+
+    private suspend fun resolveCompanionIdentity(context: Context, chatId: String?): CompanionIdentity {
+        val cardManager = CharacterCardManager.getInstance(context)
+        val groupManager = CharacterGroupCardManager.getInstance(context)
+        val chat =
+            chatId?.takeIf { it.isNotBlank() }
+                ?.let { AppDatabase.getDatabase(context).chatDao().getChatById(it) }
+
+        chat?.characterGroupId?.takeIf { it.isNotBlank() }?.let { groupId ->
+            val group = groupManager.getCharacterGroupCard(groupId)
+            return CompanionIdentity(
+                characterGroupId = groupId,
+                characterGroupName = group?.name.orEmpty(),
+            )
+        }
+        chat?.characterCardName?.takeIf { it.isNotBlank() }?.let { cardName ->
+            val card = cardManager.findCharacterCardByName(cardName)
+            if (card != null) {
+                return CompanionIdentity(characterId = card.id, characterName = card.name)
+            }
+        }
+
+        return when (val activePrompt = ActivePromptManager.getInstance(context).getActivePrompt()) {
+            is ActivePrompt.CharacterCard -> {
+                val card = cardManager.getCharacterCard(activePrompt.id)
+                CompanionIdentity(characterId = card.id, characterName = card.name)
+            }
+            is ActivePrompt.CharacterGroup -> {
+                val group = groupManager.getCharacterGroupCard(activePrompt.id)
+                CompanionIdentity(
+                    characterGroupId = activePrompt.id,
+                    characterGroupName = group?.name.orEmpty(),
+                )
+            }
+        }
+    }
+
+    private data class CompanionIdentity(
+        val characterId: String = "",
+        val characterName: String = "",
+        val characterGroupId: String = "",
+        val characterGroupName: String = "",
+    ) {
+        val displayName: String
+            get() = characterGroupName.ifBlank { characterName }
+
+        fun toMemoryTarget(): CompanionMemoryTarget =
+            CompanionMemoryTarget(
+                characterId = characterId,
+                characterName = characterName,
+                characterGroupId = characterGroupId,
+                characterGroupName = characterGroupName,
+            )
     }
 
     private fun parseUserPreferences(context: Context, preferencesObj: JSONObject): String {
@@ -872,6 +1222,9 @@ object MemoryLibrary {
 
     private fun buildPreferencesText(context: Context, profile: com.ai.assistance.operit.data.model.PreferenceProfile): String {
         val parts = mutableListOf<String>()
+        if (profile.displayName.isNotEmpty()) parts.add(context.getString(R.string.profile_display_name_value, profile.displayName))
+        if (profile.preferredAddress.isNotEmpty()) parts.add(context.getString(R.string.profile_preferred_address_value, profile.preferredAddress))
+        if (profile.pronouns.isNotEmpty()) parts.add(context.getString(R.string.profile_pronouns_value, profile.pronouns))
         if (profile.gender.isNotEmpty()) parts.add(context.getString(R.string.profile_gender_value, profile.gender))
         if (profile.birthDate > 0) {
             val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())

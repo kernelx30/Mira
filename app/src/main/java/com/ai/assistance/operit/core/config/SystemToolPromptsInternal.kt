@@ -2462,7 +2462,7 @@ object SystemToolPromptsInternal {
                                     ToolParameterSchema(
                                         name = "function_type",
                                         type = "string",
-                                        description = "function type enum name (CHAT/SUMMARY/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION)",
+                                        description = "function type enum name (CHAT/SUMMARY/TITLE_GENERATION/NEXT_USER_MESSAGE/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/ROLE_RESPONSE_PLANNER/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION)",
                                         required = true
                                     )
                                 )
@@ -2475,7 +2475,7 @@ object SystemToolPromptsInternal {
                                     ToolParameterSchema(
                                         name = "function_type",
                                         type = "string",
-                                        description = "function type enum name (CHAT/SUMMARY/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION)",
+                                        description = "function type enum name (CHAT/SUMMARY/TITLE_GENERATION/NEXT_USER_MESSAGE/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/ROLE_RESPONSE_PLANNER/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION)",
                                         required = true
                                     ),
                                     ToolParameterSchema(
@@ -5459,7 +5459,7 @@ object SystemToolPromptsInternal {
                                     ToolParameterSchema(
                                         name = "function_type",
                                         type = "string",
-                                        description = "功能类型枚举名（CHAT/SUMMARY/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION）",
+                                        description = "功能类型枚举名（CHAT/SUMMARY/TITLE_GENERATION/NEXT_USER_MESSAGE/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/ROLE_RESPONSE_PLANNER/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION）",
                                         required = true
                                     )
                                 )
@@ -5472,7 +5472,7 @@ object SystemToolPromptsInternal {
                                     ToolParameterSchema(
                                         name = "function_type",
                                         type = "string",
-                                        description = "功能类型枚举名（CHAT/SUMMARY/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION）",
+                                        description = "功能类型枚举名（CHAT/SUMMARY/TITLE_GENERATION/NEXT_USER_MESSAGE/MEMORY/UI_CONTROLLER/TRANSLATION/GREP/ROLE_RESPONSE_PLANNER/IMAGE_RECOGNITION/AUDIO_RECOGNITION/VIDEO_RECOGNITION）",
                                         required = true
                                     ),
                                     ToolParameterSchema(

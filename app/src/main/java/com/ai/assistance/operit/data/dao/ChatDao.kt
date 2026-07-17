@@ -91,6 +91,21 @@ interface ChatDao {
         timestamp: Long = System.currentTimeMillis()
     )
 
+    @Query(
+        "UPDATE chats SET chatModelConfigId = :modelConfigId, chatModelIndex = :modelIndex, " +
+            "memoryAutoUpdateOverride = :memoryAutoUpdateOverride, autoReadOverride = :autoReadOverride, " +
+            "isTemporary = :isTemporary, updatedAt = :timestamp WHERE id = :chatId"
+    )
+    suspend fun updateChatSessionControls(
+        chatId: String,
+        modelConfigId: String?,
+        modelIndex: Int,
+        memoryAutoUpdateOverride: Boolean?,
+        autoReadOverride: Boolean?,
+        isTemporary: Boolean,
+        timestamp: Long = System.currentTimeMillis(),
+    )
+
     /** 更新聊天锁定状态 */
     @Query("UPDATE chats SET locked = :locked, updatedAt = :timestamp WHERE id = :chatId")
     suspend fun updateChatLocked(chatId: String, locked: Boolean, timestamp: Long = System.currentTimeMillis())
@@ -98,6 +113,10 @@ interface ChatDao {
     /** 更新聊天置顶状态 */
     @Query("UPDATE chats SET pinned = :pinned, updatedAt = :timestamp WHERE id = :chatId")
     suspend fun updateChatPinned(chatId: String, pinned: Boolean, timestamp: Long = System.currentTimeMillis())
+
+    /** 更新聊天归档状态 */
+    @Query("UPDATE chats SET archived = :archived, pinned = CASE WHEN :archived THEN 0 ELSE pinned END, updatedAt = :timestamp WHERE id = :chatId")
+    suspend fun updateChatArchived(chatId: String, archived: Boolean, timestamp: Long = System.currentTimeMillis())
 
     /** 更新单个聊天的顺序和分组 */
     @Query("UPDATE chats SET displayOrder = :displayOrder, `group` = :group, updatedAt = :timestamp WHERE id = :chatId")

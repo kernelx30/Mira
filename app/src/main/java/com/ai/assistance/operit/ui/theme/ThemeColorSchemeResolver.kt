@@ -2,11 +2,8 @@ package com.ai.assistance.operit.ui.theme
 
 import android.content.Context
 import android.content.res.Configuration
-import android.os.Build
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import com.ai.assistance.operit.data.preferences.ThemePreferenceSnapshot
@@ -16,13 +13,45 @@ import com.ai.assistance.operit.data.preferences.UserPreferencesManager.Companio
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager.Companion.ON_COLOR_MODE_LIGHT
 
 private val ResolvedDarkColorScheme =
-    darkColorScheme(primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80)
+    darkColorScheme(
+        primary = MiraDarkPrimary,
+        primaryContainer = MiraDarkPrimaryContainer,
+        secondary = MiraDarkSecondary,
+        secondaryContainer = MiraDarkSecondaryContainer,
+        tertiary = MiraDarkTertiary,
+        tertiaryContainer = MiraDarkTertiaryContainer,
+        background = MiraDarkBackground,
+        surface = MiraDarkSurface,
+        onSurface = MiraDarkOnSurface,
+        outline = MiraDarkOutline,
+        onSurfaceVariant = Color(0xFFB9BBC1),
+    ).copy(
+        outlineVariant = Color(0xFF3A3B40),
+        surfaceContainerLow = MiraDarkSurfaceLow,
+        surfaceContainer = MiraDarkSurfaceContainer,
+        surfaceContainerHigh = MiraDarkSurfaceHigh,
+    )
 
 private val ResolvedLightColorScheme =
     lightColorScheme(
-        primary = Purple40,
-        secondary = PurpleGrey40,
-        tertiary = Pink40
+        primary = MiraTeal,
+        primaryContainer = MiraTealContainer,
+        secondary = MiraRose,
+        secondaryContainer = MiraRoseContainer,
+        tertiary = MiraGold,
+        tertiaryContainer = MiraGoldContainer,
+        background = MiraLightBackground,
+        surface = MiraLightSurface,
+        onSurface = MiraLightOnSurface,
+        onSurfaceVariant = MiraLightOnSurfaceVariant,
+        outline = MiraLightOutline,
+    ).copy(
+        outlineVariant = MiraLightDivider,
+        surfaceContainerLowest = MiraLightSurface,
+        surfaceContainerLow = MiraLightSurfaceLow,
+        surfaceContainer = MiraLightSurfaceContainer,
+        surfaceContainerHigh = MiraLightSurfaceHigh,
+        surfaceContainerHighest = Color(0xFFECECEC),
     )
 
 fun resolveThemeColorScheme(
@@ -39,18 +68,7 @@ fun resolveThemeColorScheme(
             snapshot.themeMode == UserPreferencesManager.THEME_MODE_DARK
         }
 
-    var colorScheme =
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-                if (darkTheme) {
-                    dynamicDarkColorScheme(context)
-                } else {
-                    dynamicLightColorScheme(context)
-                }
-
-            darkTheme -> ResolvedDarkColorScheme
-            else -> ResolvedLightColorScheme
-        }
+    var colorScheme = if (darkTheme) ResolvedDarkColorScheme else ResolvedLightColorScheme
 
     if (snapshot.useCustomColors) {
         snapshot.customPrimaryColor?.let { primaryArgb ->

@@ -63,9 +63,6 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
     
-    <!-- Voice Interaction Service permissions -->
-    <uses-permission android:name="android.permission.BIND_VOICE_INTERACTION" />
-    
     <!-- Workflow scheduling permissions -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -80,10 +77,10 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher_simple"
+        android:icon="@mipmap/ic_launcher_mira"
         android:label="@string/app_name"
         android:resizeableActivity="true"
-        android:roundIcon="@mipmap/ic_launcher_simple_round"
+        android:roundIcon="@mipmap/ic_launcher_mira_round"
         android:supportsRtl="true"
         android:localeConfig="@xml/locales_config"
         android:theme="@style/Theme.Operit"
@@ -111,6 +108,7 @@
 
         <activity 
             android:name="live.pw.renderX.LatexView"
+            tools:ignore="MissingClass"
             tools:node="remove" />
 
         <activity
@@ -214,7 +212,7 @@
             android:name=".ui.main.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:configChanges="orientation|keyboardHidden|screenSize|screenLayout"
+            android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout"
             android:windowSoftInputMode="adjustPan"
             android:theme="@style/Theme.Operit"
             android:launchMode="singleTask">
@@ -305,8 +303,8 @@
         <activity
             android:name=".integrations.tasker.ActivityConfigAIAgentAction"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher_simple"
-            android:label="AI Agent Action">
+            android:icon="@mipmap/ic_launcher_mira"
+            android:label="Mira Agent Action">
             <intent-filter>
                 <action android:name="net.dinglisch.android.tasker.ACTION_EDIT_EVENT" />
             </intent-filter>
@@ -351,6 +349,31 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps the user-requested assistant runtime alive for external HTTP control when no standard foreground service type fully describes that mode." />
         </service>
+
+        <service
+            android:name=".core.companion.MiraCompanionService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps user-enabled, on-device companion reminders and local message generation available in the background." />
+        </service>
+
+        <receiver
+            android:name=".core.companion.MiraAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".core.companion.MiraScheduleRestoreReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         
         <!-- 添加广播接收器配置 -->
         <receiver
@@ -453,8 +476,8 @@
         <activity
             android:name=".integrations.tasker.WorkflowTaskerActivityConfig"
             android:exported="true"
-            android:label="Operit Workflow"
-            android:icon="@mipmap/ic_launcher_simple">
+            android:label="Mira Workflow"
+            android:icon="@mipmap/ic_launcher_mira">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
             </intent-filter>

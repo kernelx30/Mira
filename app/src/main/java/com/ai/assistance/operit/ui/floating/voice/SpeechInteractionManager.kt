@@ -15,12 +15,19 @@ import com.ai.assistance.operit.api.speech.SpeechPrerollStore
 import com.ai.assistance.operit.api.speech.WakePhraseSnapshot
 import com.ai.assistance.operit.api.speech.SpeechServiceFactory
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.api.voice.ExpressiveTtsDirector
+import com.ai.assistance.operit.api.voice.VoiceCapabilities
+import com.ai.assistance.operit.data.model.SpeechDelivery
+import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
 import com.ai.assistance.operit.util.TtsCleaner
 import com.ai.assistance.operit.util.WaifuMessageProcessor
+import com.ai.assistance.operit.util.LocaleUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TAG = "SpeechInteractionManager"
 
@@ -32,7 +39,9 @@ class SpeechInteractionManager(
     private val context: Context,
     private val coroutineScope: CoroutineScope,
     private val onSpeechResult: (String, Boolean) -> Unit, // (text, isFinal)
-    private val onStateChange: (String) -> Unit // 更新状态提示文本
+    private val onStateChange: (String) -> Unit, // 更新状态提示文本
+    private val onSessionStateChange: (VoiceCallSessionState) -> Unit = {},
+    private val onAudioFocusGained: () -> Unit = {},
 ) {
     // ===== 状态 =====
     var isRecording by mutableStateOf(false)
@@ -45,6 +54,8 @@ class SpeechInteractionManager(
     // 文本累积
     var userMessage by mutableStateOf("")
         private set
+    var currentSpokenText by mutableStateOf("")
+        private set
     private var accumulatedText = ""
     private var latestPartialText = ""
 
@@ -53,36 +64,79 @@ class SpeechInteractionManager(
     // 任务控制
     private var timeoutJob: Job? = null
     private var silenceTimeoutJob: Job? = null
+    private var startListeningJob: Job? = null
+    private var utteranceGeneration = 0L
+    private var finalizedGeneration = -1L
+    private var initialized = false
 
     // ===== 服务 =====
     val speechService = SpeechServiceFactory.getInstance(context)
     val voiceService
         get() = VoiceServiceFactory.getInstance(context)
     private val inputMethodManager = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+    private val audioSession = VoiceCallAudioSession(context.applicationContext)
+    private val speechPreferences = SpeechServicesPreferences(context.applicationContext)
 
     // 暴露 Flow 给外部使用
     val volumeLevelFlow get() = speechService.volumeLevelFlow
     val recognitionResultFlow get() = speechService.recognitionResultFlow
 
     // ===== 初始化与清理 =====
-    suspend fun initialize() {
+    suspend fun initialize(): Boolean {
         resetState()
+        onSessionStateChange(VoiceCallSessionState.Initializing)
         try {
-            speechService.initialize()
-            voiceService.initialize()
+            val speechReady = speechService.initialize()
+            val voiceReady = voiceService.initialize()
+            val focusReady =
+                audioSession.start(
+                    onFocusLost = { _ ->
+                        stopListening(isCancel = true)
+                        coroutineScope.launch { voiceService.stop() }
+                        onSessionStateChange(VoiceCallSessionState.Suspended)
+                    },
+                    onFocusGained = {
+                        onSessionStateChange(VoiceCallSessionState.Idle)
+                        onAudioFocusGained()
+                    },
+                )
+            initialized = speechReady && voiceReady && focusReady
+            if (initialized) {
+                onSessionStateChange(VoiceCallSessionState.Idle)
+            } else {
+                onSessionStateChange(
+                    VoiceCallSessionState.Error(
+                        context.getString(R.string.speech_error_init_failed),
+                        recoverable = true,
+                    )
+                )
+            }
         } catch (e: Exception) {
             AppLogger.e(TAG, "Failed to initialize speech services", e)
+            initialized = false
+            onSessionStateChange(
+                VoiceCallSessionState.Error(
+                    e.message ?: context.getString(R.string.speech_error_init_failed),
+                    recoverable = true,
+                )
+            )
         }
+        return initialized
     }
 
     fun cleanup() {
         stopListening(isCancel = true)
+        startListeningJob?.cancel()
         coroutineScope.launch {
             speechService.cancelRecognition()
             voiceService.stop()
         }
         timeoutJob?.cancel()
         silenceTimeoutJob?.cancel()
+        audioSession.stop()
+        currentSpokenText = ""
+        initialized = false
+        onSessionStateChange(VoiceCallSessionState.Ended)
     }
 
     private fun resetState() {
@@ -91,7 +145,11 @@ class SpeechInteractionManager(
         userMessage = ""
         accumulatedText = ""
         latestPartialText = ""
+        currentSpokenText = ""
         wakePhraseSnapshot = null
+        utteranceGeneration += 1L
+        finalizedGeneration = -1L
+        startListeningJob?.cancel()
         timeoutJob?.cancel()
         silenceTimeoutJob?.cancel()
     }
@@ -119,6 +177,12 @@ class SpeechInteractionManager(
     // ===== 语音识别流程 =====
 
     fun startListening(onStartFailure: ((String) -> Unit)? = null) {
+        if (!initialized) {
+            val message = context.getString(R.string.speech_error_init_failed)
+            onSessionStateChange(VoiceCallSessionState.Error(message, recoverable = true))
+            onStartFailure?.invoke(message)
+            return
+        }
         if (!hasFocus) {
             onStartFailure?.invoke(context.getString(R.string.floating_cannot_get_focus))
             return
@@ -132,11 +196,15 @@ class SpeechInteractionManager(
         userMessage = ""
         accumulatedText = ""
         latestPartialText = ""
+        utteranceGeneration += 1L
+        finalizedGeneration = -1L
         wakePhraseSnapshot = SpeechPrerollStore.consumePendingWakePhrase()
         onStateChange(context.getString(R.string.floating_listening))
+        onSessionStateChange(VoiceCallSessionState.Listening)
 
         // 启动监听
-        coroutineScope.launch {
+        startListeningJob?.cancel()
+        startListeningJob = coroutineScope.launch {
             try {
                 try {
                     AIForegroundService.ensureMicrophoneForeground(context, forceStart = true)
@@ -159,10 +227,11 @@ class SpeechInteractionManager(
                 var attempt = 0
                 while (!ok && attempt < 12) {
                     if (attempt > 0) {
+                        onSessionStateChange(VoiceCallSessionState.Reconnecting(attempt))
                         delay(160)
                     }
                     ok = speechService.startRecognition(
-                        languageCode = "zh-CN",
+                        languageCode = resolveRecognitionLanguageCode(),
                         continuousMode = true,
                         partialResults = true
                     )
@@ -173,12 +242,26 @@ class SpeechInteractionManager(
                     isRecording = false
                     isProcessingSpeech = false
                     onStateChange(context.getString(R.string.floating_hold_microphone))
+                    onSessionStateChange(
+                        VoiceCallSessionState.Error(
+                            context.getString(R.string.floating_start_recording_failed),
+                            recoverable = true,
+                        )
+                    )
                     onStartFailure?.invoke(context.getString(R.string.floating_start_recording_failed))
+                } else {
+                    onSessionStateChange(VoiceCallSessionState.Listening)
                 }
             } catch (e: Exception) {
                 isRecording = false
                 isProcessingSpeech = false
                 onStateChange(context.getString(R.string.floating_hold_microphone))
+                onSessionStateChange(
+                    VoiceCallSessionState.Error(
+                        e.message ?: context.getString(R.string.floating_start_recording_failed),
+                        recoverable = true,
+                    )
+                )
                 onStartFailure?.invoke(e.message ?: context.getString(R.string.floating_start_recording_failed))
             }
         }
@@ -201,9 +284,11 @@ class SpeechInteractionManager(
                 isProcessingSpeech = false
                 resetState()
                 onStateChange(context.getString(R.string.floating_hold_microphone))
+                onSessionStateChange(VoiceCallSessionState.Idle)
             } else {
                 isProcessingSpeech = true
                 onStateChange(context.getString(R.string.floating_recognizing))
+                onSessionStateChange(VoiceCallSessionState.FinalizingSpeech)
                 speechService.stopRecognition()
                 startFallbackTimeout()
             }
@@ -211,7 +296,12 @@ class SpeechInteractionManager(
     }
 
     // 处理识别结果
-    fun handleRecognitionResult(resultText: String, isFinal: Boolean, autoSendSilence: Boolean = false) {
+    fun handleRecognitionResult(
+        resultText: String,
+        isFinal: Boolean,
+        autoSendSilence: Boolean = false,
+        silenceTimeoutMs: Long = DEFAULT_SILENCE_TIMEOUT_MS,
+    ) {
         val effectiveText = stripWakePhrasePrefixIfNeeded(resultText)
         if (isRecording) {
             if (effectiveText.isNotBlank()) {
@@ -224,8 +314,13 @@ class SpeechInteractionManager(
                 // 静默检测
                 if (autoSendSilence) {
                     silenceTimeoutJob?.cancel()
+                    val generation = utteranceGeneration
+                    val delayMs = dynamicSilenceDelayMs(effectiveText, isFinal, silenceTimeoutMs)
                     silenceTimeoutJob = coroutineScope.launch {
-                        delay(2000)
+                        delay(delayMs)
+                        if (generation != utteranceGeneration || finalizedGeneration == generation) {
+                            return@launch
+                        }
                         AppLogger.d(TAG, "Silence timeout, sending...")
                         finalizeSpeechInput()
                     }
@@ -286,21 +381,28 @@ class SpeechInteractionManager(
     }
 
     private fun finalizeSpeechInput() {
+        val generation = utteranceGeneration
+        if (finalizedGeneration == generation) return
+        finalizedGeneration = generation
+        silenceTimeoutJob?.cancel()
+        timeoutJob?.cancel()
+        isRecording = false
         isProcessingSpeech = false
         val text = userMessage.ifBlank { accumulatedText }
-        
-        if (text.isNotBlank()) {
-            onSpeechResult(text, true)
-            onStateChange(context.getString(R.string.floating_thinking_2))
-        } else {
-            onStateChange(context.getString(R.string.floating_didnt_hear_clearly))
+        onSessionStateChange(VoiceCallSessionState.FinalizingSpeech)
+        coroutineScope.launch {
+            runCatching { speechService.cancelRecognition() }
+            if (text.isNotBlank()) {
+                onSpeechResult(text, true)
+                onStateChange(context.getString(R.string.floating_thinking_2))
+            } else {
+                onStateChange(context.getString(R.string.floating_didnt_hear_clearly))
+                onSessionStateChange(VoiceCallSessionState.Idle)
+            }
+            userMessage = ""
+            accumulatedText = ""
+            latestPartialText = ""
         }
-
-        // 如果不是静默超时触发的，重置文本（静默超时可能意味着这一句结束，准备下一句，或者直接发送）
-        // 这里我们统一重置，因为 onSpeechResult 通常会触发发送
-        userMessage = ""
-        accumulatedText = ""
-        latestPartialText = ""
     }
     
     // ===== TTS 辅助 =====
@@ -308,15 +410,109 @@ class SpeechInteractionManager(
     fun speak(text: String, interrupt: Boolean = true) {
         if (text.isBlank()) return
         coroutineScope.launch {
-            try {
-                voiceService.speak(text, interrupt)
-            } catch (e: Exception) {
-                AppLogger.e(TAG, "TTS Error", e)
+            speakExpressively(text, interrupt)
+        }
+    }
+
+    suspend fun speakExpressively(text: String, interrupt: Boolean = true): Boolean {
+        if (text.isBlank()) return true
+        return try {
+            val baseRate = speechPreferences.ttsSpeechRateFlow.first()
+            val basePitch = speechPreferences.ttsPitchFlow.first()
+            val expressiveEnabled = speechPreferences.expressiveTtsEnabledFlow.first()
+            val expressionStrength = speechPreferences.expressiveTtsStrengthFlow.first()
+            val requests =
+                ExpressiveTtsDirector.plan(
+                    content = text,
+                    capabilities = if (expressiveEnabled) voiceService.capabilities else VoiceCapabilities.PLAIN,
+                    baseRate = baseRate,
+                    basePitch = basePitch,
+                    delivery = SpeechDelivery.CALL,
+                    expressionScale = expressionStrength.scale,
+                )
+
+            if (requests.isEmpty()) return true
+            onSessionStateChange(VoiceCallSessionState.Speaking)
+            var firstSegment = true
+            for (request in requests) {
+                currentSpokenText = request.text
+                val accepted =
+                    voiceService.speak(
+                        text = request.text,
+                        interrupt = if (firstSegment) interrupt else false,
+                        rate = request.rate,
+                        pitch = request.pitch,
+                        extraParams = request.extraParams,
+                    )
+                if (!accepted) {
+                    currentSpokenText = ""
+                    return false
+                }
+                val playbackCompleted = withTimeoutOrNull(MAX_TTS_SEGMENT_DURATION_MS) {
+                    while (voiceService.isSpeaking) delay(50L)
+                    true
+                } == true
+                if (!playbackCompleted) {
+                    voiceService.stop()
+                    currentSpokenText = ""
+                    return false
+                }
+                firstSegment = false
             }
+            currentSpokenText = ""
+            onSessionStateChange(VoiceCallSessionState.Idle)
+            true
+        } catch (e: Exception) {
+            currentSpokenText = ""
+            AppLogger.e(TAG, "TTS Error", e)
+            onSessionStateChange(
+                VoiceCallSessionState.Error(
+                    e.message ?: context.getString(R.string.chat_speak_failed),
+                    recoverable = true,
+                )
+            )
+            false
         }
     }
     
     fun cleanTextForTts(text: String, regexs: List<String>): String {
         return WaifuMessageProcessor.cleanContentForWaifu(TtsCleaner.clean(text, regexs))
+    }
+
+    private fun resolveRecognitionLanguageCode(): String {
+        val language = LocaleUtils.getCurrentLanguage(context)
+        return when (language.substringBefore('-').lowercase()) {
+            "zh" -> "zh-CN"
+            "en" -> "en-US"
+            "ko" -> "ko-KR"
+            "es" -> "es-ES"
+            "ms" -> "ms-MY"
+            "id" -> "id-ID"
+            "pt" -> "pt-BR"
+            else -> LocaleUtils.getLocaleForLanguageCode(language, context).toLanguageTag()
+        }
+    }
+
+    private fun dynamicSilenceDelayMs(
+        text: String,
+        isFinal: Boolean,
+        configuredMs: Long,
+    ): Long {
+        val base = configuredMs.coerceIn(700L, 4_000L)
+        val normalized = text.trim()
+        return when {
+            isFinal && normalized.lastOrNull() in TERMINAL_PUNCTUATION -> (base * 0.58f).toLong()
+            normalized.length <= 3 -> (base * 1.35f).toLong()
+            normalized.lastOrNull() in CONTINUATION_PUNCTUATION -> (base * 1.28f).toLong()
+            normalized.length >= 40 -> (base * 1.15f).toLong()
+            else -> base
+        }.coerceIn(650L, 5_000L)
+    }
+
+    private companion object {
+        const val DEFAULT_SILENCE_TIMEOUT_MS = 1_800L
+        const val MAX_TTS_SEGMENT_DURATION_MS = 120_000L
+        val TERMINAL_PUNCTUATION = setOf('。', '！', '？', '.', '!', '?')
+        val CONTINUATION_PUNCTUATION = setOf('，', '、', ',', '；', ';', '：', ':')
     }
 }

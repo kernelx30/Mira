@@ -303,6 +303,7 @@ object AIMessageManager {
      * @param enhancedAiService AI服务实例。
      * @param chatId 聊天ID。
      * @param messageContent 已经构建好的完整消息内容。
+     * @param currentRequestTimestamp 当前请求在本地消息记录中的时间戳。
      * @param chatHistory 完整的聊天历史记录。
      * @param workspacePath 当前工作区路径。
      * @param promptFunctionType 提示功能类型。
@@ -321,6 +322,7 @@ object AIMessageManager {
         enhancedAiService: EnhancedAIService,
         chatId: String? = null,
         messageContent: String,
+        currentRequestTimestamp: Long? = null,
         chatHistory: List<ChatMessage>,
         workspacePath: String?,
         promptFunctionType: PromptFunctionType,
@@ -343,7 +345,8 @@ object AIMessageManager {
         chatModelConfigIdOverride: String? = null,
         chatModelIndexOverride: Int? = null,
         preferenceProfileIdOverride: String? = null,
-        disableWarning: Boolean = false
+        disableWarning: Boolean = false,
+        toolsEnabledOverride: Boolean? = null,
     ): SharedStream<String> {
         val totalStartTime = messageTimingNow()
         val chatKey = chatId ?: DEFAULT_CHAT_KEY
@@ -351,12 +354,17 @@ object AIMessageManager {
         activeEnhancedAiServiceByChatId[chatKey] = enhancedAiService
 
         val buildMemoryStartTime = messageTimingNow()
-        val memory = getMemoryFromMessages(
-            messages = chatHistory,
-            splitByRole = splitHistoryByRole,
-            targetRoleName = currentRoleName,
-            groupOrchestrationMode = groupOrchestrationMode
-        )
+        val memory =
+            ConversationTimeContext.markCurrentRequest(
+                chatHistory =
+                    getMemoryFromMessages(
+                        messages = chatHistory,
+                        splitByRole = splitHistoryByRole,
+                        targetRoleName = currentRoleName,
+                        groupOrchestrationMode = groupOrchestrationMode,
+                    ),
+                messageTimestamp = currentRequestTimestamp,
+            )
         logMessageTiming(
             stage = "sendMessage.buildMemory",
             startTimeMs = buildMemoryStartTime,
@@ -479,7 +487,8 @@ object AIMessageManager {
                     chatModelIndexOverride = chatModelIndexOverride,
                     preferenceProfileIdOverride = preferenceProfileIdOverride,
                     stream = enableStream,
-                    disableWarning = disableWarning
+                    disableWarning = disableWarning,
+                    toolsEnabledOverride = toolsEnabledOverride,
                 )
             ).shareRevisable(
                 scope = scope,
@@ -671,6 +680,10 @@ object AIMessageManager {
             AppLogger.d(TAG, "没有新消息需要总结")
             return null
         }
+        val sourceTokenEstimate =
+            messagesToSummarize.sumOf { message ->
+                ChatUtils.estimateTokenCount(message.content).coerceAtLeast(0)
+            } + ChatUtils.estimateTokenCount(previousSummary.orEmpty()).coerceAtLeast(0)
 
         val memoryTagRegex = Regex("<memory>.*?</memory>", RegexOption.DOT_MATCHES_ALL)
         val conversationReviewEntries = mutableListOf<Pair<String, String>>()
@@ -978,7 +991,7 @@ object AIMessageManager {
                         conversationReviewEntries.add(speakerLabel to displayContent)
 
                         if (isNotEmpty()) append(" ")
-                        append("$speakerLabel: $cleanedContent")
+                        append("$speakerLabel: $displayContent")
                     }
                 }
             }
@@ -994,9 +1007,15 @@ object AIMessageManager {
                 } else {
                     stripMediaLinksForAssistant(message.content)
                 }
+                val displayContent =
+                    if (cleanedContent.isBlank()) {
+                        "[Empty]"
+                    } else if (role == "assistant") {
+                        condenseAssistantForReview(cleanedContent)
+                    } else {
+                        condenseUserForReview(cleanedContent)
+                    }
                 if (cleanedContent.isNotBlank()) {
-                    val displayContent =
-                        if (role == "assistant") condenseAssistantForReview(cleanedContent) else condenseUserForReview(cleanedContent)
                     val speakerLabel =
                         if (message.sender == "user") {
                             "user"
@@ -1006,7 +1025,7 @@ object AIMessageManager {
                         }
                     conversationReviewEntries.add(speakerLabel to displayContent)
                 }
-                Pair(role, "#${index + 1}: $cleanedContent")
+                Pair(role, "#${index + 1}: $displayContent")
             }
         }
 
@@ -1027,7 +1046,14 @@ object AIMessageManager {
                     append(trimmedSummary)
                     if (conversationReviewEntries.isNotEmpty()) {
                         append(context.getString(R.string.ai_message_dialogue_review))
-                        conversationReviewEntries.forEach { (speaker, content) ->
+                        val reviewEntries = conversationReviewEntries.takeLast(8)
+                        val omittedReviewCount = conversationReviewEntries.size - reviewEntries.size
+                        if (omittedReviewCount > 0) {
+                            append("- ... ")
+                            append(omittedReviewCount)
+                            append(" earlier dialogue entries compacted\n")
+                        }
+                        reviewEntries.forEach { (speaker, content) ->
                             append("- ")
                             append(speaker)
                             append(": ")
@@ -1046,7 +1072,25 @@ object AIMessageManager {
                 } else {
                     summaryWithQuotes
                 }
-                
+                val summaryTokenEstimate = ChatUtils.estimateTokenCount(finalSummary).coerceAtLeast(0)
+                val compressionRatio =
+                    if (sourceTokenEstimate > 0) {
+                        summaryTokenEstimate.toDouble() / sourceTokenEstimate.toDouble()
+                    } else {
+                        1.0
+                    }
+                AppLogger.d(
+                    TAG,
+                    "Compaction quality: sourceTokens~$sourceTokenEstimate, summaryTokens~$summaryTokenEstimate, ratio=$compressionRatio"
+                )
+                if (sourceTokenEstimate >= 512 && compressionRatio >= 0.85) {
+                    AppLogger.w(
+                        TAG,
+                        "Summary rejected because it did not reduce the estimated context enough"
+                    )
+                    return null
+                }
+
                 ChatMessage(
                     sender = "summary",
                     content = finalSummary,
@@ -1330,7 +1374,8 @@ object AIMessageManager {
                     "summary" ->
                         PromptTurn(
                             kind = PromptTurnKind.SUMMARY,
-                            content = message.content
+                            content = message.content,
+                            metadata = ConversationTimeContext.metadataFor(message),
                         )
                     else -> null
                 }
@@ -1354,12 +1399,14 @@ object AIMessageManager {
         // 清理思考内容
         val cleanedContent = ChatUtils.removeThinkingContent(message.content).trim()
         val contentWithoutStatus = removeStatusTags(cleanedContent)
+        val timingMetadata = ConversationTimeContext.metadataFor(message)
 
         // 非角色隔离模式：直接返回 assistant 消息
         if (!isRoleScopedMode) {
             return PromptTurn(
                 kind = PromptTurnKind.ASSISTANT,
-                content = message.content
+                content = message.content,
+                metadata = timingMetadata,
             )
         }
 
@@ -1369,18 +1416,20 @@ object AIMessageManager {
             // 当前角色的消息：作为 assistant 返回
             PromptTurn(
                 kind = PromptTurnKind.ASSISTANT,
-                content = message.content
+                content = message.content,
+                metadata = timingMetadata,
             )
         } else {
             // 其他角色的消息：转换为 user 消息，添加角色标签
             val roleLabel = if (messageRoleName.isNotBlank()) messageRoleName else "unknown"
-            val bridgedContent = removeStatusTags(cleanedContent)
+            val bridgedContent = contentWithoutStatus
             if (bridgedContent.isBlank()) {
                 null
             } else {
                 PromptTurn(
                     kind = PromptTurnKind.USER,
-                    content = "[From role: $roleLabel]\n$bridgedContent"
+                    content = "[From role: $roleLabel]\n$bridgedContent",
+                    metadata = timingMetadata,
                 )
             }
         }
@@ -1392,21 +1441,38 @@ object AIMessageManager {
         groupOrchestrationMode: Boolean
     ): PromptTurn {
         val baseContent = message.content
+        val timingMetadata = ConversationTimeContext.metadataFor(message)
 
         // 群组编排模式 + 角色隔离模式：给用户消息添加 [From user] 前缀
         if (groupOrchestrationMode && isRoleScopedMode) {
             val trimmed = baseContent.trim()
             return when {
                 trimmed.isBlank() ->
-                    PromptTurn(kind = PromptTurnKind.USER, content = baseContent)
+                    PromptTurn(
+                        kind = PromptTurnKind.USER,
+                        content = baseContent,
+                        metadata = timingMetadata,
+                    )
                 trimmed.startsWith("[From user]") ->
-                    PromptTurn(kind = PromptTurnKind.USER, content = trimmed)
+                    PromptTurn(
+                        kind = PromptTurnKind.USER,
+                        content = trimmed,
+                        metadata = timingMetadata,
+                    )
                 else ->
-                    PromptTurn(kind = PromptTurnKind.USER, content = "[From user]\n$trimmed")
+                    PromptTurn(
+                        kind = PromptTurnKind.USER,
+                        content = "[From user]\n$trimmed",
+                        metadata = timingMetadata,
+                    )
             }
         }
 
         // 其他模式：直接返回
-        return PromptTurn(kind = PromptTurnKind.USER, content = baseContent)
+        return PromptTurn(
+            kind = PromptTurnKind.USER,
+            content = baseContent,
+            metadata = timingMetadata,
+        )
     }
 }

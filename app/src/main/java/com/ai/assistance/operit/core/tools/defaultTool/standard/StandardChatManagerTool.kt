@@ -1486,7 +1486,7 @@ class StandardChatManagerTool(private val context: Context) {
                     )
                 }
 
-                if (hasTargetChat) {
+                val accepted = if (hasTargetChat) {
                     // 后台发送到指定对话，不切换 UI
                     core.sendUserMessage(
                         promptFunctionType = PromptFunctionType.CHAT,
@@ -1504,6 +1504,17 @@ class StandardChatManagerTool(private val context: Context) {
                         messageTextOverride = message,
                         proxySenderNameOverride = proxySenderName,
                         turnOptions = turnOptions
+                    )
+                }
+
+                if (!accepted) {
+                    return MessageSendStreamStartResult.Failed(
+                        ToolResult(
+                            toolName = tool.name,
+                            success = false,
+                            result = MessageSendResultData(chatId = preflightChatId ?: "", message = message),
+                            error = "Conversation is already processing another message",
+                        )
                     )
                 }
 

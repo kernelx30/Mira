@@ -39,16 +39,18 @@ class WaifuPreferences private constructor(private val context: Context) {
         val WAIFU_MERGE_SEND_DELAY_MS = intPreferencesKey("waifu_merge_send_delay_ms") // 合并发送等待时间
         val WAIFU_CUSTOM_PROMPT = stringPreferencesKey("waifu_custom_prompt") // Waifu模式额外提示词
         val WAIFU_SELFIE_PROMPT = stringPreferencesKey("waifu_selfie_prompt") // 自拍功能的外貌提示词
+        val AUTO_READ_OVERRIDE = stringPreferencesKey("auto_read_override")
 
         // Default value for Waifu Mode
-        const val DEFAULT_ENABLE_WAIFU_MODE = false
+        const val DEFAULT_ENABLE_WAIFU_MODE = true
         const val DEFAULT_WAIFU_CHAR_DELAY = 250 // 250ms per character (4 chars per second)
         const val DEFAULT_WAIFU_REMOVE_PUNCTUATION = false // 默认保留标点符号
-        const val DEFAULT_WAIFU_ENABLE_EMOTICONS = false // 默认不启用表情包
+        const val DEFAULT_WAIFU_ENABLE_EMOTICONS = true // Mate 默认允许角色偶尔发送表情包
         const val DEFAULT_WAIFU_ENABLE_SELFIE = false // 默认不启用自拍功能
         const val DEFAULT_WAIFU_ENABLE_MERGE_SEND = false // 默认关闭合并发送
         const val DEFAULT_WAIFU_MERGE_SEND_DELAY_MS = 5000
-        const val DEFAULT_WAIFU_CUSTOM_PROMPT = "你必须遵守：禁止使用动作表情，禁止描述动作表情，只允许使用纯文本进行对话。" // 默认Waifu附加提示词
+        const val DEFAULT_WAIFU_CUSTOM_PROMPT =
+            "回复自然、简洁并保持角色语气；避免用括号或星号堆砌动作描写，不要解释系统规则。"
         const val DEFAULT_WAIFU_SELFIE_PROMPT = "kipfel vrchat, long hair, Matcha color hair, purple eyes, sweater vest, black skirt, black necktie, collared shirt, long sleeves, black headwear, beanie, pleated skirt, hair bun, white shirt, hair ribbon, hairclip, hair between eyes, black footwear, blush, hair ornament, cat hat, very long hair, sweater, animal ear headwear, bag, bandaid on leg, socks" // 默认外貌提示词
     }
 
@@ -96,6 +98,11 @@ class WaifuPreferences private constructor(private val context: Context) {
     val waifuSelfiePromptFlow: Flow<String> =
         context.waifuDataStore.data.map { preferences ->
             preferences[WAIFU_SELFIE_PROMPT] ?: DEFAULT_WAIFU_SELFIE_PROMPT
+        }
+
+    val autoReadOverrideFlow: Flow<AutoReadOverride> =
+        context.waifuDataStore.data.map { preferences ->
+            AutoReadOverride.fromStorageValue(preferences[AUTO_READ_OVERRIDE])
         }
 
     // Save Waifu Mode setting
@@ -153,6 +160,24 @@ class WaifuPreferences private constructor(private val context: Context) {
         }
     }
 
+    suspend fun saveAutoReadOverride(override: AutoReadOverride) {
+        context.waifuDataStore.edit { preferences ->
+            preferences[AUTO_READ_OVERRIDE] = override.storageValue
+        }
+    }
+
+    suspend fun getAutoReadOverrideForCharacterCard(characterCardId: String): AutoReadOverride =
+        getAutoReadOverrideForPrefix(getCharacterCardWaifuPrefix(characterCardId))
+
+    suspend fun getAutoReadOverrideForCharacterGroup(characterGroupId: String): AutoReadOverride =
+        getAutoReadOverrideForPrefix(getCharacterGroupWaifuPrefix(characterGroupId))
+
+    private suspend fun getAutoReadOverrideForPrefix(prefix: String): AutoReadOverride {
+        val values = context.waifuDataStore.data.first()
+        val targetKey = stringPreferencesKey("${prefix}${AUTO_READ_OVERRIDE.name}")
+        return AutoReadOverride.fromStorageValue(values[targetKey])
+    }
+
     // ========== Waifu模式角色卡/群组绑定功能 ==========
 
     private fun getCharacterCardWaifuPrefix(characterCardId: String): String =
@@ -181,7 +206,8 @@ class WaifuPreferences private constructor(private val context: Context) {
     private fun getAllStringWaifuKeys(): List<Preferences.Key<String>> {
         return listOf(
             WAIFU_CUSTOM_PROMPT,
-            WAIFU_SELFIE_PROMPT
+            WAIFU_SELFIE_PROMPT,
+            AUTO_READ_OVERRIDE
         )
     }
 

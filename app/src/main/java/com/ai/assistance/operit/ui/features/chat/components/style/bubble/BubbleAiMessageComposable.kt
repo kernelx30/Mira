@@ -7,6 +7,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,7 +31,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRendererState
@@ -37,18 +43,18 @@ import com.ai.assistance.operit.ui.features.chat.components.rememberRevisableTex
 import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRenderer
 import com.ai.assistance.operit.ui.features.chat.components.part.ThinkToolsXmlNodeGrouper
 import com.ai.assistance.operit.ui.features.chat.components.LinkPreviewDialog
+import com.ai.assistance.operit.core.chat.CompanionEmojiMarkup
+import com.ai.assistance.operit.ui.features.chat.components.style.common.CompanionEmojiImage
 import com.ai.assistance.operit.util.markdown.toCharStream
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.ToolCollapseMode
 import androidx.compose.foundation.Image
-import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.ai.assistance.operit.util.markdown.MarkdownProcessorType
@@ -59,7 +65,7 @@ import com.ai.assistance.operit.ui.theme.isWaterGlassSupported
 import com.ai.assistance.operit.ui.theme.liquidGlass
 import com.ai.assistance.operit.ui.theme.resolveConfiguredFontFamily
 import com.ai.assistance.operit.ui.theme.waterGlass
-import kotlinx.coroutines.runBlocking
+import java.io.File
 
 private val ExpandedBubbleLayoutNodeTypes =
     setOf(
@@ -92,6 +98,9 @@ fun BubbleAiMessageComposable(
     heightMemory: ChatMessageHeightMemory? = null,
     enableDialogs: Boolean = true,
     onAvatarLongPressMention: ((String) -> Unit)? = null,
+    isVisualGroupStart: Boolean = true,
+    isVisualGroupEnd: Boolean = true,
+    isCurrentlySpoken: Boolean = false,
 ) {
     val context = LocalContext.current
     val preferencesManager = remember { UserPreferencesManager.getInstance(context) }
@@ -123,24 +132,18 @@ fun BubbleAiMessageComposable(
     val toolCollapseMode by displayPreferencesManager.toolCollapseMode.collectAsState(initial = ToolCollapseMode.ALL)
     
     // 根据角色名获取头像
-    val aiAvatarUri by remember(message.roleName) {
-        if (message.roleName != null) {
-            try {
-                runBlocking {
-                    val characterCard = characterCardManager.findCharacterCardByName(message.roleName)
-                    if (characterCard != null) {
-                        preferencesManager.getAiAvatarForCharacterCardFlow(characterCard.id)
-                    } else {
-                        preferencesManager.customAiAvatarUri
-                    }
+    val aiAvatarUri by
+        produceState<String?>(initialValue = null, message.roleName) {
+            val avatarFlow =
+                runCatching {
+                    characterCardManager.findCharacterCardByName(message.roleName)?.let { card ->
+                        preferencesManager.getAiAvatarForCharacterCardFlow(card.id)
+                    } ?: preferencesManager.customAiAvatarUri
+                }.getOrElse {
+                    preferencesManager.customAiAvatarUri
                 }
-            } catch (e: Exception) {
-                preferencesManager.customAiAvatarUri
-            }
-        } else {
-            preferencesManager.customAiAvatarUri
+            avatarFlow.collect { value = it }
         }
-    }.collectAsState(initial = null)
 
     val avatarShape = remember(avatarShapePref, avatarCornerRadius) {
         if (avatarShapePref == UserPreferencesManager.AVATAR_SHAPE_SQUARE) {
@@ -218,10 +221,12 @@ fun BubbleAiMessageComposable(
         animationSpec = tween(durationMillis = 300)
     )
 
-    val imageUrl = remember(message.content, message.contentStream) {
+    val companionEmoji = remember(message.content, message.contentStream) {
         if (message.contentStream == null) {
-            val regex = """^\s*!\[[^\]]*\]\(([^)]+)\)\s*$""".toRegex()
-            regex.find(message.content)?.groups?.get(1)?.value
+            CompanionEmojiMarkup.parseStandalone(
+                content = message.content,
+                customEmojiRoot = File(context.filesDir, "custom_emoji"),
+            )
         } else {
             null
         }
@@ -271,10 +276,11 @@ fun BubbleAiMessageComposable(
     MaterialTheme(typography = bubbleTypography) {
         ProvideAiMarkdownTextLayoutSettings {
         if (bubbleWideLayoutEnabled) {
-        val headerVisible = bubbleShowAvatar || roleNameText.isNotEmpty() || metadataText.isNotEmpty()
+        val headerVisible =
+            isVisualGroupStart &&
+                (bubbleShowAvatar || roleNameText.isNotEmpty() || metadataText.isNotEmpty())
         val avatarModifier = Modifier
-            .size(32.dp)
-            .clip(avatarShape)
+            .size(48.dp)
             .combinedClickable(
                 onClick = {},
                 onLongClick = {
@@ -284,19 +290,21 @@ fun BubbleAiMessageComposable(
                     }
                 },
             )
+            .padding(8.dp)
+            .clip(avatarShape)
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
                     start = if (bubbleShowAvatar) 0.dp else 8.dp,
-                    top = 4.dp,
+                    top = if (isVisualGroupStart) 4.dp else 0.dp,
                     end = 0.dp,
-                    bottom = 4.dp,
+                    bottom = if (isVisualGroupEnd) 4.dp else 0.dp,
                 )
                 .then(sizeTrackingModifier)
                 .alpha(alpha)
-                .offset(y = offsetY.dp),
+                .offset { IntOffset(x = 0, y = offsetY.dp.roundToPx()) },
         ) {
             if (headerVisible) {
                 Row(
@@ -307,14 +315,14 @@ fun BubbleAiMessageComposable(
                         if (!aiAvatarUri.isNullOrEmpty()) {
                             Image(
                                 painter = rememberAsyncImagePainter(model = Uri.parse(aiAvatarUri)),
-                                contentDescription = "AI Avatar",
+                                contentDescription = stringResource(R.string.character_avatar),
                                 modifier = avatarModifier,
                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Assistant,
-                                contentDescription = "AI Avatar",
+                                contentDescription = stringResource(R.string.character_avatar),
                                 modifier = avatarModifier,
                                 tint = MaterialTheme.colorScheme.secondary,
                             )
@@ -351,28 +359,37 @@ fun BubbleAiMessageComposable(
             }
 
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val maxBubbleWidth = maxWidth
-                if (imageUrl != null) {
-                    AsyncImage(
-                        model = Uri.parse(imageUrl),
-                        contentDescription = "Image from AI",
-                        modifier = Modifier
-                            .widthIn(max = maxBubbleWidth)
-                            .heightIn(max = 80.dp)
-                            .clip(RoundedCornerShape(16.dp)),
-                        contentScale = ContentScale.Fit,
+                val maxBubbleWidth = maxWidth * 0.84f
+                if (companionEmoji != null) {
+                    CompanionEmojiImage(
+                        content = companionEmoji,
+                        modifier = Modifier.widthIn(max = maxBubbleWidth),
                     )
                 } else {
                     val bubbleShape =
-                        if (bubbleRoundedCornersEnabled) {
-                            RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp)
-                        } else {
-                            RoundedCornerShape(0.dp)
-                        }
+                        aiBubbleShape(
+                            roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                            isVisualGroupStart = isVisualGroupStart,
+                            isVisualGroupEnd = isVisualGroupEnd,
+                        )
                     val bubbleModifier =
                         Modifier
                             .widthIn(max = maxBubbleWidth)
-                            .defaultMinSize(minHeight = 44.dp)
+                            .defaultMinSize(
+                                minHeight =
+                                    if (isVisualGroupStart && isVisualGroupEnd) 40.dp else 34.dp,
+                            )
+                            .then(
+                                if (isCurrentlySpoken) {
+                                    Modifier.border(
+                                        width = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = bubbleShape,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
                     val renderContent: @Composable () -> Unit = {
                         key(message.timestamp) {
                             val stream = rememberRevisableTextStream(message.contentStream)
@@ -389,9 +406,9 @@ fun BubbleAiMessageComposable(
                                     modifier =
                                         Modifier.padding(
                                             start = bubbleContentPaddingLeft.dp,
-                                            top = 12.dp,
+                                            top = 8.dp,
                                             end = bubbleContentPaddingRight.dp,
-                                            bottom = 12.dp,
+                                            bottom = 8.dp,
                                     ),
                                     state = rendererState,
                                     fillMaxWidth = shouldUseExpandedBubbleLayout,
@@ -408,9 +425,9 @@ fun BubbleAiMessageComposable(
                                     modifier =
                                         Modifier.padding(
                                             start = bubbleContentPaddingLeft.dp,
-                                            top = 12.dp,
+                                            top = 8.dp,
                                             end = bubbleContentPaddingRight.dp,
-                                            bottom = 12.dp,
+                                            bottom = 8.dp,
                                     ),
                                     state = rendererState,
                                     fillMaxWidth = shouldUseExpandedBubbleLayout,
@@ -451,6 +468,15 @@ fun BubbleAiMessageComposable(
                                         enableLens = false,
                                     ),
                             shape = bubbleShape,
+                            border =
+                                if (isCurrentlySpoken || liquidGlassEnabled || waterGlassEnabled) {
+                                    null
+                                } else {
+                                    BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+                                    )
+                                },
                             color =
                                 if (liquidGlassEnabled || waterGlassEnabled) {
                                     Color.Transparent
@@ -461,7 +487,7 @@ fun BubbleAiMessageComposable(
                                 if (liquidGlassEnabled || waterGlassEnabled) {
                                     0.dp
                                 } else {
-                                    2.dp
+                                    0.dp
                                 },
                         ) {
                             renderContent()
@@ -473,17 +499,21 @@ fun BubbleAiMessageComposable(
     } else {
     Row(
         modifier = Modifier
-            .padding(horizontal = 0.dp, vertical = 4.dp)
+            .padding(
+                start = 0.dp,
+                top = if (isVisualGroupStart) 4.dp else 0.dp,
+                end = 0.dp,
+                bottom = if (isVisualGroupEnd) 4.dp else 0.dp,
+            )
             .then(sizeTrackingModifier)
             .alpha(alpha)
-            .offset(y = offsetY.dp),
+            .offset { IntOffset(x = 0, y = offsetY.dp.roundToPx()) },
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
         if (bubbleShowAvatar) {
             val avatarModifier = Modifier
-                .size(32.dp)
-                .clip(avatarShape)
+                .size(48.dp)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = {
@@ -493,21 +523,26 @@ fun BubbleAiMessageComposable(
                         }
                     }
                 )
-            // Avatar
-            if (!aiAvatarUri.isNullOrEmpty()) {
-                Image(
-                    painter = rememberAsyncImagePainter(model = Uri.parse(aiAvatarUri)),
-                    contentDescription = "AI Avatar",
-                    modifier = avatarModifier,
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Assistant,
-                    contentDescription = "AI Avatar",
-                    modifier = avatarModifier,
-                    tint = MaterialTheme.colorScheme.secondary
-                )
+                .padding(8.dp)
+                .clip(avatarShape)
+            Box(modifier = Modifier.size(48.dp)) {
+                if (isVisualGroupStart) {
+                    if (!aiAvatarUri.isNullOrEmpty()) {
+                        Image(
+                            painter = rememberAsyncImagePainter(model = Uri.parse(aiAvatarUri)),
+                            contentDescription = stringResource(R.string.character_avatar),
+                            modifier = avatarModifier,
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Assistant,
+                            contentDescription = stringResource(R.string.character_avatar),
+                            modifier = avatarModifier,
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.width(8.dp))
         }
@@ -545,7 +580,7 @@ fun BubbleAiMessageComposable(
                 }
             }
             
-            if (displayText.isNotEmpty()) {
+            if (isVisualGroupStart && displayText.isNotEmpty()) {
                 Text(
                     text = displayText,
                     style = MaterialTheme.typography.labelSmall,
@@ -555,29 +590,38 @@ fun BubbleAiMessageComposable(
             }
             
             BoxWithConstraints {
-                val maxBubbleWidth = maxWidth * 0.85f
-                if (imageUrl != null) {
-                    AsyncImage(
-                        model = Uri.parse(imageUrl),
-                        contentDescription = "Image from AI",
-                        modifier = Modifier
-                            .widthIn(max = maxBubbleWidth)
-                            .heightIn(max = 80.dp)
-                            .clip(RoundedCornerShape(16.dp)),
-                        contentScale = ContentScale.Fit
+                val maxBubbleWidth = maxWidth * 0.84f
+                if (companionEmoji != null) {
+                    CompanionEmojiImage(
+                        content = companionEmoji,
+                        modifier = Modifier.widthIn(max = maxBubbleWidth),
                     )
                 } else {
                     // Message bubble
                     val bubbleShape =
-                        if (bubbleRoundedCornersEnabled) {
-                            RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp)
-                        } else {
-                            RoundedCornerShape(0.dp)
-                        }
+                        aiBubbleShape(
+                            roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                            isVisualGroupStart = isVisualGroupStart,
+                            isVisualGroupEnd = isVisualGroupEnd,
+                        )
                     val bubbleModifier =
                         Modifier
                             .widthIn(max = maxBubbleWidth)
-                            .defaultMinSize(minHeight = 44.dp)
+                            .defaultMinSize(
+                                minHeight =
+                                    if (isVisualGroupStart && isVisualGroupEnd) 40.dp else 34.dp,
+                            )
+                            .then(
+                                if (isCurrentlySpoken) {
+                                    Modifier.border(
+                                        width = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = bubbleShape,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
                     val renderContent: @Composable () -> Unit = {
                         // 使用 message.timestamp 作为 key，确保在重组期间，
                         // 只要是同一条消息，StreamMarkdownRenderer就不会被销毁和重建。
@@ -596,9 +640,9 @@ fun BubbleAiMessageComposable(
                                     modifier =
                                         Modifier.padding(
                                             start = bubbleContentPaddingLeft.dp,
-                                            top = 12.dp,
+                                            top = 8.dp,
                                             end = bubbleContentPaddingRight.dp,
-                                            bottom = 12.dp,
+                                            bottom = 8.dp,
                                     ),
                                     state = rendererState,
                                     fillMaxWidth = shouldUseExpandedBubbleLayout,
@@ -617,9 +661,9 @@ fun BubbleAiMessageComposable(
                                     modifier =
                                         Modifier.padding(
                                             start = bubbleContentPaddingLeft.dp,
-                                            top = 12.dp,
+                                            top = 8.dp,
                                             end = bubbleContentPaddingRight.dp,
-                                            bottom = 12.dp,
+                                            bottom = 8.dp,
                                     ),
                                     state = rendererState,
                                     fillMaxWidth = shouldUseExpandedBubbleLayout,
@@ -660,18 +704,22 @@ fun BubbleAiMessageComposable(
                                         enableLens = false,
                                     ),
                             shape = bubbleShape,
+                            border =
+                                if (isCurrentlySpoken || liquidGlassEnabled || waterGlassEnabled) {
+                                    null
+                                } else {
+                                    BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+                                    )
+                                },
                             color =
                                 if (liquidGlassEnabled || waterGlassEnabled) {
                                     Color.Transparent
                                 } else {
                                     backgroundColor
                                 },
-                            tonalElevation =
-                                if (liquidGlassEnabled || waterGlassEnabled) {
-                                    0.dp
-                                } else {
-                                    2.dp
-                                }
+                            tonalElevation = 0.dp,
                         ) {
                             renderContent()
                         }
@@ -694,4 +742,19 @@ fun BubbleAiMessageComposable(
             }
         )
     }
+}
+
+private fun aiBubbleShape(
+    roundedCornersEnabled: Boolean,
+    isVisualGroupStart: Boolean,
+    isVisualGroupEnd: Boolean,
+): RoundedCornerShape {
+    if (!roundedCornersEnabled) return RoundedCornerShape(0.dp)
+
+    return RoundedCornerShape(
+        topStart = if (isVisualGroupStart) 4.dp else 8.dp,
+        topEnd = 16.dp,
+        bottomEnd = 16.dp,
+        bottomStart = if (isVisualGroupEnd) 16.dp else 8.dp,
+    )
 }

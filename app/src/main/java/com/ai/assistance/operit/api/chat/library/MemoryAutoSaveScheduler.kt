@@ -2,7 +2,9 @@ package com.ai.assistance.operit.api.chat.library
 
 import android.content.Context
 import com.ai.assistance.operit.api.chat.EnhancedAIService
-import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
+import com.ai.assistance.operit.core.chat.CompanionMemoryProposalExtractor
+import com.ai.assistance.operit.core.chat.CompanionMemoryTargetResolver
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.MemoryAutoSaveCandidate
@@ -20,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CancellationException
 
 class MemoryAutoSaveScheduler(
     private val context: Context,
@@ -32,7 +35,6 @@ class MemoryAutoSaveScheduler(
             MemorySearchSettingsPreferences.DEFAULT_AUTO_SAVE_INTERVAL_MINUTES * 60 * 1000L
         private const val MAX_MESSAGES_PER_BATCH = 48
         private const val MAX_CANDIDATES_PER_RUN_PER_CHAT = 20
-        private const val MIN_TOTAL_CANDIDATES_TO_EXTRACT = 5
 
         @Volatile
         private var instance: MemoryAutoSaveScheduler? = null
@@ -44,6 +46,7 @@ class MemoryAutoSaveScheduler(
     @Volatile
     private var loopJob: Job? = null
     private val nextRunAtMsByProfileId = ConcurrentHashMap<String, Long>()
+    private val immediateRequests = ConcurrentHashMap.newKeySet<String>()
 
     fun start() {
         if (loopJob?.isActive == true) return
@@ -53,7 +56,13 @@ class MemoryAutoSaveScheduler(
                 AppLogger.d(TAG, "长期记忆自动保存轮询器已启动")
                 while (isActive) {
                     delay(LOOP_TICK_MS)
-                    runOnce()
+                    try {
+                        runOnce()
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        AppLogger.e(TAG, "长期记忆自动保存轮询失败，将在下个周期重试", error)
+                    }
                 }
             }
     }
@@ -79,15 +88,124 @@ class MemoryAutoSaveScheduler(
         }
     }
 
+    fun requestImmediateProcessing(profileId: String, chatId: String) {
+        if (profileId.isBlank() || chatId.isBlank()) return
+        val requestKey = "$profileId::$chatId"
+        if (!immediateRequests.add(requestKey)) return
+
+        scope.launch(Dispatchers.IO) {
+            try {
+                while (isActive) {
+                    if (isRunning.get()) {
+                        delay(500L)
+                        continue
+                    }
+                    val completed = flushBeforeCompaction(profileId, chatId)
+                    if (!completed) {
+                        // A flush intentionally handles a bounded batch. Let WorkManager drain
+                        // the remainder with backoff instead of either dropping it or spinning.
+                        MemoryAutoSaveWorkScheduler.requestImmediate(context, profileId, chatId)
+                    }
+                    break
+                }
+            } finally {
+                immediateRequests.remove(requestKey)
+            }
+        }
+    }
+
+    /**
+     * Best-effort pre-compaction flush. Unlike the periodic pass, this bypasses the interval so
+     * durable facts are extracted before old context is summarized.
+     */
+    suspend fun flushBeforeCompaction(profileId: String, chatId: String): Boolean {
+        if (profileId.isBlank() || chatId.isBlank()) return true
+        if (!isRunning.compareAndSet(false, true)) {
+            AppLogger.d(TAG, "Pre-compaction memory flush skipped because another pass is active")
+            return false
+        }
+
+        return try {
+            val repository = MemoryAutoSaveCandidateRepository(context, profileId)
+            val candidates =
+                repository.getProcessableCandidates()
+                    .filter { it.chatId == chatId }
+                    .sortedWith(
+                        compareBy<MemoryAutoSaveCandidate> { it.triggerMessageTimestamp }
+                            .thenBy { it.createdAt.time }
+                    )
+                    .take(MAX_CANDIDATES_PER_RUN_PER_CHAT)
+            if (candidates.isEmpty()) {
+                return repository.getPendingAndFailedCandidates().none { it.chatId == chatId }
+            }
+
+            val memoryService =
+                EnhancedAIService.getAIServiceForFunction(context, FunctionType.MEMORY)
+            val messageDao = AppDatabase.getDatabase(context).messageDao()
+            val selectedUserCandidates =
+                candidates.filter {
+                    MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
+                }
+            val highValueCandidates =
+                candidates.filter {
+                    MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
+                }
+            val automaticCandidates =
+                candidates.filter {
+                    !MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType) &&
+                        !MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
+                }
+
+            if (selectedUserCandidates.isNotEmpty()) {
+                processChatCandidateGroup(
+                    profileId = profileId,
+                    chatId = chatId,
+                    candidates = selectedUserCandidates,
+                    repository = repository,
+                    messageDao = messageDao,
+                    memoryService = memoryService
+                )
+            }
+            if (highValueCandidates.isNotEmpty()) {
+                processChatCandidateGroup(
+                    profileId = profileId,
+                    chatId = chatId,
+                    candidates = highValueCandidates,
+                    repository = repository,
+                    messageDao = messageDao,
+                    memoryService = memoryService
+                )
+            }
+            if (automaticCandidates.isNotEmpty()) {
+                processChatCandidateGroup(
+                    profileId = profileId,
+                    chatId = chatId,
+                    candidates = automaticCandidates,
+                    repository = repository,
+                    messageDao = messageDao,
+                    memoryService = memoryService
+                )
+            }
+
+            val remaining =
+                repository.getPendingAndFailedCandidates().count { it.chatId == chatId }
+            AppLogger.d(
+                TAG,
+                "Pre-compaction memory flush finished: profileId=$profileId, chatId=$chatId, remaining=$remaining"
+            )
+            remaining == 0
+        } finally {
+            isRunning.set(false)
+        }
+    }
+
     private suspend fun scanAndProcessCandidates() {
         val profileIds = preferencesManager.profileListFlow.first()
         if (profileIds.isEmpty()) return
 
-        val toolHandler = AIToolHandler.getInstance(context)
-        val memoryService =
-            EnhancedAIService.getAIServiceForFunction(context, FunctionType.MEMORY)
         val messageDao = AppDatabase.getDatabase(context).messageDao()
         val nowMs = System.currentTimeMillis()
+        var memoryService: AIService? = null
 
         for (profileId in profileIds) {
             val intervalMs = intervalMsForProfile(profileId)
@@ -97,23 +215,17 @@ class MemoryAutoSaveScheduler(
             }
 
             val repository = MemoryAutoSaveCandidateRepository(context, profileId)
-            val allCandidates = repository.getPendingAndFailedCandidates()
-            if (allCandidates.size < MIN_TOTAL_CANDIDATES_TO_EXTRACT) {
-                val nextRunAt = System.currentTimeMillis() + intervalMs
-                AppLogger.d(
-                    TAG,
-                    "候选总条数不足，继续累计并重置下次执行时间: profileId=$profileId, totalCandidates=${allCandidates.size}, nextRunAt=$nextRunAt"
-                )
-                scheduleNextRun(profileId, nextRunAt)
-                continue
-            }
+            val allCandidates = repository.getProcessableCandidates()
             val groupedCandidates =
                 allCandidates
                     .groupBy { it.chatId }
                     .filterKeys { it.isNotBlank() }
 
             if (groupedCandidates.isEmpty()) {
-                scheduleNextRun(profileId, System.currentTimeMillis() + intervalMs)
+                scheduleNextRun(
+                    profileId,
+                    resolveNextRunAtMs(repository, System.currentTimeMillis(), intervalMs)
+                )
                 continue
             }
 
@@ -121,6 +233,10 @@ class MemoryAutoSaveScheduler(
                 TAG,
                 "开始处理长期记忆候选: profileId=$profileId, chats=${groupedCandidates.size}"
             )
+            val activeMemoryService =
+                memoryService
+                    ?: EnhancedAIService.getAIServiceForFunction(context, FunctionType.MEMORY)
+                        .also { memoryService = it }
 
             for ((chatId, candidates) in groupedCandidates) {
                 val orderedCandidates =
@@ -133,9 +249,14 @@ class MemoryAutoSaveScheduler(
                     batchCandidates.filter {
                         MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
                     }
+                val highValueCandidates =
+                    batchCandidates.filter {
+                        MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
+                    }
                 val automaticCandidates =
-                    batchCandidates.filterNot {
-                        MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
+                    batchCandidates.filter {
+                        !MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType) &&
+                            !MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
                     }
 
                 if (selectedUserCandidates.isNotEmpty()) {
@@ -145,8 +266,17 @@ class MemoryAutoSaveScheduler(
                         candidates = selectedUserCandidates,
                         repository = repository,
                         messageDao = messageDao,
-                        toolHandler = toolHandler,
-                        memoryService = memoryService
+                        memoryService = activeMemoryService
+                    )
+                }
+                if (highValueCandidates.isNotEmpty()) {
+                    processChatCandidateGroup(
+                        profileId = profileId,
+                        chatId = chatId,
+                        candidates = highValueCandidates,
+                        repository = repository,
+                        messageDao = messageDao,
+                        memoryService = activeMemoryService
                     )
                 }
                 if (automaticCandidates.isNotEmpty()) {
@@ -156,13 +286,32 @@ class MemoryAutoSaveScheduler(
                         candidates = automaticCandidates,
                         repository = repository,
                         messageDao = messageDao,
-                        toolHandler = toolHandler,
-                        memoryService = memoryService
+                        memoryService = activeMemoryService
                     )
                 }
             }
-            scheduleNextRun(profileId, System.currentTimeMillis() + intervalMs)
+            scheduleNextRun(
+                profileId,
+                resolveNextRunAtMs(repository, System.currentTimeMillis(), intervalMs)
+            )
         }
+    }
+
+    private fun resolveNextRunAtMs(
+        repository: MemoryAutoSaveCandidateRepository,
+        nowMs: Long,
+        intervalMs: Long
+    ): Long {
+        if (repository.getProcessableCandidates(nowMs).isNotEmpty()) {
+            return nowMs + LOOP_TICK_MS
+        }
+        val earliestDeferredRetry =
+            repository.getPendingAndFailedCandidates()
+                .asSequence()
+                .map { it.nextAttemptAtMs }
+                .filter { it > nowMs }
+                .minOrNull()
+        return minOf(nowMs + intervalMs, earliestDeferredRetry ?: Long.MAX_VALUE)
     }
 
     private fun intervalMsForProfile(profileId: String): Long {
@@ -194,7 +343,6 @@ class MemoryAutoSaveScheduler(
         candidates: List<MemoryAutoSaveCandidate>,
         repository: MemoryAutoSaveCandidateRepository,
         messageDao: com.ai.assistance.operit.data.dao.MessageDao,
-        toolHandler: AIToolHandler,
         memoryService: com.ai.assistance.operit.api.chat.llmprovider.AIService
     ) {
         if (candidates.isEmpty()) return
@@ -203,12 +351,16 @@ class MemoryAutoSaveScheduler(
             candidates.all {
                 MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
             }
+        val isHighValueBatch =
+            candidates.all {
+                MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
+            }
         val candidateIds = candidates.map { it.id }
         repository.markProcessing(candidateIds)
 
         try {
             val messages =
-                if (isSelectedUserBatch) {
+                if (isSelectedUserBatch || isHighValueBatch) {
                     val selectedMessages =
                         withContext(Dispatchers.IO) {
                             candidates
@@ -216,7 +368,7 @@ class MemoryAutoSaveScheduler(
                                     messageDao.getMessageByTimestamp(
                                         chatId = chatId,
                                         timestamp = candidate.triggerMessageTimestamp
-                                    )?.toChatMessage()
+                                    )
                                 }
                         }
                     selectedMessages
@@ -230,7 +382,7 @@ class MemoryAutoSaveScheduler(
                             maxTimestamp = latestTriggerTimestamp,
                             limit = MAX_MESSAGES_PER_BATCH
                         )
-                    }.asReversed().map { it.toChatMessage() }
+                    }.asReversed()
                 }
 
             if (messages.isEmpty()) {
@@ -239,56 +391,35 @@ class MemoryAutoSaveScheduler(
                 return
             }
 
-            val conversationHistory =
-                messages
-                    .filter { message -> message.sender == "user" || message.sender == "ai" }
-                    .map { message ->
-                        val role =
-                            if (message.sender == "user") {
-                                "user"
-                            } else {
-                            "assistant"
-                            }
-                        role to message.content
-                    }
-
-            if (conversationHistory.isEmpty() || conversationHistory.none { it.first == "user" }) {
+            if (messages.none { it.sender == "user" && it.content.isNotBlank() }) {
                 AppLogger.w(TAG, "候选消息缺少有效用户上下文，直接清理候选: profileId=$profileId, chatId=$chatId")
                 repository.deleteCandidates(candidateIds)
                 return
             }
 
-            val memoryContent =
-                if (isSelectedUserBatch) {
-                    conversationHistory
-                        .filter { it.first == "user" }
-                        .joinToString("\n\n") { it.second }
-                        .trim()
-                } else {
-                    conversationHistory.lastOrNull { (role, content) ->
-                        role == "assistant" && content.isNotBlank()
-                    }?.second.orEmpty()
+            val companionId = CompanionMemoryTargetResolver.resolve(context, chatId)
+            val autoConfirmHighImportance =
+                candidates.any {
+                    MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
                 }
-
-            if (memoryContent.isBlank()) {
-                AppLogger.w(TAG, "候选消息缺少可写入的记忆内容，直接清理候选: profileId=$profileId, chatId=$chatId")
-                repository.deleteCandidates(candidateIds)
-                return
-            }
-
-            MemoryLibrary.saveMemoryNow(
+            val appliedCount = CompanionMemoryProposalExtractor.extractAndApply(
                 context = context,
-                toolHandler = toolHandler,
-                conversationHistory = conversationHistory,
-                content = memoryContent,
+                profileId = profileId,
+                companionId = companionId,
+                conversationId = chatId,
+                messages = messages,
                 aiService = memoryService,
-                profileIdOverride = profileId
+                requireReview = !isSelectedUserBatch,
+                autoConfirmHighImportance = autoConfirmHighImportance,
             )
             repository.deleteCandidates(candidateIds)
             AppLogger.d(
                 TAG,
-                "长期记忆候选处理成功: profileId=$profileId, chatId=$chatId, candidates=${candidateIds.size}"
+                "伴侣记忆候选处理成功: profileId=$profileId, chatId=$chatId, candidates=${candidateIds.size}, proposals=$appliedCount"
             )
+        } catch (e: CancellationException) {
+            repository.markPending(candidateIds)
+            throw e
         } catch (e: Exception) {
             AppLogger.e(TAG, "长期记忆候选处理失败: profileId=$profileId, chatId=$chatId", e)
             repository.markFailed(candidateIds, e.message ?: e.javaClass.simpleName)

@@ -546,10 +546,10 @@ internal fun ThemeSettingsChatTab(
     val defaultBubbleAiBubbleColor = MaterialTheme.colorScheme.surface.toArgb()
 
     val chatStyle by preferencesManager.chatStyle.collectAsState(
-        initial = UserPreferencesManager.CHAT_STYLE_CURSOR,
+        initial = UserPreferencesManager.DEFAULT_CHAT_STYLE,
     )
     val inputStyle by preferencesManager.inputStyle.collectAsState(
-        initial = UserPreferencesManager.INPUT_STYLE_AGENT,
+        initial = UserPreferencesManager.DEFAULT_INPUT_STYLE,
     )
     val bubbleShowAvatar by preferencesManager.bubbleShowAvatar.collectAsState(initial = true)
     val bubbleWideLayoutEnabled by preferencesManager.bubbleWideLayoutEnabled.collectAsState(initial = false)
@@ -628,7 +628,7 @@ internal fun ThemeSettingsChatTab(
     val showUserName by preferencesManager.showUserName.collectAsState(initial = true)
     val showMessageTokenStats by preferencesManager.showMessageTokenStats.collectAsState(initial = false)
     val showMessageTimingStats by preferencesManager.showMessageTimingStats.collectAsState(initial = false)
-    val showMessageTimestamp by preferencesManager.showMessageTimestamp.collectAsState(initial = false)
+    val showMessageTimestamp by preferencesManager.showMessageTimestamp.collectAsState(initial = true)
     val showInputProcessingStatus by preferencesManager.showInputProcessingStatus.collectAsState(initial = true)
     val showChatFloatingDotsAnimation by preferencesManager.showChatFloatingDotsAnimation.collectAsState(initial = true)
     val recentColors by preferencesManager.recentColorsFlow.collectAsState(initial = emptyList())

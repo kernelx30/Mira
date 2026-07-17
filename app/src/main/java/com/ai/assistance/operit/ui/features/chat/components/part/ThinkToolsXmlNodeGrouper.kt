@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
@@ -297,7 +298,17 @@ class ThinkToolsXmlNodeGrouper(
             ) {
                 Box(
                     modifier =
-                        Modifier.fillMaxWidth()
+                        Modifier
+                            .fillMaxWidth()
+                            .drawBehind {
+                                val railX = 8.dp.toPx()
+                                drawLine(
+                                    color = textColor.copy(alpha = 0.18f),
+                                    start = androidx.compose.ui.geometry.Offset(railX, 0f),
+                                    end = androidx.compose.ui.geometry.Offset(railX, size.height),
+                                    strokeWidth = 1.dp.toPx(),
+                                )
+                            }
                             .padding(top = 4.dp, bottom = 8.dp, start = 24.dp)
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -417,6 +428,6 @@ private fun shouldCollapseToolSequence(
     if (xmlToolRelatedCount <= 0) return false
     return when (toolCollapseMode) {
         ToolCollapseMode.FULL -> true
-        ToolCollapseMode.READ_ONLY, ToolCollapseMode.ALL -> toolCount >= 2 && xmlToolRelatedCount >= 2
+        ToolCollapseMode.READ_ONLY, ToolCollapseMode.ALL -> toolCount >= 1
     }
 }

@@ -23,8 +23,14 @@ data class ChatEntity(
         val parentChatId: String? = null,
         val characterCardName: String? = null,
         val characterGroupId: String? = null,
+        val chatModelConfigId: String? = null,
+        val chatModelIndex: Int = 0,
+        val memoryAutoUpdateOverride: Boolean? = null,
+        val autoReadOverride: Boolean? = null,
+        val isTemporary: Boolean = false,
         val locked: Boolean = false,
-        val pinned: Boolean = false
+        val pinned: Boolean = false,
+        val archived: Boolean = false,
 ) {
     /** 转换为ChatHistory对象（供UI层使用） */
     fun toChatHistory(messages: List<ChatMessage>): ChatHistory {
@@ -52,8 +58,14 @@ data class ChatEntity(
                 parentChatId = parentChatId,
                 characterCardName = characterCardName,
                 characterGroupId = characterGroupId,
+                chatModelConfigId = chatModelConfigId,
+                chatModelIndex = chatModelIndex,
+                memoryAutoUpdateOverride = memoryAutoUpdateOverride,
+                autoReadOverride = autoReadOverride,
+                isTemporary = isTemporary,
                 locked = locked,
-                pinned = pinned
+                pinned = pinned,
+                archived = archived,
         )
     }
 
@@ -86,8 +98,14 @@ data class ChatEntity(
                     parentChatId = chatHistory.parentChatId,
                     characterCardName = chatHistory.characterCardName,
                     characterGroupId = chatHistory.characterGroupId,
+                    chatModelConfigId = chatHistory.chatModelConfigId,
+                    chatModelIndex = chatHistory.chatModelIndex,
+                    memoryAutoUpdateOverride = chatHistory.memoryAutoUpdateOverride,
+                    autoReadOverride = chatHistory.autoReadOverride,
+                    isTemporary = chatHistory.isTemporary,
                     locked = chatHistory.locked,
-                    pinned = chatHistory.pinned
+                    pinned = chatHistory.pinned,
+                    archived = chatHistory.archived,
             )
         }
     }

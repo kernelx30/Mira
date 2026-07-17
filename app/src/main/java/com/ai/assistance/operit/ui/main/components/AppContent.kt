@@ -34,6 +34,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -112,7 +113,10 @@ private fun ImeWakeListeningEffect(
     context: Context,
     density: androidx.compose.ui.unit.Density,
 ) {
-    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val imeInsets = WindowInsets.ime
+    val imeVisible by remember(imeInsets, density) {
+        derivedStateOf { imeInsets.getBottom(density) > 0 }
+    }
 
     LaunchedEffect(context, imeVisible) {
         AIForegroundService.setWakeListeningSuspendedForIme(context, imeVisible)
@@ -151,15 +155,17 @@ fun AppContent(
         onGoBack: () -> Unit,
         isNavigatingBack: Boolean = false,
         actions: @Composable RowScope.() -> Unit = {},
-        titleContent: TopBarTitleContent? = null
+        titleContent: TopBarTitleContent? = null,
+        bottomBar: @Composable () -> Unit = {},
+        contentAvoidsNavigationBar: Boolean = true,
 ) {
     // Get background image state
     val context = LocalContext.current
     val hostActivity = remember(context) { context.findActivity() }
     val manifestSoftInputMode = remember(hostActivity) { hostActivity?.manifestSoftInputMode() }
     val density = LocalDensity.current
-    val pageTransitionDurationMillis = if (enableNavigationAnimation) 280 else 400
-    val drawerRelayTransitionDurationMillis = 320
+    val pageTransitionDurationMillis = 200
+    val drawerRelayTransitionDurationMillis = 220
     val pageTransitionOffsetPx =
         with(density) { if (useTabletLayout) 28.dp.toPx() else 20.dp.toPx() }
     val drawerNavigationOffsetPx =
@@ -196,10 +202,10 @@ fun AppContent(
                 when (appBarContentColorMode) {
                     UserPreferencesManager.APP_BAR_CONTENT_COLOR_MODE_LIGHT -> Color.White
                     UserPreferencesManager.APP_BAR_CONTENT_COLOR_MODE_DARK -> Color.Black
-                    else -> MaterialTheme.colorScheme.onPrimary
+                    else -> MaterialTheme.colorScheme.onSurface
                 }
             } else {
-                MaterialTheme.colorScheme.onPrimary
+                MaterialTheme.colorScheme.onSurface
             }
 
     // 获取聊天历史管理器
@@ -257,10 +263,11 @@ fun AppContent(
         // contentWindowInsets = WindowInsets(0) 让内容可以延伸到系统栏下方，使背景能够完全填充
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            bottomBar = bottomBar,
             topBar = {
-                // 单一工具栏 - 使用小型化的设计
-                // 使用 windowInsets 参数让 TopAppBar 自己处理状态栏的 insets
-                TopAppBar(
+                if (currentScreen !is Screen.AiChat) {
+                    // Chat owns its character header; secondary screens keep the app toolbar.
+                    TopAppBar(
                     windowInsets = WindowInsets.statusBars,
                     title = {
                         if (titleContent != null) {
@@ -285,7 +292,7 @@ fun AppContent(
                                         else -> ""
                                     },
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
+                                    fontSize = 18.sp,
                                     color = appBarContentColor
                                 )
 
@@ -345,14 +352,16 @@ fun AppContent(
                         when {
                             toolbarTransparent -> Color.Transparent
                             useCustomAppBarColor && customAppBarColor != null -> Color(customAppBarColor)
-                            else -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.surfaceContainerLowest
                         },
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                         titleContentColor = appBarContentColor,
                         navigationIconContentColor = appBarContentColor,
                         actionIconContentColor = appBarContentColor
                     ),
                     // Scaffold会处理 insets, 这里不再需要手动添加 modifier
-                )
+                    )
+                }
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
@@ -362,7 +371,10 @@ fun AppContent(
                 modifier = Modifier
                     .padding(innerPadding)
                     .consumeWindowInsets(innerPadding)
-                    .navigationBarsPadding()
+                    .then(
+                        if (contentAvoidsNavigationBar) Modifier.navigationBarsPadding()
+                        else Modifier
+                    )
                     .then(
                         if (currentScreenUsesImePadding) {
                             Modifier.imePadding()
@@ -635,25 +647,7 @@ fun AppContent(
                                     },
                                     label = "ScreenScaleAnimation"
                                 ) { currentVisibility ->
-                                    if (!allowCrossfadeForActiveTransition) {
-                                        1f
-                                    } else if (isDrawerRelayTransition) {
-                                        if (currentVisibility == ScreenVisibility.VISIBLE) {
-                                            1f
-                                        } else if (isCurrentScreen) {
-                                            0.975f
-                                        } else {
-                                            0.995f
-                                        }
-                                    } else if (!enableNavigationAnimation) {
-                                        1f
-                                    } else if (currentVisibility == ScreenVisibility.VISIBLE) {
-                                        1f
-                                    } else if (isCurrentScreen) {
-                                        0.985f
-                                    } else {
-                                        0.992f
-                                    }
+                                    1f
                                 }
 
                                 Box(

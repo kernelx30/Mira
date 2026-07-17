@@ -698,12 +698,13 @@ class ApiConfigDelegate(
         }
     }
 
-    /** 切换工具启用/禁用 */
+    /** 保持 Mira 主聊天的工具能力开启；执行权限由 ToolPermissionSystem 管理。 */
     fun toggleTools() {
         configScope.launch {
-            val newValue = !_enableTools.value
-            apiPreferences.saveEnableTools(newValue)
-            _enableTools.value = newValue
+            // Mira always exposes tools to chat. Execution is controlled by the permission level,
+            // so a transient global off state must not turn an ordinary turn into "chat only".
+            apiPreferences.saveEnableTools(true)
+            _enableTools.value = true
         }
     }
 

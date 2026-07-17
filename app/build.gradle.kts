@@ -20,6 +20,17 @@ if (localPropertiesFile.exists()) {
     localProperties.load(FileInputStream(localPropertiesFile))
 }
 
+fun buildConfigStringProperty(name: String, defaultValue: String = ""): String {
+    val value =
+        localProperties
+            .getProperty(name, defaultValue)
+            .trim()
+            .removeSurrounding("\"")
+            .ifBlank { defaultValue }
+    val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+    return "\"$escaped\""
+}
+
 android {
     namespace = "com.ai.assistance.operit"
     compileSdk = 36
@@ -52,7 +63,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.ai.assistance.operit"
+        applicationId = "com.ai.assistance.mira"
         minSdk = 26
         targetSdk = 34
         versionCode = 44
@@ -76,8 +87,12 @@ android {
             }
         }
 
-        buildConfigField("String", "GITHUB_CLIENT_ID", "\"${localProperties.getProperty("GITHUB_CLIENT_ID")}\"")
-        buildConfigField("String", "GITHUB_CLIENT_SECRET", "\"${localProperties.getProperty("GITHUB_CLIENT_SECRET")}\"")
+        buildConfigField("String", "GITHUB_CLIENT_ID", buildConfigStringProperty("GITHUB_CLIENT_ID"))
+        buildConfigField("String", "GITHUB_CLIENT_SECRET", buildConfigStringProperty("GITHUB_CLIENT_SECRET"))
+        buildConfigField("String", "UPDATE_REPO_OWNER", buildConfigStringProperty("UPDATE_REPO_OWNER", "kernelx30"))
+        buildConfigField("String", "UPDATE_REPO_NAME", buildConfigStringProperty("UPDATE_REPO_NAME", "Mira"))
+        buildConfigField("String", "UPDATE_PATCH_REPO_OWNER", buildConfigStringProperty("UPDATE_PATCH_REPO_OWNER"))
+        buildConfigField("String", "UPDATE_PATCH_REPO_NAME", buildConfigStringProperty("UPDATE_PATCH_REPO_NAME"))
     }
 
     buildTypes {
@@ -106,7 +121,7 @@ android {
                 signingConfig = releaseSigningConfig
             }
             matchingFallbacks += listOf("debug")
-            resValue("string", "app_name", "Operit Clone")
+            resValue("string", "app_name", "Mira Clone")
         }
         create("nightly") {
             isMinifyEnabled = false
@@ -211,6 +226,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics.android)
     // Vendored binary dependencies live in app/libs, including ffmpeg-kit and its Java-side deps.
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+    implementation("com.arthenica:ffmpeg-kit-full:6.0.LTS")
     implementation(libs.androidx.runtime.android)
     implementation(libs.androidx.ui.text.android)
     implementation(libs.androidx.animation.android)

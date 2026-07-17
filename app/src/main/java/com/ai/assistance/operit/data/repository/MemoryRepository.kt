@@ -6,6 +6,7 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.db.ObjectBoxManager
 import com.ai.assistance.operit.data.model.Memory
 import com.ai.assistance.operit.data.model.MemoryLink
+import com.ai.assistance.operit.data.model.MemoryProperty
 import com.ai.assistance.operit.data.model.MemoryTag
 import com.ai.assistance.operit.data.model.MemoryTag_
 import com.ai.assistance.operit.data.model.Memory_
@@ -39,6 +40,8 @@ import com.ai.assistance.operit.data.model.MemoryImportResult
 import com.ai.assistance.operit.data.model.MemorySearchDebugCandidate
 import com.ai.assistance.operit.data.model.MemorySearchDebugInfo
 import com.ai.assistance.operit.data.model.MemoryScoreMode
+import com.ai.assistance.operit.data.model.CompanionMemoryKeys
+import com.ai.assistance.operit.data.model.companionMetadata
 import com.ai.assistance.operit.util.OperitPaths
 import com.ai.assistance.operit.util.TextSegmenter
 import com.ai.assistance.operit.util.vector.IndexItem
@@ -91,6 +94,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
     private val memoryBox: Box<Memory> = store.boxFor()
     private val tagBox = store.boxFor<MemoryTag>()
     private val linkBox = store.boxFor<MemoryLink>()
+    private val propertyBox = store.boxFor<MemoryProperty>()
     private val chunkBox = store.boxFor<DocumentChunk>()
 
     private val searchSettingsPreferences = MemorySearchSettingsPreferences(context, profileId)
@@ -1020,6 +1024,52 @@ class MemoryRepository(private val context: Context, profileId: String) {
             memoryBox.put(memory)
         }
         tag
+    }
+
+    /** Updates structured metadata without regenerating the memory embedding. */
+    suspend fun setMemoryProperties(
+        memory: Memory,
+        values: Map<String, String>,
+        removeKeys: Set<String> = emptySet(),
+    ): Memory = withContext(Dispatchers.IO) {
+        require(memory.id > 0L) { "Memory must be persisted before properties can be updated" }
+
+        memory.properties.reset()
+        val existingProperties = memory.properties.toList()
+        val propertiesToRemove = mutableListOf<MemoryProperty>()
+
+        existingProperties
+            .filter { it.key in removeKeys }
+            .forEach(propertiesToRemove::add)
+
+        values.forEach { (key, value) ->
+            val matches = existingProperties.filter { it.key == key && it !in propertiesToRemove }
+            val property = matches.firstOrNull()
+            if (property == null) {
+                val newProperty = MemoryProperty(key = key, value = value)
+                propertyBox.put(newProperty)
+                memory.properties.add(newProperty)
+            } else {
+                property.value = value
+                propertyBox.put(property)
+                matches.drop(1).forEach(propertiesToRemove::add)
+            }
+        }
+
+        propertiesToRemove.distinctBy { it.id }.forEach { property ->
+            memory.properties.remove(property)
+        }
+        memory.updatedAt = Date()
+        memoryBox.put(memory)
+        val removedProperties = propertiesToRemove.distinctBy { it.id }.filter { it.id > 0L }
+        if (removedProperties.isNotEmpty()) {
+            propertyBox.remove(removedProperties)
+        }
+        memory
+    }
+
+    suspend fun getCompanionMemories(): List<Memory> = withContext(Dispatchers.IO) {
+        memoryBox.all.filter { it.companionMetadata() != null }
     }
 
     // --- Linking Operations ---
@@ -2093,6 +2143,11 @@ class MemoryRepository(private val context: Context, profileId: String) {
         }
     }
 
+    /** Returns every memory in the active profile for the human-readable archive view. */
+    suspend fun getAllMemories(): List<Memory> = withContext(Dispatchers.IO) {
+        memoryBox.all
+    }
+
     /**
      * 获取指定文件夹的图谱（包括跨文件夹的边）。
      * @param folderPath 文件夹路径。
@@ -2201,6 +2256,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
         content: String,
         contentType: String = "text/plain",
         source: String = "user_input",
+        credibility: Float = 0.5f,
+        importance: Float = 0.5f,
         folderPath: String = "",
         tags: List<String>? = null
     ): Memory? = withContext(Dispatchers.IO) {
@@ -2214,6 +2271,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
             content = content,
             contentType = contentType,
             source = source,
+            credibility = credibility.coerceIn(0.0f, 1.0f),
+            importance = importance.coerceIn(0.0f, 1.0f),
             folderPath = normalizeFolderPath(folderPath)
         )
         saveMemory(memory)
@@ -2595,6 +2654,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
             // 获取标签名称
             memory.tags.reset()
             val tagNames = memory.tags.map { it.name }
+            memory.properties.reset()
+            val propertyValues = memory.properties.associate { it.key to it.value }
             
             SerializableMemory(
                 uuid = memory.uuid,
@@ -2607,7 +2668,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 folderPath = memory.folderPath,
                 createdAt = memory.createdAt,
                 updatedAt = memory.updatedAt,
-                tagNames = tagNames
+                tagNames = tagNames,
+                propertyValues = propertyValues,
             )
         }
         
@@ -2704,6 +2766,18 @@ class MemoryRepository(private val context: Context, profileId: String) {
                         
                         // 更新标签
                         updateMemoryTags(existingMemory, serializableMemory.tagNames)
+                        if (serializableMemory.propertyValues.isNotEmpty()) {
+                            setMemoryProperties(
+                                memory = existingMemory,
+                                values = serializableMemory.propertyValues,
+                                removeKeys =
+                                    if (CompanionMemoryKeys.KIND in serializableMemory.propertyValues) {
+                                        CompanionMemoryKeys.ALL
+                                    } else {
+                                        emptySet()
+                                    },
+                            )
+                        }
                     }
                     
                     else -> {
@@ -2712,6 +2786,12 @@ class MemoryRepository(private val context: Context, profileId: String) {
                             serializableMemory,
                             strategy == ImportStrategy.CREATE_NEW
                         )
+                        if (serializableMemory.propertyValues.isNotEmpty()) {
+                            setMemoryProperties(
+                                memory = newMemory,
+                                values = serializableMemory.propertyValues,
+                            )
+                        }
                         newCount++
                         uuidMap[serializableMemory.uuid] = newMemory
                     }

@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
@@ -67,24 +65,68 @@ import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 
 private val DarkColorScheme =
-        darkColorScheme(primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80)
+        darkColorScheme(
+                primary = MiraDarkPrimary,
+                onPrimary = Color(0xFF0B2346),
+                primaryContainer = MiraDarkPrimaryContainer,
+                onPrimaryContainer = Color(0xFFD8E6FF),
+                secondary = MiraDarkSecondary,
+                onSecondary = Color(0xFF202123),
+                secondaryContainer = MiraDarkSecondaryContainer,
+                onSecondaryContainer = Color(0xFFE7E7EA),
+                tertiary = MiraDarkTertiary,
+                onTertiary = Color(0xFF3C2F00),
+                tertiaryContainer = MiraDarkTertiaryContainer,
+                onTertiaryContainer = Color(0xFFFFE9AD),
+                background = MiraDarkBackground,
+                onBackground = MiraDarkOnSurface,
+                surface = MiraDarkSurface,
+                onSurface = MiraDarkOnSurface,
+                surfaceVariant = MiraDarkSurfaceHigh,
+                onSurfaceVariant = Color(0xFFB9BBC1),
+                outline = MiraDarkOutline,
+        ).copy(
+                outlineVariant = Color(0xFF3A3B40),
+                surfaceContainerLowest = Color(0xFF0D0D0D),
+                surfaceContainerLow = MiraDarkSurfaceLow,
+                surfaceContainer = MiraDarkSurfaceContainer,
+                surfaceContainerHigh = MiraDarkSurfaceHigh,
+                surfaceContainerHighest = Color(0xFF323338),
+                surfaceBright = Color(0xFF36373C),
+                surfaceDim = Color(0xFF0D0D0D),
+        )
 
 private val LightColorScheme =
         lightColorScheme(
-                primary = Purple40,
-                secondary = PurpleGrey40,
-                tertiary = Pink40,
-
-                /* Other default colors to override
-                background = Color(0xFFFFFBFE),
-                surface = Color(0xFFFFFBFE),
+                primary = MiraTeal,
                 onPrimary = Color.White,
+                primaryContainer = MiraTealContainer,
+                onPrimaryContainer = Color(0xFF153A73),
+                secondary = MiraRose,
                 onSecondary = Color.White,
-                onTertiary = Color.White,
-                onBackground = Color(0xFF1C1B1F),
-                onSurface = Color(0xFF1C1B1F),
-                */
-                )
+                secondaryContainer = MiraRoseContainer,
+                onSecondaryContainer = MiraLightOnSurface,
+                tertiary = MiraGold,
+                onTertiary = Color(0xFF3B2F00),
+                tertiaryContainer = MiraGoldContainer,
+                onTertiaryContainer = Color(0xFF251A00),
+                background = MiraLightBackground,
+                onBackground = MiraLightOnSurface,
+                surface = MiraLightSurface,
+                onSurface = MiraLightOnSurface,
+                surfaceVariant = MiraLightSurfaceContainer,
+                onSurfaceVariant = MiraLightOnSurfaceVariant,
+                outline = MiraLightOutline,
+        ).copy(
+                outlineVariant = MiraLightDivider,
+                surfaceContainerLowest = Color(0xFFFFFFFF),
+                surfaceContainerLow = MiraLightSurfaceLow,
+                surfaceContainer = MiraLightSurfaceContainer,
+                surfaceContainerHigh = MiraLightSurfaceHigh,
+                surfaceContainerHighest = Color(0xFFECECEC),
+                surfaceBright = Color(0xFFFFFFFF),
+                surfaceDim = Color(0xFFE5E5E5),
+        )
 
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -163,19 +205,9 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 themeMode == UserPreferencesManager.THEME_MODE_DARK
             }
 
-    // Dynamic color is available on Android 12+
-    val dynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-    // 基础主题色调
-    var colorScheme =
-            when {
-                dynamicColor -> {
-                    if (darkTheme) dynamicDarkColorScheme(context)
-                    else dynamicLightColorScheme(context)
-                }
-                darkTheme -> DarkColorScheme
-                else -> LightColorScheme
-            }
+    // The fork has a stable brand palette. Device dynamic color must not turn the
+    // entire product into a vendor-blue skin on first launch.
+    var colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     // 应用自定义颜色和文本颜色
     if (useCustomColors) {
@@ -217,14 +249,16 @@ fun OperitTheme(content: @Composable () -> Unit) {
                     statusBarTransparent -> Color.Transparent.toArgb()
                     useBackgroundImage && backgroundImageUri != null -> Color.Transparent.toArgb()  // 有背景时透明
                     useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
-                    else -> colorScheme.primary.toArgb()
+                    else -> Color.Transparent.toArgb()
                 }
                 window.statusBarColor = statusBarColor
 
                 // 根据状态栏背景色动态设置状态栏图标颜色
                 // isAppearanceLightStatusBars = true 表示图标为深色（适用于浅色背景）
                 // isAppearanceLightStatusBars = false 表示图标为浅色（适用于深色背景）
-                insetsController?.isAppearanceLightStatusBars = !isColorLight(Color(statusBarColor))
+                insetsController?.isAppearanceLightStatusBars =
+                    if (statusBarColor == Color.Transparent.toArgb()) !darkTheme
+                    else isColorLight(Color(statusBarColor))
             }
             
             // 设置导航栏颜色（底部小白条所在的区域）
@@ -247,7 +281,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 // 根据导航栏背景色动态设置导航栏图标颜色
                 // isAppearanceLightNavigationBars = true 表示图标为深色（适用于浅色背景）
                 // isAppearanceLightNavigationBars = false 表示图标为浅色（适用于深色背景）
-                insetsController?.isAppearanceLightNavigationBars = !isColorLight(colorScheme.background)
+                insetsController?.isAppearanceLightNavigationBars = isColorLight(colorScheme.background)
             }
         }
     }
@@ -365,7 +399,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .background(if (darkTheme) Color.Black else Color.White)
+                            .background(colorScheme.background)
                             .then(
                                 if (waterGlassState != null) {
                                     Modifier.liquefiable(waterGlassState)
@@ -522,12 +556,14 @@ fun OperitTheme(content: @Composable () -> Unit) {
                                 colorScheme.surfaceContainerLowest.copy(alpha = 1f),
                         ),
                     typography = customTypography,
+                    shapes = MateShapes,
                     content = content,
                 )
             } else {
                 MaterialTheme(
                     colorScheme = colorScheme,
                     typography = customTypography,
+                    shapes = MateShapes,
                     content = content,
                 )
             }

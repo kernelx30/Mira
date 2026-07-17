@@ -302,9 +302,7 @@ class ApiPreferences private constructor(private val context: Context) {
 
     // Flow for Tools Enable/Disable
     val enableToolsFlow: Flow<Boolean> =
-        context.apiDataStore.data.map { preferences ->
-            preferences[ENABLE_TOOLS] ?: DEFAULT_ENABLE_TOOLS
-        }
+        context.apiDataStore.data.map { true }
 
     // Flow for per-tool prompt visibility
     val toolPromptVisibilityFlow: Flow<Map<String, Boolean>> =
@@ -433,7 +431,7 @@ class ApiPreferences private constructor(private val context: Context) {
 
     // Save Tools Enable/Disable setting
     suspend fun saveEnableTools(isEnabled: Boolean) {
-        context.apiDataStore.edit { preferences -> preferences[ENABLE_TOOLS] = isEnabled }
+        context.apiDataStore.edit { preferences -> preferences[ENABLE_TOOLS] = true }
     }
 
     // Save prompt visibility for a single tool

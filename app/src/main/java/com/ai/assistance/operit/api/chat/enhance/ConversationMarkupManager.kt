@@ -17,7 +17,7 @@ class ConversationMarkupManager {
 
     companion object {
         private const val TOOL_RESULT_TRUNCATION_SUFFIX =
-            "\n[工具结果过长，已截断]"
+            "\n[Tool result truncated in chat; the complete output is available through result_path.]"
 
         /**
          * Creates an 'error' status markup element for a tool.
@@ -51,14 +51,19 @@ class ConversationMarkupManager {
          * @param result The tool execution result
          * @return The formatted tool result message
          */
-        fun formatToolResultForMessage(result: ToolResult): String {
+        fun formatToolResultForMessage(result: ToolResult, context: Context? = null): String {
             return if (result.success) {
                 val (toolPayload, imageLinkPayload) = splitImageLinksForModel(result.result.toString())
+                val archiveReference =
+                    context?.let {
+                        ToolResultArchive.archiveIfLarge(it, result.toolName, toolPayload)
+                    }
                 val toolResultXml =
                     createBoundedToolResultXml(
                         toolName = result.toolName,
                         status = "success",
-                        rawPayload = toolPayload
+                        rawPayload = toolPayload,
+                        archiveReference = archiveReference
                     ) { payload ->
                         "<content>$payload</content>"
                     }
@@ -80,10 +85,15 @@ class ConversationMarkupManager {
                         append(detail)
                     }
                 }
+                val archiveReference =
+                    context?.let {
+                        ToolResultArchive.archiveIfLarge(it, result.toolName, errorPayload)
+                    }
                 createBoundedToolResultXml(
                     toolName = result.toolName,
                     status = "error",
-                    rawPayload = errorPayload
+                    rawPayload = errorPayload,
+                    archiveReference = archiveReference
                 ) { payload ->
                     "<content><error>$payload</error></content>"
                 }
@@ -107,7 +117,10 @@ class ConversationMarkupManager {
             return toolPayload to imageLinkPayload
         }
 
-        fun buildBoundedToolResultMessage(results: List<ToolResult>): String {
+        fun buildBoundedToolResultMessage(
+            results: List<ToolResult>,
+            context: Context? = null
+        ): String {
             if (results.isEmpty()) {
                 return ""
             }
@@ -117,16 +130,21 @@ class ConversationMarkupManager {
             val builder = StringBuilder()
 
             for (result in results) {
-                val formatted = formatToolResultForMessage(result)
+                val formatted = formatToolResultForMessage(result, context)
+                val providerFormatted =
+                    context
+                        ?.takeUnless { result.toolName.equals("apply_file", ignoreCase = true) }
+                        ?.let { ToolResultArchive.projectMarkupForModel(it, formatted) }
+                        ?: formatted
                 val additionalLength =
-                    (if (builder.isEmpty()) 0 else separator.length) + formatted.length
+                    (if (builder.isEmpty()) 0 else separator.length) + providerFormatted.length
                 if (builder.length + additionalLength > maxChars) {
                     break
                 }
                 if (builder.isNotEmpty()) {
                     builder.append(separator)
                 }
-                builder.append(formatted)
+                builder.append(providerFormatted)
             }
 
             return builder.toString()
@@ -158,22 +176,34 @@ class ConversationMarkupManager {
             return createToolErrorStatus(toolName, errorMessage)
         }
 
-        private fun createToolResultXml(toolName: String, status: String, content: String): String {
+        private fun createToolResultXml(
+            toolName: String,
+            status: String,
+            content: String,
+            archiveReference: ToolResultArchive.Reference? = null
+        ): String {
             val tagName = ChatMarkupRegex.generateRandomToolResultTagName()
-            return """<$tagName name="$toolName" status="$status">$content</$tagName>""".trimIndent()
+            val attributes =
+                ToolResultArchive.appendReferenceAttributes(
+                    attributes = " name=\"$toolName\" status=\"$status\"",
+                    reference = archiveReference
+                )
+            return "<$tagName$attributes>$content</$tagName>"
         }
 
         private fun createBoundedToolResultXml(
             toolName: String,
             status: String,
             rawPayload: String,
+            archiveReference: ToolResultArchive.Reference? = null,
             bodyBuilder: (String) -> String
         ): String {
             val emptyXml =
                 createToolResultXml(
                     toolName = toolName,
                     status = status,
-                    content = bodyBuilder("")
+                    content = bodyBuilder(""),
+                    archiveReference = archiveReference
                 )
             val maxPayloadChars =
                 (ToolExecutionLimits.MAX_FINAL_TOOL_RESULT_MESSAGE_CHARS - emptyXml.length)
@@ -182,7 +212,8 @@ class ConversationMarkupManager {
             return createToolResultXml(
                 toolName = toolName,
                 status = status,
-                content = bodyBuilder(boundedPayload)
+                content = bodyBuilder(boundedPayload),
+                archiveReference = archiveReference
             )
         }
 

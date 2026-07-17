@@ -6,6 +6,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.data.model.Memory
+import com.ai.assistance.operit.data.model.CompanionEventStatus
+import com.ai.assistance.operit.data.model.CompanionMemoryKeys
+import com.ai.assistance.operit.data.model.CompanionMemoryOwnership
+import com.ai.assistance.operit.data.model.CompanionMemoryOwnershipKeys
+import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
+import com.ai.assistance.operit.data.model.companionMetadata
 import com.ai.assistance.operit.data.model.DocumentChunk
 import com.ai.assistance.operit.data.model.CloudEmbeddingConfig
 import com.ai.assistance.operit.data.model.EmbeddingDimensionUsage
@@ -14,10 +20,14 @@ import com.ai.assistance.operit.data.model.MemorySearchConfig
 import com.ai.assistance.operit.data.model.MemorySearchDebugInfo
 import com.ai.assistance.operit.data.preferences.MemorySearchSettingsPreferences
 import com.ai.assistance.operit.data.repository.MemoryRepository
+import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
+import com.ai.assistance.operit.ui.features.memory.screens.graph.CompanionMemoryGraphLabels
+import com.ai.assistance.operit.ui.features.memory.screens.graph.CompanionMemoryGraphProjector
 import com.ai.assistance.operit.ui.features.memory.screens.graph.model.Edge
 import com.ai.assistance.operit.ui.features.memory.screens.graph.model.Graph
 import com.ai.assistance.operit.ui.features.memory.screens.graph.model.Node
 import com.ai.assistance.operit.core.tools.AIToolHandler
+import com.ai.assistance.operit.core.companion.CompanionReminderScheduler
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.R
@@ -43,6 +53,8 @@ data class MemoryUiState(
         val isLinkingMode: Boolean = false, // 是否处于连接模式
         val linkingNodeIds: List<String> = emptyList(), // 已选择的连接节点
         val selectedEdge: Edge? = null,
+        val selectedCompanionMemory: CompanionMemoryRecordEntity? = null,
+        val selectedCompanionEdge: Edge? = null,
         val editingEdge: Edge? = null,
         val isEditingEdge: Boolean = false,
         val isBoxSelectionMode: Boolean = false, // 新增：是否处于框选模式
@@ -98,6 +110,7 @@ class MemoryViewModel(
     private val _uiState = MutableStateFlow(MemoryUiState())
     val uiState: StateFlow<MemoryUiState> = _uiState.asStateFlow()
     private val searchSettingsPreferences = MemorySearchSettingsPreferences(context, profileId)
+    private val companionMemoryRepository = CompanionMemoryRepository(context)
 
     init {
         loadSearchSettings()
@@ -110,10 +123,55 @@ class MemoryViewModel(
 
     private suspend fun refreshGraph(): Graph {
         val selectedFolder = _uiState.value.selectedFolderPath
-        return if (selectedFolder.isEmpty()) {
+        val legacyGraph = if (selectedFolder.isEmpty()) {
             repository.getMemoryGraph()
         } else {
             repository.getGraphForFolder(selectedFolder)
+        }
+        if (selectedFolder.isNotEmpty()) return legacyGraph
+        return CompanionMemoryGraphProjector.merge(
+            legacyGraph = legacyGraph,
+            snapshot = companionMemoryRepository.getGraphSnapshot(profileId),
+            query = _uiState.value.searchQuery,
+            labels = companionGraphLabels(),
+        )
+    }
+
+    private fun companionGraphLabels() =
+        CompanionMemoryGraphLabels(
+            root = context.getString(R.string.mate_memory_graph_root),
+            scope = { record ->
+                when (record.scope) {
+                    "USER" -> context.getString(R.string.mate_memory_scope_user)
+                    "COMPANION" -> context.getString(R.string.mate_memory_scope_companion, "Mira")
+                    "RELATIONSHIP" -> context.getString(R.string.mate_memory_category_relationship)
+                    else -> context.getString(R.string.mate_memory_scope_conversation)
+                }
+            },
+            type = { type ->
+                when (type) {
+                    "IDENTITY" -> context.getString(R.string.mate_memory_type_identity)
+                    "PREFERENCE" -> context.getString(R.string.mate_memory_type_preference)
+                    "FACT" -> context.getString(R.string.mate_memory_type_fact)
+                    "EVENT" -> context.getString(R.string.mate_memory_type_event)
+                    "ROUTINE" -> context.getString(R.string.mate_memory_type_routine)
+                    "BOUNDARY" -> context.getString(R.string.mate_memory_type_boundary)
+                    "COMMITMENT" -> context.getString(R.string.mate_memory_type_commitment)
+                    "RELATIONSHIP" -> context.getString(R.string.mate_memory_type_relationship)
+                    else -> context.getString(R.string.mate_memory_type_summary)
+                }
+            },
+            recordToType = context.getString(R.string.mate_memory_graph_edge_category),
+            typeToScope = context.getString(R.string.mate_memory_graph_edge_scope),
+            scopeToRoot = context.getString(R.string.mate_memory_graph_edge_domain),
+        )
+
+    private suspend fun refreshMemories(): List<Memory> {
+        val selectedFolder = _uiState.value.selectedFolderPath
+        return if (selectedFolder.isEmpty()) {
+            repository.getAllMemories()
+        } else {
+            repository.getMemoriesByFolderPath(selectedFolder)
         }
     }
 
@@ -123,7 +181,8 @@ class MemoryViewModel(
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val graphData = refreshGraph()
-                _uiState.update { it.copy(graph = graphData, isLoading = false) }
+                val memories = refreshMemories()
+                _uiState.update { it.copy(memories = memories, graph = graphData, isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isLoading = false, error = context.getString(R.string.memory_error_load_graph, e.message ?: "Unknown error"))
@@ -162,8 +221,14 @@ class MemoryViewModel(
                             edgeWeight = config.edgeWeight
                         )
                     }
-                val graphData = repository.getGraphForMemories(memories)
-                _uiState.update { it.copy(graph = graphData, isLoading = false) }
+                val graphData =
+                    CompanionMemoryGraphProjector.merge(
+                        legacyGraph = repository.getGraphForMemories(memories),
+                        snapshot = companionMemoryRepository.getGraphSnapshot(profileId),
+                        query = query,
+                        labels = companionGraphLabels(),
+                    )
+                _uiState.update { it.copy(memories = memories, graph = graphData, isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isLoading = false, error = context.getString(R.string.memory_error_search, e.message ?: "Unknown error"))
@@ -420,7 +485,8 @@ class MemoryViewModel(
             _uiState.update { it.copy(isLoading = true, selectedFolderPath = folderPath) }
             try {
                 val graphData = refreshGraph()
-                _uiState.update { it.copy(graph = graphData, isLoading = false) }
+                val memories = refreshMemories()
+                _uiState.update { it.copy(memories = memories, graph = graphData, isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isLoading = false, error = context.getString(R.string.memory_error_load_folder_graph, e.message ?: "Unknown error"))
@@ -446,8 +512,10 @@ class MemoryViewModel(
                 if (success) {
                     loadFolderPaths()
                     val graphData = refreshGraph()
+                    val memories = refreshMemories()
                     _uiState.update {
                         it.copy(
+                            memories = memories,
                             graph = graphData,
                             isLoading = false,
                             boxSelectedNodeIds = emptySet(),
@@ -465,12 +533,58 @@ class MemoryViewModel(
 
     /** Selects a memory to view its details. */
     fun selectMemory(memory: Memory) {
-        _uiState.update { it.copy(selectedMemory = memory) }
+        if (!memory.isDocumentNode) {
+            _uiState.update {
+                it.copy(
+                    selectedMemory = memory,
+                    selectedNodeId = memory.uuid,
+                    selectedEdge = null,
+                    isDocumentViewOpen = false,
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            val query = _uiState.value.searchQuery
+            val chunks =
+                if (query.isBlank()) {
+                    repository.getChunksForMemory(memory.id)
+                } else {
+                    repository.searchChunksInDocument(memory.id, query)
+                }
+            _uiState.update {
+                it.copy(
+                    selectedMemory = memory,
+                    selectedNodeId = memory.uuid,
+                    selectedEdge = null,
+                    isDocumentViewOpen = true,
+                    selectedDocumentChunks = chunks,
+                    documentSearchQuery = query,
+                )
+            }
+        }
     }
 
     /** Selects a node in the graph. Fetches the full memory details for the selected node. */
     fun selectNode(node: Node) {
         viewModelScope.launch {
+            val companionRecordId = CompanionMemoryGraphProjector.recordId(node)
+            if (companionRecordId != null) {
+                if (_uiState.value.isLinkingMode || _uiState.value.isBoxSelectionMode) return@launch
+                val companionRecord = companionMemoryRepository.getRecordById(companionRecordId)
+                _uiState.update {
+                    it.copy(
+                        selectedCompanionMemory = companionRecord,
+                        selectedCompanionEdge = null,
+                        selectedMemory = null,
+                        selectedEdge = null,
+                        selectedNodeId = node.id,
+                    )
+                }
+                return@launch
+            }
+            if (CompanionMemoryGraphProjector.isCompanionNode(node)) return@launch
             if (_uiState.value.isLinkingMode) {
                 // 连接模式
                 val currentLinkingIds = _uiState.value.linkingNodeIds.toMutableList()
@@ -521,12 +635,39 @@ class MemoryViewModel(
 
     /** Selects an edge in the graph. */
     fun selectEdge(edge: Edge) {
-        _uiState.update { it.copy(selectedEdge = edge, selectedNodeId = null, selectedMemory = null) }
+        if (CompanionMemoryGraphProjector.isCompanionEdge(edge)) {
+            _uiState.update {
+                it.copy(
+                    selectedCompanionEdge = edge,
+                    selectedCompanionMemory = null,
+                    selectedEdge = null,
+                    selectedNodeId = null,
+                )
+            }
+        } else {
+            _uiState.update {
+                it.copy(
+                    selectedEdge = edge,
+                    selectedCompanionEdge = null,
+                    selectedCompanionMemory = null,
+                    selectedNodeId = null,
+                    selectedMemory = null,
+                )
+            }
+        }
     }
 
     /** Clears any selection (node or edge). */
     fun clearSelection() {
-        _uiState.update { it.copy(selectedMemory = null, selectedNodeId = null, selectedEdge = null) }
+        _uiState.update {
+            it.copy(
+                selectedMemory = null,
+                selectedCompanionMemory = null,
+                selectedNodeId = null,
+                selectedEdge = null,
+                selectedCompanionEdge = null,
+            )
+        }
     }
 
     /** 关闭文档视图 */
@@ -624,8 +765,9 @@ class MemoryViewModel(
                 repository.createMemoryFromDocument(title, filePath, fileContent, currentFolder)
                 // 刷新图谱和文件夹列表
                 val updatedGraph = refreshGraph()
+                val memories = refreshMemories()
                 loadFolderPaths()
-                _uiState.update { it.copy(graph = updatedGraph, isLoading = false) }
+                _uiState.update { it.copy(memories = memories, graph = updatedGraph, isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isLoading = false, error = context.getString(R.string.memory_error_import_document, e.message ?: "Unknown error"))
@@ -635,16 +777,55 @@ class MemoryViewModel(
     }
 
     /** 新建记忆 */
-    fun createMemory(title: String, content: String, contentType: String = "text/plain") {
+    fun createMemory(
+        title: String,
+        content: String,
+        contentType: String = "text/plain",
+        source: String = "user_input",
+        credibility: Float = 0.8f,
+        importance: Float = 0.5f,
+        folderPath: String? = null,
+        tags: List<String> = emptyList(),
+        ownership: CompanionMemoryOwnership? = null,
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val currentFolder = _uiState.value.selectedFolderPath
-                repository.createMemory(title, content, contentType, folderPath = currentFolder)
+                val currentFolder =
+                    when {
+                        folderPath == null -> _uiState.value.selectedFolderPath
+                        folderPath == context.getString(R.string.memory_uncategorized) -> ""
+                        else -> folderPath
+                    }
+                val createdMemory =
+                    repository.createMemory(
+                        title = title,
+                        content = content,
+                        contentType = contentType,
+                        source = source,
+                        credibility = credibility,
+                        importance = importance,
+                        folderPath = currentFolder,
+                        tags = tags,
+                    ) ?: error("Memory repository did not return the created memory")
+                ownership?.let {
+                    repository.setMemoryProperties(
+                        memory = createdMemory,
+                        values = it.toPropertyValues(),
+                        removeKeys = CompanionMemoryOwnershipKeys.ALL,
+                    )
+                }
                 val updatedGraph = refreshGraph()
+                val memories = refreshMemories()
                 loadFolderPaths()
                 _uiState.update {
-                    it.copy(isLoading = false, isEditing = false, editingMemory = null, graph = updatedGraph)
+                    it.copy(
+                        memories = memories,
+                        isLoading = false,
+                        isEditing = false,
+                        editingMemory = null,
+                        graph = updatedGraph,
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.update {
@@ -663,29 +844,46 @@ class MemoryViewModel(
         newCredibility: Float,
         newImportance: Float,
         newFolderPath: String,
-        newTags: List<String>
+        newTags: List<String>,
+        ownership: CompanionMemoryOwnership? = null,
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 // 文档节点的内容不允许自由编辑，保持固定格式
                 val contentToUpdate = if (memory.isDocumentNode) memory.content else newContent
-                repository.updateMemory(
-                    memory = memory,
-                    newTitle = newTitle,
-                    newContent = contentToUpdate,
-                    newContentType = newContentType,
-                    newSource = newSource,
-                    newCredibility = newCredibility,
-                    newImportance = newImportance,
-                    newFolderPath = newFolderPath.ifBlank { null }, // 空字符串视为未分类
-                    newTags = newTags
-                )
+                val updatedMemory =
+                    repository.updateMemory(
+                        memory = memory,
+                        newTitle = newTitle,
+                        newContent = contentToUpdate,
+                        newContentType = newContentType,
+                        newSource = newSource,
+                        newCredibility = newCredibility,
+                        newImportance = newImportance,
+                        newFolderPath = newFolderPath.ifBlank { null }, // 空字符串视为未分类
+                        newTags = newTags,
+                    ) ?: error("Memory repository did not return the updated memory")
+                ownership?.let {
+                    repository.setMemoryProperties(
+                        memory = updatedMemory,
+                        values = it.toPropertyValues(),
+                        removeKeys = CompanionMemoryOwnershipKeys.ALL,
+                    )
+                }
                 val updatedGraph = refreshGraph()
+                val memories = refreshMemories()
                 // 刷新文件夹列表（如果记忆移动到新文件夹或从文件夹移出）
                 loadFolderPaths()
                 _uiState.update {
-                    it.copy(isLoading = false, isEditing = false, editingMemory = null, graph = updatedGraph, isDocumentViewOpen = false)
+                    it.copy(
+                        memories = memories,
+                        isLoading = false,
+                        isEditing = false,
+                        editingMemory = null,
+                        graph = updatedGraph,
+                        isDocumentViewOpen = false,
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.update {
@@ -699,16 +897,56 @@ class MemoryViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
+                val deletedMemory = repository.findMemoryById(memoryId)
                 repository.deleteMemory(memoryId)
+                deletedMemory?.let { memory ->
+                    if (memory.companionMetadata() != null) {
+                        CompanionReminderScheduler.getInstance(context).cancel(profileId, memory.uuid)
+                    }
+                }
                 val updatedGraph = refreshGraph()
+                val memories = refreshMemories()
                 // 刷新文件夹列表（删除记忆可能导致文件夹变空）
                 loadFolderPaths()
                 _uiState.update {
-                    it.copy(isLoading = false, selectedMemory = null, selectedNodeId = null, graph = updatedGraph, isDocumentViewOpen = false)
+                    it.copy(
+                        memories = memories,
+                        isLoading = false,
+                        selectedMemory = null,
+                        selectedNodeId = null,
+                        graph = updatedGraph,
+                        isDocumentViewOpen = false,
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isLoading = false, error = context.getString(R.string.memory_error_delete_memory, e.message ?: "Unknown error"))
+                }
+            }
+        }
+    }
+
+    fun updateCompanionStatus(memory: Memory, status: CompanionEventStatus) {
+        viewModelScope.launch {
+            try {
+                val metadata = memory.companionMetadata() ?: return@launch
+                val resetDelivery = status == CompanionEventStatus.PENDING
+                val updatedMemory = repository.setMemoryProperties(
+                    memory = memory,
+                    values =
+                        metadata.copy(
+                            status = status,
+                            notifiedAtMs = if (resetDelivery) null else metadata.notifiedAtMs,
+                            nextAttemptAtMs = if (resetDelivery) null else metadata.nextAttemptAtMs,
+                        ).toPropertyValues(),
+                    removeKeys = CompanionMemoryKeys.ALL,
+                )
+                CompanionReminderScheduler.getInstance(context).sync(profileId, updatedMemory)
+                val memories = refreshMemories()
+                _uiState.update { it.copy(memories = memories) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(error = context.getString(R.string.memory_error_update_memory, e.message ?: "Unknown error"))
                 }
             }
         }
@@ -743,12 +981,16 @@ class MemoryViewModel(
             try {
                 com.ai.assistance.operit.util.AppLogger.d("MemoryViewModel", "Calling repository.deleteMemoriesByUuids with IDs: $selectedIds")
                 repository.deleteMemoriesByUuids(selectedIds)
+                val reminderScheduler = CompanionReminderScheduler.getInstance(context)
+                selectedIds.forEach { memoryUuid -> reminderScheduler.cancel(profileId, memoryUuid) }
                 val updatedGraph = refreshGraph()
+                val memories = refreshMemories()
                 com.ai.assistance.operit.util.AppLogger.d("MemoryViewModel", "Graph refreshed after deletion.")
                 // 刷新文件夹列表（批量删除可能导致文件夹变空）
                 loadFolderPaths()
                 _uiState.update {
                     it.copy(
+                            memories = memories,
                             isLoading = false,
                             graph = updatedGraph,
                             isBoxSelectionMode = false,
@@ -767,7 +1009,11 @@ class MemoryViewModel(
     /** 将框选的节点添加到已选择集合中 */
     fun addNodesToSelection(nodeIds: Set<String>) {
         _uiState.update {
-            it.copy(boxSelectedNodeIds = it.boxSelectedNodeIds + nodeIds)
+            it.copy(
+                boxSelectedNodeIds =
+                    it.boxSelectedNodeIds +
+                        nodeIds.filterNot { nodeId -> nodeId.startsWith("companion-") },
+            )
         }
     }
 

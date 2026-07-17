@@ -59,4 +59,30 @@ sealed class NavItem(val route: String, val titleResId: Int, val icon: ImageVect
         object Help : NavItem("help", R.string.nav_help, Icons.AutoMirrored.Filled.Help)
         object TokenConfig : NavItem("token_config", R.string.token_config, Icons.Default.Token)
         object Workflow : NavItem("workflow", R.string.nav_workflow, Icons.Default.AccountTree)
+
+        companion object {
+                val all: List<NavItem> =
+                        listOf(
+                                AiChat,
+                                ShizukuCommands,
+                                AssistantConfig,
+                                Settings,
+                                ToolPermissions,
+                                UserPreferencesGuide,
+                                UserPreferencesSettings,
+                                ChatHistorySettings,
+                                Packages,
+                                MemoryBase,
+                                Terminal,
+                                Toolbox,
+                                About,
+                                Agreement,
+                                Help,
+                                TokenConfig,
+                                Workflow,
+                        )
+
+                fun fromRoute(route: String?): NavItem? =
+                        route?.let { target -> all.firstOrNull { it.route == target } }
+        }
 }

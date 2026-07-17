@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.DataObject
@@ -94,6 +95,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -134,7 +141,7 @@ import com.ai.assistance.operit.data.repository.MemoryAutoSaveCandidateRepositor
 import com.ai.assistance.operit.ui.common.icons.MaterialIconNameResolver
 import com.ai.assistance.operit.ui.common.animations.SimpleAnimatedVisibility
 import com.ai.assistance.operit.ui.features.chat.components.AttachmentChip
-import com.ai.assistance.operit.ui.features.chat.components.AttachmentSelectorPopupPanel
+import com.ai.assistance.operit.ui.features.chat.components.MateAttachmentActionSheet
 import com.ai.assistance.operit.ui.features.chat.components.FullscreenInputDialog
 import com.ai.assistance.operit.ui.features.chat.components.style.input.common.CharacterCardMemoryBindingSwitchConfirmDialog
 import com.ai.assistance.operit.ui.features.chat.components.style.input.common.CharacterCardModelBindingSwitchConfirmDialog
@@ -143,10 +150,12 @@ import com.ai.assistance.operit.ui.features.chat.components.style.input.common.I
 import com.ai.assistance.operit.ui.features.chat.components.style.input.common.InputMenuTogglePluginRegistry
 import com.ai.assistance.operit.ui.features.chat.components.style.input.common.InputMenuToggleSlots
 import com.ai.assistance.operit.ui.features.chat.components.style.input.common.PendingMessageQueuePanel
-import com.ai.assistance.operit.ui.features.chat.components.style.input.common.PendingQueueMessageItem
+import com.ai.assistance.operit.data.model.PendingQueueMessageItem
+import com.ai.assistance.operit.ui.features.chat.components.style.input.common.MiraComposerControlBar
 import com.ai.assistance.operit.ui.features.chat.components.style.input.common.ToolPromptManagerDialog
 import com.ai.assistance.operit.ui.features.chat.components.style.input.common.rememberMentionVisualTransformation
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
+import kotlinx.coroutines.flow.collect
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.ui.permissions.PermissionLevel
 import com.ai.assistance.operit.ui.theme.isLiquidGlassSupported
@@ -165,6 +174,7 @@ fun AgentChatInputSection(
     onUserMessageChange: (TextFieldValue) -> Unit,
     enableEnterToSend: Boolean = false,
     onSendMessage: () -> Unit,
+    onSendSuggestedMessage: (String) -> Unit,
     onQueueMessage: () -> Unit,
     onCancelMessage: () -> Unit,
     isLoading: Boolean,
@@ -182,7 +192,7 @@ fun AgentChatInputSection(
     onTakePhoto: (Uri) -> Unit,
     hasBackgroundImage: Boolean = false,
     chatInputTransparent: Boolean = false,
-    chatInputFloating: Boolean = false,
+    chatInputFloating: Boolean = true,
     chatInputLiquidGlass: Boolean = false,
     chatInputWaterGlass: Boolean = false,
     modifier: Modifier = Modifier,
@@ -241,6 +251,11 @@ fun AgentChatInputSection(
     var showCharacterCardMemoryBindingSwitchConfirm by remember { mutableStateOf(false) }
     var pendingCharacterCardMemorySelection by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val suggestedUserMessage by actualViewModel.suggestedUserMessage.collectAsState()
+    val sendableSuggestedMessage =
+        suggestedUserMessage?.trim()?.takeIf { userMessage.text.isBlank() && it.isNotEmpty() }
+    val composerFocusRequester = remember { FocusRequester() }
+    val softwareKeyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val characterCardManager = remember(context) { CharacterCardManager.getInstance(context) }
     val activePromptManager = remember(context) { ActivePromptManager.getInstance(context) }
@@ -256,6 +271,13 @@ fun AgentChatInputSection(
             inputState is InputProcessingState.ProcessingToolResult ||
             inputState is InputProcessingState.Summarizing ||
             inputState is InputProcessingState.Receiving
+
+    LaunchedEffect(actualViewModel, composerFocusRequester) {
+        actualViewModel.composerFocusRequests.collect {
+            composerFocusRequester.requestFocus()
+            softwareKeyboardController?.show()
+        }
+    }
     if (showTokenLimitDialog.value) {
         AlertDialog(
             onDismissRequest = {
@@ -267,7 +289,7 @@ fun AgentChatInputSection(
                 TextButton(
                     onClick = {
                         showTokenLimitDialog.value = false
-                        onSendMessage()
+                        sendableSuggestedMessage?.let(onSendSuggestedMessage) ?: onSendMessage()
                     },
                 ) { Text(context.getString(R.string.continue_send)) }
             },
@@ -351,6 +373,8 @@ fun AgentChatInputSection(
     )
 
     val inputTextStyle = TextStyle(fontSize = 14.sp, lineHeight = 20.sp)
+    val effectiveInputTextStyle =
+        inputTextStyle.copy(color = MaterialTheme.colorScheme.onSurface)
     val mentionVisualTransformation = rememberMentionVisualTransformation(inputTextStyle)
     val colorScheme = MaterialTheme.colorScheme
     val typography = MaterialTheme.typography
@@ -413,7 +437,8 @@ fun AgentChatInputSection(
     val baseContextLengthInK by actualViewModel.baseContextLengthInK.collectAsState()
     val maxContextLengthInK by actualViewModel.maxContextLengthInK.collectAsState()
     val maxTokens = (maxWindowSizeInK * 1024).toLong().coerceAtLeast(0L)
-    val userMessageTokens = remember(userMessage.text) { ChatUtils.estimateTokenCount(userMessage.text) }
+    val sendableText = userMessage.text.ifBlank { sendableSuggestedMessage.orEmpty() }
+    val userMessageTokens = remember(sendableText) { ChatUtils.estimateTokenCount(sendableText) }
     val projectedTokens = userMessageTokens.toLong() + currentWindowSize
 
     val isOverTokenLimit =
@@ -424,7 +449,8 @@ fun AgentChatInputSection(
         }
 
     val hasDraftText = userMessage.text.isNotBlank()
-    val canSendMessage = hasDraftText || attachments.isNotEmpty()
+    val canSendMessage =
+        hasDraftText || sendableSuggestedMessage != null || attachments.isNotEmpty()
     val showQueueAction = isProcessing && hasDraftText
     val showCancelAction = isProcessing && !showQueueAction
     val sendButtonEnabled = true
@@ -453,7 +479,10 @@ fun AgentChatInputSection(
             contract = ActivityResultContracts.RequestPermission(),
         ) { isGranted ->
             if (isGranted) {
-                actualViewModel.launchFloatingModeIn(FloatingMode.FULLSCREEN, colorScheme, typography)
+                actualViewModel.launchFullscreenVoiceModeAfterMicPermissionGranted(
+                    colorScheme = colorScheme,
+                    typography = typography,
+                )
             } else {
                 actualViewModel.showToast(context.getString(R.string.microphone_permission_denied_toast))
             }
@@ -481,7 +510,7 @@ fun AgentChatInputSection(
             showTokenLimitDialog.value = true
             return
         }
-        onSendMessage()
+        sendableSuggestedMessage?.let(onSendSuggestedMessage) ?: onSendMessage()
         setShowAttachmentPanel(false)
     }
     val onEnterToSendKeyEvent: (androidx.compose.ui.input.key.KeyEvent) -> Boolean = { keyEvent ->
@@ -575,6 +604,36 @@ fun AgentChatInputSection(
         showModelSelectorPopup.value = !showModelSelectorPopup.value
     }
 
+    val leadingContextControls: @Composable RowScope.() -> Unit = {
+        Box(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onModelSelectorClick)
+                    .padding(horizontal = 6.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = modelLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+
     val onSelectMemory: (String) -> Unit = { selectedId ->
         if (isMemorySelectionLockedByCharacterCard) {
             val isSameSelection = selectedId == effectiveProfileId
@@ -652,7 +711,7 @@ fun AgentChatInputSection(
 
     val floatingContainerModifier =
         if (chatInputFloating) {
-            modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            modifier.padding(horizontal = 12.dp, vertical = 4.dp)
         } else {
             modifier
         }
@@ -692,7 +751,7 @@ fun AgentChatInputSection(
                             modifier = Modifier.weight(1f),
                         )
 
-                        IconButton(onClick = { onClearReply?.invoke() }, modifier = Modifier.size(24.dp)) {
+                        IconButton(onClick = { onClearReply?.invoke() }, modifier = Modifier.size(48.dp)) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = context.getString(R.string.cancel_reply),
@@ -724,14 +783,24 @@ fun AgentChatInputSection(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 0.dp),
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        CircularProgressIndicator(
+                            progress = { processingProgressValue },
+                            modifier = Modifier.size(14.dp),
+                            color = processingProgressColor,
+                            trackColor = processingProgressColor.copy(alpha = 0.18f),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = processingMessage,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -755,11 +824,24 @@ fun AgentChatInputSection(
                 }
             }
 
+            MateAttachmentActionSheet(
+                visible = showAttachmentPanel,
+                onAttachImage = { filePath -> onAttachmentRequest(filePath) },
+                onAttachFile = { filePath -> onAttachmentRequest(filePath) },
+                onAttachScreenContent = onAttachScreenContent,
+                onAttachNotifications = onAttachNotifications,
+                onAttachLocation = onAttachLocation,
+                onAttachMemory = onAttachMemory,
+                onAttachPackage = onAttachPackage,
+                onTakePhoto = onTakePhoto,
+                onDismiss = { setShowAttachmentPanel(false) },
+            )
+
             val inputCardShape =
                 if (chatInputFloating) {
-                    RoundedCornerShape(22.dp)
+                    RoundedCornerShape(8.dp)
                 } else {
-                    RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                 }
             val inputLiquidGlassEnabled =
                 chatInputTransparent && chatInputLiquidGlass && !chatInputWaterGlass && isLiquidGlassSupported()
@@ -772,25 +854,11 @@ fun AgentChatInputSection(
                     MaterialTheme.colorScheme.surface
                 }
             val inputContainerEffectModifier =
-                if (isDarkTheme) {
-                    Modifier.topEdgeHighlight(
-                        shape = inputCardShape,
-                        lineColor =
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = if (chatInputFloating) 0.03f else 0.05f,
-                            ),
-                        glowColor =
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = if (chatInputFloating) 0.008f else 0.015f,
-                            ),
-                        glowHeight = if (chatInputFloating) 1.dp else 2.dp,
-                    )
-                } else {
-                    Modifier.outerDiffuseShadow(
-                        shape = inputCardShape,
-                        spread = if (chatInputFloating) 3.dp else 6.dp,
-                    )
-                }
+                Modifier.border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = inputCardShape,
+                )
 
             if (chatInputTransparent) {
                 // 透明模式：暗色顶部高光，亮色保持原阴影
@@ -830,24 +898,47 @@ fun AgentChatInputSection(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
                     OutlinedTextField(
                         value = userMessage,
-                        onValueChange = onUserMessageChange,
+                        onValueChange = { value ->
+                            actualViewModel.dismissSuggestedUserMessage()
+                            onUserMessageChange(value)
+                        },
                         visualTransformation = mentionVisualTransformation,
                         placeholder = {
                             Text(
-                                if (isWorkspaceOpen) {
+                                suggestedUserMessage ?: if (isWorkspaceOpen) {
                                     context.getString(R.string.input_question_with_workspace)
                                 } else {
                                     context.getString(R.string.input_question_hint)
                                 },
                                 style = inputTextStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).onPreviewKeyEvent(onEnterToSendKeyEvent),
-                        textStyle = inputTextStyle,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .onFocusChanged { focusState ->
+                                    if (focusState.isFocused) {
+                                        actualViewModel.dismissSuggestedUserMessage()
+                                    }
+                                }
+                                .pointerInput(suggestedUserMessage) {
+                                    if (suggestedUserMessage != null) {
+                                        awaitPointerEventScope {
+                                            awaitPointerEvent(PointerEventPass.Initial)
+                                            actualViewModel.dismissSuggestedUserMessage()
+                                        }
+                                    }
+                                }
+                                .onPreviewKeyEvent(onEnterToSendKeyEvent),
+                        textStyle = effectiveInputTextStyle,
                         maxLines = 6,
                         minLines = 1,
                         singleLine = false,
@@ -870,7 +961,7 @@ fun AgentChatInputSection(
                                 unfocusedContainerColor = Color.Transparent,
                                 disabledContainerColor = Color.Transparent,
                             ),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(8.dp),
                         trailingIcon = {
                             IconButton(onClick = { showFullscreenInput.value = true }) {
                                 Icon(
@@ -883,118 +974,29 @@ fun AgentChatInputSection(
                         enabled = !isProcessing || allowTextInputWhileProcessing,
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.CenterStart,
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.Transparent,
-                                modifier =
-                                    Modifier
-                                        .widthIn(min = 0.dp, max = 220.dp)
-                                        .border(
-                                            width = 1.dp,
-                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                            shape = RoundedCornerShape(12.dp),
-                                        )
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .clickable(onClick = onModelSelectorClick),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = modelLabel,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.widthIn(max = 160.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(
-                                        imageVector =
-                                            if (showModelSelectorPopup.value) {
-                                                Icons.Default.KeyboardArrowUp
-                                            } else {
-                                                Icons.Default.KeyboardArrowDown
-                                            },
-                                        contentDescription = context.getString(R.string.select_model_config),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp),
-                                    )
+                        MiraComposerControlBar(
+                            actualViewModel = actualViewModel,
+                            onOpenAttachments = {
+                                if (showAttachmentPanel) {
+                                    setShowAttachmentPanel(false)
+                                } else {
+                                    softwareKeyboardController?.hide()
+                                    setShowAttachmentPanel(true)
                                 }
-                            }
-                        }
-
-                        Box(
-                            modifier =
-                                Modifier
-                                    .padding(start = 6.dp)
-                                    .size(34.dp)
-                                    .clickable(
-                                        enabled = true,
-                                        onClick = {
-                                            showModelSelectorPopup.value = false
-                                            showExtraSettingsPopup.value = !showExtraSettingsPopup.value
-                                        },
-                                    ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Tune,
-                                contentDescription = context.getString(R.string.settings_options),
-                                tint =
-                                    if (showExtraSettingsPopup.value) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-
-                        Box(
-                            modifier =
-                                Modifier
-                                    .padding(start = 8.dp)
-                                    .size(36.dp)
-                                    .clickable(
-                                        enabled = true,
-                                        onClick = {
-                                            showModelSelectorPopup.value = false
-                                            showExtraSettingsPopup.value = false
-                                            setShowAttachmentPanel(!showAttachmentPanel)
-                                        },
-                                    ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = context.getString(R.string.add_attachment),
-                                tint =
-                                    if (showAttachmentPanel) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
-                                    },
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(6.dp))
+                            },
+                            onNavigateToModelConfig = onNavigateToModelConfig,
+                            modifier = Modifier.weight(1f),
+                        )
 
                         val actionButtonBackground =
                             when {
-                                showCancelAction -> MaterialTheme.colorScheme.error
+                                showCancelAction -> MaterialTheme.colorScheme.inverseSurface
                                 showQueueAction -> MaterialTheme.colorScheme.tertiary
                                 canSendMessage ->
                                     if (isOverTokenLimit) {
@@ -1007,7 +1009,7 @@ fun AgentChatInputSection(
 
                         val actionButtonIconTint =
                             when {
-                                showCancelAction -> MaterialTheme.colorScheme.onError
+                                showCancelAction -> MaterialTheme.colorScheme.inverseOnSurface
                                 showQueueAction -> MaterialTheme.colorScheme.onTertiary
                                 canSendMessage ->
                                     if (isOverTokenLimit) {
@@ -1019,13 +1021,13 @@ fun AgentChatInputSection(
                             }
 
                         Box(
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(48.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             if (showProcessingStatus) {
                                 CircularProgressIndicator(
                                     progress = { processingProgressValue },
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier.size(44.dp),
                                     color = processingProgressColor,
                                     trackColor = processingProgressColor.copy(alpha = 0.2f),
                                     strokeWidth = 2.dp,
@@ -1035,8 +1037,8 @@ fun AgentChatInputSection(
                             Box(
                                 modifier =
                                     Modifier
-                                        .size(36.dp)
-                                        .background(actionButtonBackground, CircleShape)
+                                        .size(48.dp)
+                                        .clip(CircleShape)
                                         .clickable(
                                             enabled = sendButtonEnabled,
                                             onClick = {
@@ -1050,7 +1052,8 @@ fun AgentChatInputSection(
                                                         if (isOverTokenLimit) {
                                                             showTokenLimitDialog.value = true
                                                         } else {
-                                                            onSendMessage()
+                                                            sendableSuggestedMessage?.let(onSendSuggestedMessage)
+                                                                ?: onSendMessage()
                                                             setShowAttachmentPanel(false)
                                                         }
                                                     }
@@ -1064,13 +1067,15 @@ fun AgentChatInputSection(
                                                     }
                                                 }
                                             },
-                                        ),
+                                        )
+                                        .padding(4.dp)
+                                        .background(actionButtonBackground, CircleShape),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     imageVector =
                                         when {
-                                            showCancelAction -> Icons.Default.Close
+                                            showCancelAction -> Icons.Default.Stop
                                             showQueueAction -> Icons.Default.Add
                                             canSendMessage -> Icons.AutoMirrored.Filled.Send
                                             else -> Icons.Default.Mic
@@ -1083,7 +1088,7 @@ fun AgentChatInputSection(
                                             else -> context.getString(R.string.voice_input)
                                         },
                                     tint = actionButtonIconTint,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(if (showCancelAction) 17.dp else 18.dp),
                                 )
                             }
                         }
@@ -1130,24 +1135,48 @@ fun AgentChatInputSection(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
                         OutlinedTextField(
                             value = userMessage,
-                            onValueChange = onUserMessageChange,
+                            onValueChange = { value ->
+                                actualViewModel.dismissSuggestedUserMessage()
+                                onUserMessageChange(value)
+                            },
                             visualTransformation = mentionVisualTransformation,
                             placeholder = {
                                 Text(
-                                    if (isWorkspaceOpen) {
+                                    suggestedUserMessage ?: if (isWorkspaceOpen) {
                                         context.getString(R.string.input_question_with_workspace)
                                     } else {
                                         context.getString(R.string.input_question_hint)
                                     },
                                     style = inputTextStyle,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).onPreviewKeyEvent(onEnterToSendKeyEvent),
-                            textStyle = inputTextStyle,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .focusRequester(composerFocusRequester)
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            actualViewModel.dismissSuggestedUserMessage()
+                                        }
+                                    }
+                                    .pointerInput(suggestedUserMessage) {
+                                        if (suggestedUserMessage != null) {
+                                            awaitPointerEventScope {
+                                                awaitPointerEvent(PointerEventPass.Initial)
+                                                actualViewModel.dismissSuggestedUserMessage()
+                                            }
+                                        }
+                                    }
+                                    .onPreviewKeyEvent(onEnterToSendKeyEvent),
+                            textStyle = effectiveInputTextStyle,
                             maxLines = 6,
                             minLines = 1,
                             singleLine = false,
@@ -1170,7 +1199,7 @@ fun AgentChatInputSection(
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                 ),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(8.dp),
                             trailingIcon = {
                                 IconButton(onClick = { showFullscreenInput.value = true }) {
                                     Icon(
@@ -1183,118 +1212,29 @@ fun AgentChatInputSection(
                             enabled = !isProcessing || allowTextInputWhileProcessing,
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.CenterStart,
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.Transparent,
-                                    modifier =
-                                        Modifier
-                                            .widthIn(min = 0.dp, max = 220.dp)
-                                            .border(
-                                                width = 1.dp,
-                                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                                shape = RoundedCornerShape(12.dp),
-                                            )
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable(onClick = onModelSelectorClick),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Text(
-                                            text = modelLabel,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.widthIn(max = 160.dp),
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(
-                                            imageVector =
-                                                if (showModelSelectorPopup.value) {
-                                                    Icons.Default.KeyboardArrowUp
-                                                } else {
-                                                    Icons.Default.KeyboardArrowDown
-                                                },
-                                            contentDescription = context.getString(R.string.select_model_config),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp),
-                                        )
+                            MiraComposerControlBar(
+                                actualViewModel = actualViewModel,
+                                onOpenAttachments = {
+                                    if (showAttachmentPanel) {
+                                        setShowAttachmentPanel(false)
+                                    } else {
+                                        softwareKeyboardController?.hide()
+                                        setShowAttachmentPanel(true)
                                     }
-                                }
-                            }
-
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .padding(start = 6.dp)
-                                            .size(34.dp)
-                                            .clickable(
-                                                enabled = true,
-                                                onClick = {
-                                                    showModelSelectorPopup.value = false
-                                                    showExtraSettingsPopup.value = !showExtraSettingsPopup.value
-                                                },
-                                            ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Tune,
-                                    contentDescription = context.getString(R.string.settings_options),
-                                    tint =
-                                        if (showExtraSettingsPopup.value) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .padding(start = 8.dp)
-                                            .size(36.dp)
-                                            .clickable(
-                                                enabled = true,
-                                                onClick = {
-                                                    showModelSelectorPopup.value = false
-                                                    showExtraSettingsPopup.value = false
-                                                    setShowAttachmentPanel(!showAttachmentPanel)
-                                                },
-                                            ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = context.getString(R.string.add_attachment),
-                                    tint =
-                                        if (showAttachmentPanel) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
-                                        },
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(6.dp))
+                                },
+                                onNavigateToModelConfig = onNavigateToModelConfig,
+                                modifier = Modifier.weight(1f),
+                            )
 
                             val actionButtonBackground =
                                 when {
-                                    showCancelAction -> MaterialTheme.colorScheme.error
+                                    showCancelAction -> MaterialTheme.colorScheme.inverseSurface
                                     showQueueAction -> MaterialTheme.colorScheme.tertiary
                                     canSendMessage ->
                                         if (isOverTokenLimit) {
@@ -1307,7 +1247,7 @@ fun AgentChatInputSection(
 
                             val actionButtonIconTint =
                                 when {
-                                    showCancelAction -> MaterialTheme.colorScheme.onError
+                                    showCancelAction -> MaterialTheme.colorScheme.inverseOnSurface
                                     showQueueAction -> MaterialTheme.colorScheme.onTertiary
                                     canSendMessage ->
                                         if (isOverTokenLimit) {
@@ -1319,13 +1259,13 @@ fun AgentChatInputSection(
                                 }
 
                             Box(
-                                modifier = Modifier.size(40.dp),
+                                modifier = Modifier.size(48.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (showProcessingStatus) {
                                     CircularProgressIndicator(
                                         progress = { processingProgressValue },
-                                        modifier = Modifier.fillMaxSize(),
+                                        modifier = Modifier.size(44.dp),
                                         color = processingProgressColor,
                                         trackColor = processingProgressColor.copy(alpha = 0.2f),
                                         strokeWidth = 2.dp,
@@ -1335,8 +1275,8 @@ fun AgentChatInputSection(
                                 Box(
                                     modifier =
                                         Modifier
-                                            .size(36.dp)
-                                            .background(actionButtonBackground, CircleShape)
+                                            .size(48.dp)
+                                            .clip(CircleShape)
                                             .clickable(
                                                 enabled = sendButtonEnabled,
                                                 onClick = {
@@ -1350,7 +1290,8 @@ fun AgentChatInputSection(
                                                             if (isOverTokenLimit) {
                                                                 showTokenLimitDialog.value = true
                                                             } else {
-                                                                onSendMessage()
+                                                                sendableSuggestedMessage?.let(onSendSuggestedMessage)
+                                                                    ?: onSendMessage()
                                                                 setShowAttachmentPanel(false)
                                                             }
                                                         }
@@ -1364,13 +1305,15 @@ fun AgentChatInputSection(
                                                         }
                                                     }
                                                 },
-                                            ),
+                                            )
+                                            .padding(4.dp)
+                                            .background(actionButtonBackground, CircleShape),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
                                         imageVector =
                                             when {
-                                                showCancelAction -> Icons.Default.Close
+                                                showCancelAction -> Icons.Default.Stop
                                                 showQueueAction -> Icons.Default.Add
                                                 canSendMessage -> Icons.AutoMirrored.Filled.Send
                                                 else -> Icons.Default.Mic
@@ -1383,7 +1326,7 @@ fun AgentChatInputSection(
                                                 else -> context.getString(R.string.voice_input)
                                             },
                                         tint = actionButtonIconTint,
-                                        modifier = Modifier.size(18.dp),
+                                        modifier = Modifier.size(if (showCancelAction) 17.dp else 18.dp),
                                     )
                                 }
                             }
@@ -1452,20 +1395,6 @@ fun AgentChatInputSection(
                 onNavigateToPackageManager = onNavigateToPackageManager,
                 onManualMemoryUpdate = onManualMemoryUpdate,
                 onDismiss = { showExtraSettingsPopup.value = false },
-            )
-
-            AttachmentSelectorPopupPanel(
-                visible = showAttachmentPanel,
-                containerColor = popupContainerColor,
-                onAttachImage = { filePath -> onAttachmentRequest(filePath) },
-                onAttachFile = { filePath -> onAttachmentRequest(filePath) },
-                onAttachScreenContent = onAttachScreenContent,
-                onAttachNotifications = onAttachNotifications,
-                onAttachLocation = onAttachLocation,
-                onAttachMemory = onAttachMemory,
-                onAttachPackage = onAttachPackage,
-                onTakePhoto = onTakePhoto,
-                onDismiss = { setShowAttachmentPanel(false) },
             )
 
             if (showFullscreenInput.value) {
@@ -1705,7 +1634,7 @@ private fun AgentThinkingSettingsItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .clickable { onExpandedChange(!expanded) }
                 .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1716,7 +1645,7 @@ private fun AgentThinkingSettingsItem(
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
@@ -1821,7 +1750,7 @@ private fun AgentThinkingSliderSettingItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
-            IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = stringResource(R.string.details),
@@ -1833,8 +1762,10 @@ private fun AgentThinkingSliderSettingItem(
                 text = label,
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = sliderValue.roundToInt().coerceIn(
                     ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
@@ -1893,7 +1824,7 @@ private fun AgentThinkingSubSettingItem(
                     onValueChange = { onToggle() },
                     role = Role.Switch,
                 )
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .padding(horizontal = 8.dp),
     ) {
         Row(
@@ -1906,7 +1837,7 @@ private fun AgentThinkingSubSettingItem(
                 tint = iconTint,
                 modifier = Modifier.size(16.dp),
             )
-            IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = stringResource(R.string.details),
@@ -1954,7 +1885,7 @@ private fun AgentMaxContextSettingItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .padding(horizontal = 12.dp)
                 .toggleable(
                     value = enableMaxContextMode,
@@ -1974,7 +1905,7 @@ private fun AgentMaxContextSettingItem(
                 },
             modifier = Modifier.size(16.dp),
         )
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
@@ -2039,7 +1970,7 @@ private fun AgentModelSelectorItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .then(
                     if (allowCollapse) {
                         Modifier.clickable { onExpandedChange(!expanded) }
@@ -2056,7 +1987,7 @@ private fun AgentModelSelectorItem(
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
@@ -2260,7 +2191,7 @@ private fun AgentModelSelectorItem(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(30.dp)
+                        .heightIn(min = 48.dp)
                         .clickable(onClick = onManageClick),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2549,7 +2480,7 @@ private fun AgentMemorySelectorItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .clickable { onExpandedChange(!expanded) }
                 .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2560,7 +2491,7 @@ private fun AgentMemorySelectorItem(
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
@@ -2639,7 +2570,7 @@ private fun AgentMemorySelectorItem(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(30.dp)
+                        .heightIn(min = 48.dp)
                         .clickable(onClick = onManageClick),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2686,7 +2617,7 @@ private fun AgentSettingsGroupHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .clickable { onExpandedChange(!expanded) }
                 .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2697,7 +2628,7 @@ private fun AgentSettingsGroupHeader(
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
@@ -2781,7 +2712,7 @@ private fun AgentToolsPermissionGroupItem(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(30.dp)
+                        .heightIn(min = 48.dp)
                         .clickable(onClick = onManageTools),
                 contentAlignment = Alignment.Center,
             ) {
@@ -2832,7 +2763,7 @@ private fun AgentPermissionSegmentedControl(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .height(28.dp)
+                        .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(999.dp))
                         .background(
                             if (isSelected) {
@@ -2864,7 +2795,7 @@ private fun AgentPermissionSegmentedControl(
                     },
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -2986,7 +2917,7 @@ private fun AgentSimpleToggleSettingItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .toggleable(
                     value = isChecked,
                     enabled = isEnabled,
@@ -3009,7 +2940,7 @@ private fun AgentSimpleToggleSettingItem(
                 },
             modifier = Modifier.size(16.dp),
         )
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
@@ -3083,7 +3014,7 @@ private fun AgentActionSettingItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .clickable(onClick = onClick)
                 .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -3094,7 +3025,7 @@ private fun AgentActionSettingItem(
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),

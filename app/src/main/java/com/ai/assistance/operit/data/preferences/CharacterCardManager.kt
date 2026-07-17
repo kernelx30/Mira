@@ -66,7 +66,10 @@ class CharacterCardManager private constructor(private val context: Context) {
         // 默认角色卡ID
         const val DEFAULT_CHARACTER_CARD_ID = "default_character"
 
-        const val DEFAULT_CHARACTER_NAME = "Operit"
+        private const val LEGACY_DEFAULT_CHARACTER_NAME = "Operit"
+        private const val LEGACY_DEFAULT_AVATAR_URI = "file:///android_asset/operit.png"
+        private const val DEFAULT_AVATAR_URI = "file:///android_asset/mira_default_companion.png"
+        const val DEFAULT_CHARACTER_NAME = DefaultCompanionPreset.NAME
         
         @Volatile
         private var INSTANCE: CharacterCardManager? = null
@@ -463,12 +466,13 @@ class CharacterCardManager private constructor(private val context: Context) {
                 // 首次安装，创建默认角色卡
                 val defaultCardId = DEFAULT_CHARACTER_CARD_ID
                 preferences[cardListKey] = setOf(defaultCardId)
-                // 不再自动设置活跃角色卡，让用户自己选择角色卡或群组
-                // preferences[ACTIVE_CHARACTER_CARD_ID] = defaultCardId
+                preferences[ACTIVE_CHARACTER_CARD_ID] = defaultCardId
 
                 // 设置默认角色卡数据
                 setupDefaultCharacterCard(preferences, defaultCardId)
             }
+
+            migrateLegacyDefaultCharacterCard(preferences)
         }
 
         if (isInitialized) {
@@ -476,8 +480,10 @@ class CharacterCardManager private constructor(private val context: Context) {
             // We should migrate their existing theme settings to the default character card.
             AppLogger.d("CharacterCardManager", "First initialization detected. Migrating current theme to default character card.")
             userPreferencesManager.copyCurrentThemeToCharacterCard(DEFAULT_CHARACTER_CARD_ID)
-            userPreferencesManager.saveAiAvatarForCharacterCard(DEFAULT_CHARACTER_CARD_ID, "file:///android_asset/operit.png")
+            userPreferencesManager.saveAiAvatarForCharacterCard(DEFAULT_CHARACTER_CARD_ID, DEFAULT_AVATAR_URI)
         }
+
+        migrateDefaultCharacterAvatar()
 
         // 清理历史内置功能标签（chat/voice/desktop pet）
         tagManager.removeLegacyBuiltInTags()
@@ -491,7 +497,19 @@ class CharacterCardManager private constructor(private val context: Context) {
             setupDefaultCharacterCard(preferences, DEFAULT_CHARACTER_CARD_ID)
         }
         // 同时也重置头像和主题
-        userPreferencesManager.saveAiAvatarForCharacterCard(DEFAULT_CHARACTER_CARD_ID, "file:///android_asset/operit.png")
+        userPreferencesManager.saveAiAvatarForCharacterCard(DEFAULT_CHARACTER_CARD_ID, DEFAULT_AVATAR_URI)
+    }
+
+    private suspend fun migrateDefaultCharacterAvatar() {
+        val currentAvatar = userPreferencesManager
+            .getAiAvatarForCharacterCardFlow(DEFAULT_CHARACTER_CARD_ID)
+            .first()
+        if (currentAvatar == LEGACY_DEFAULT_AVATAR_URI) {
+            userPreferencesManager.saveAiAvatarForCharacterCard(
+                DEFAULT_CHARACTER_CARD_ID,
+                DEFAULT_AVATAR_URI
+            )
+        }
     }
     
     private fun setupDefaultCharacterCard(preferences: MutablePreferences, id: String) {
@@ -517,7 +535,7 @@ class CharacterCardManager private constructor(private val context: Context) {
         preferences[nameKey] = DEFAULT_CHARACTER_NAME
         preferences[descriptionKey] = CharacterCardBilingualData.getDefaultDescription(context)
         preferences[characterSettingKey] = CharacterCardBilingualData.getDefaultCharacterSetting(context)
-        preferences[openingStatementKey] = ""
+        preferences[openingStatementKey] = CharacterCardBilingualData.getDefaultOpeningStatement(context)
         preferences[otherContentChatKey] = CharacterCardBilingualData.getDefaultOtherContentChat(context)
         preferences[otherContentVoiceKey] = CharacterCardBilingualData.getDefaultOtherContentVoice(context)
         preferences[attachedTagIdsKey] = setOf<String>()
@@ -532,6 +550,80 @@ class CharacterCardManager private constructor(private val context: Context) {
         preferences[isDefaultKey] = true
         preferences[createdAtKey] = System.currentTimeMillis()
         preferences[updatedAtKey] = System.currentTimeMillis()
+    }
+
+    private fun migrateLegacyDefaultCharacterCard(preferences: MutablePreferences) {
+        val id = DEFAULT_CHARACTER_CARD_ID
+        val nameKey = stringPreferencesKey("character_card_${id}_name")
+        val descriptionKey = stringPreferencesKey("character_card_${id}_description")
+        val characterSettingKey = stringPreferencesKey("character_card_${id}_character_setting")
+        val openingStatementKey = stringPreferencesKey("character_card_${id}_opening_statement")
+        val otherContentChatKey = stringPreferencesKey("character_card_${id}_other_content_chat")
+        val otherContentVoiceKey = stringPreferencesKey("character_card_${id}_other_content_voice")
+        val updatedAtKey = longPreferencesKey("character_card_${id}_updated_at")
+        var changed = false
+
+        if (preferences[nameKey] == LEGACY_DEFAULT_CHARACTER_NAME) {
+            preferences[nameKey] = DEFAULT_CHARACTER_NAME
+            changed = true
+        }
+        if (
+            preferences[descriptionKey] == "系统默认的角色卡配置" ||
+                preferences[descriptionKey] == "System default character card configuration"
+        ) {
+            preferences[descriptionKey] = CharacterCardBilingualData.getDefaultDescription(context)
+            changed = true
+        }
+        if (
+            preferences[characterSettingKey] == "你是Operit，一个全能AI助手，旨在解决用户提出的任何任务。" ||
+                preferences[characterSettingKey] ==
+                    "You are Operit, an all-purpose AI assistant designed to help users solve any task."
+        ) {
+            preferences[characterSettingKey] =
+                CharacterCardBilingualData.getDefaultCharacterSetting(context)
+            changed = true
+        }
+        if (
+            preferences[otherContentChatKey] == "保持有帮助的语气，并清楚地传达限制。" ||
+                preferences[otherContentChatKey] ==
+                    "Maintain a helpful tone and clearly communicate limitations."
+        ) {
+            preferences[otherContentChatKey] =
+                CharacterCardBilingualData.getDefaultOtherContentChat(context)
+            changed = true
+        }
+        val voicePrompt = preferences[otherContentVoiceKey].orEmpty()
+        if (voicePrompt.contains("你永远是 Operit") || voicePrompt.contains("You are always Operit")) {
+            preferences[otherContentVoiceKey] =
+                CharacterCardBilingualData.getDefaultOtherContentVoice(context)
+            changed = true
+        }
+        if (
+            DefaultCompanionPreset.matchesPreviousDefaultPreset(
+                name = preferences[nameKey].orEmpty(),
+                description = preferences[descriptionKey].orEmpty(),
+                characterSetting = preferences[characterSettingKey].orEmpty(),
+                openingStatement = preferences[openingStatementKey].orEmpty(),
+                otherContentChat = preferences[otherContentChatKey].orEmpty(),
+                otherContentVoice = preferences[otherContentVoiceKey].orEmpty(),
+            )
+        ) {
+            preferences[nameKey] = DEFAULT_CHARACTER_NAME
+            preferences[descriptionKey] = CharacterCardBilingualData.getDefaultDescription(context)
+            preferences[characterSettingKey] =
+                CharacterCardBilingualData.getDefaultCharacterSetting(context)
+            preferences[openingStatementKey] =
+                CharacterCardBilingualData.getDefaultOpeningStatement(context)
+            preferences[otherContentChatKey] =
+                CharacterCardBilingualData.getDefaultOtherContentChat(context)
+            preferences[otherContentVoiceKey] =
+                CharacterCardBilingualData.getDefaultOtherContentVoice(context)
+            changed = true
+        }
+        if (changed) {
+            preferences[updatedAtKey] = System.currentTimeMillis()
+            AppLogger.d("CharacterCardManager", "Migrated the built-in default companion preset")
+        }
     }
     
     // 获取所有角色卡

@@ -2,12 +2,14 @@
   <span>中文</span> | <a href="README(E).md">English</a>
 </div>
 
+> **Mira 分支**：本分支将角色陪伴、长期记忆与语音交互作为默认体验，并采用更克制的 Material 3 界面。Operit 原有的 Skill、MCP、地图、Shizuku、终端、工作流、自动点击与设备操作能力均保留。应用 ID 为 `com.ai.assistance.mira`，可与上游 Operit 独立安装。
+
 <div align="center">
-  <img src="https://img.shields.io/github/last-commit/AAswordman/Operit" alt="Last Commit">
+  <img src="https://img.shields.io/github/last-commit/kernelx30/Mira" alt="Last Commit">
   <img src="https://img.shields.io/badge/Platform-Android_8.0%2B-brightgreen.svg" alt="Platform">
-  <a href="https://github.com/AAswordman/Operit/releases/latest"><img src="https://img.shields.io/github/v/release/AAswordman/Operit" alt="Latest Release"></a>
+  <a href="https://github.com/kernelx30/Mira/releases/latest"><img src="https://img.shields.io/github/v/release/kernelx30/Mira" alt="Latest Release"></a>
   <br>
-  <a href="https://github.com/AAswordman/Operit/stargazers"><img src="https://img.shields.io/github/stars/AAswordman/Operit" alt="GitHub Stars"></a>
+  <a href="https://github.com/kernelx30/Mira/stargazers"><img src="https://img.shields.io/github/stars/kernelx30/Mira" alt="GitHub Stars"></a>
   <a href="https://aaswordman.github.io/OperitWeb"><img src="https://img.shields.io/badge/📖-用户指南-blue.svg" alt="User Guide"></a>
   <a href="https://www.patreon.com/c/aaswordsman"><img src="https://img.shields.io/badge/🌍-Patreon-f96854.svg" alt="Patreon"></a>
   <a href="https://afdian.com/a/aaswordsman"><img src="https://img.shields.io/badge/💖-支持开发-ff6b6b.svg" alt="Support Development"></a>
@@ -16,13 +18,13 @@
   <a href="mailto:aaswordsman@foxmail.com"><img src="https://img.shields.io/badge/📧-Email-red.svg" alt="Email"></a>
   <a href="https://qm.qq.com/q/Sa4fKEH7sO"><img src="https://img.shields.io/badge/💬-QQ群-blue.svg" alt="QQ Group"></a>
   <a href="https://discord.gg/YnV9MWurRF"><img src="https://img.shields.io/badge/🎮-Discord-5865F2.svg" alt="Discord"></a>
-  <a href="https://github.com/AAswordman/Operit/issues"><img src="https://img.shields.io/badge/🐛-Issues-orange.svg" alt="Issues"></a>
+  <a href="https://github.com/kernelx30/Mira/issues"><img src="https://img.shields.io/badge/🐛-Issues-orange.svg" alt="Issues"></a>
 </div>
 
 <div align="center">
-  <img src="app/src/main/assets/logo.svg" width="120" height="120" alt="Operit Logo">
-  <h1>Operit AI - 智能助手应用</h1>
-  <p>📱 <b>移动端首个功能完备的AI智能助手应用，完全独立运行，拥有强大的工具调用能力</b> 📱</p>
+  <img src="artifacts/branding/mira-icon.svg" width="120" height="120" alt="Mira Logo">
+  <h1>Mira - 本地智能伴侣</h1>
+  <p>📱 <b>以角色陪伴、长期记忆和语音交互为默认体验，同时保留完整 Agent 工具能力</b> 📱</p>
 </div>
 
 <div align="center">
@@ -38,7 +40,7 @@
 
 ## 🌟 项目简介
 
-**Operit AI** 是移动端首个功能完备的 AI 智能助手应用，完全独立运行于您的 Android 设备上（除API调用），拥有强大的**工具调用能力**、**深度搜索**、**工作流与自动化**、**智能记忆库**，并支持**人设定制**与**角色卡**等高度自定义功能，集成 **MNN/llama.cpp 本地模型**、**MCP/Skill 生态**与**多语言界面**。它不仅仅是聊天界面，更是与Android权限和各种工具深度融合的**全能助手**，内置**Ubuntu 24 环境**，提供前所未有的强大功能。
+**Mira** 是基于 Operit 构建的 Android 本地智能伴侣。它将**角色陪伴**、**长期记忆**、**主动提醒**和**语音交互**作为默认体验，同时保留上游的**工具调用**、**深度搜索**、**工作流与自动化**、**MCP/Skill 生态**、**MNN/llama.cpp 本地模型**以及 Ubuntu 24 终端环境。
 
 ---
 

@@ -690,48 +690,54 @@ private fun AttachmentTag(
             else -> attachment.filename
         }
 
-    Surface(
+    val canOpenAttachment =
+        enabled &&
+            (
+                attachment.content.isNotEmpty() ||
+                    attachment.id.startsWith("/") ||
+                    attachment.id.startsWith("content://") ||
+                    attachment.id.startsWith("file://") ||
+                    attachment.id.startsWith("media_pool:") ||
+                    attachment.type.startsWith("image/")
+            )
+    Box(
         modifier =
-        Modifier
-            .height(24.dp)
-            .padding(vertical = 2.dp)
-            .clickable(
-                enabled =
-                enabled &&
-                        (
-                            attachment.content.isNotEmpty() ||
-                                attachment.id.startsWith("/") ||
-                                attachment.id.startsWith("content://") ||
-                                attachment.id.startsWith("file://") ||
-                                attachment.id.startsWith("media_pool:") ||
-                                attachment.type.startsWith("image/")
-                        ),
-                onClick = { onClick(attachment) }
-            ),
-        shape = RoundedCornerShape(12.dp),
-        color = backgroundColor.copy(alpha = 0.5f)
+            Modifier
+                .widthIn(min = 48.dp)
+                .heightIn(min = 48.dp)
+                .clickable(
+                    enabled = canOpenAttachment,
+                    onClick = { onClick(attachment) },
+                ),
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.height(28.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = backgroundColor.copy(alpha = 0.5f),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(12.dp),
-                tint = textColor.copy(alpha = 0.8f)
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = textColor.copy(alpha = 0.8f),
+                )
 
-            Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
-            Text(
-                text = displayLabel,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = textColor,
-                modifier = Modifier.widthIn(max = 120.dp)
-            )
+                Text(
+                    text = displayLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = textColor,
+                    modifier = Modifier.widthIn(max = 120.dp),
+                )
+            }
         }
     }
 }

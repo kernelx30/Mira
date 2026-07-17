@@ -36,8 +36,14 @@ data class OperitArchivedChat(
     val parentChatId: String? = null,
     val characterCardName: String? = null,
     val characterGroupId: String? = null,
+    val chatModelConfigId: String? = null,
+    val chatModelIndex: Int = 0,
+    val memoryAutoUpdateOverride: Boolean? = null,
+    val autoReadOverride: Boolean? = null,
+    val isTemporary: Boolean = false,
     val locked: Boolean = false,
     val pinned: Boolean = false,
+    val archived: Boolean = false,
 ) {
     fun toChatHistory(): ChatHistory {
         return ChatHistory(
@@ -56,8 +62,14 @@ data class OperitArchivedChat(
             parentChatId = parentChatId,
             characterCardName = characterCardName,
             characterGroupId = characterGroupId,
+            chatModelConfigId = chatModelConfigId,
+            chatModelIndex = chatModelIndex,
+            memoryAutoUpdateOverride = memoryAutoUpdateOverride,
+            autoReadOverride = autoReadOverride,
+            isTemporary = isTemporary,
             locked = locked,
             pinned = pinned,
+            archived = archived,
         )
     }
 
@@ -82,8 +94,14 @@ data class OperitArchivedChat(
                 parentChatId = history.parentChatId,
                 characterCardName = history.characterCardName,
                 characterGroupId = history.characterGroupId,
+                chatModelConfigId = history.chatModelConfigId,
+                chatModelIndex = history.chatModelIndex,
+                memoryAutoUpdateOverride = history.memoryAutoUpdateOverride,
+                autoReadOverride = history.autoReadOverride,
+                isTemporary = history.isTemporary,
                 locked = history.locked,
                 pinned = history.pinned,
+                archived = history.archived,
             )
         }
     }

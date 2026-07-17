@@ -1,8 +1,23 @@
 package com.ai.assistance.operit.util.ripgrep
 
+import com.ai.assistance.operit.util.AppLogger
+
 internal object NativeRipgrep {
+    val isAvailable: Boolean
+
     init {
-        System.loadLibrary("operit_ripgrep")
+        isAvailable =
+            try {
+                System.loadLibrary("mira_ripgrep")
+                true
+            } catch (error: LinkageError) {
+                AppLogger.w(
+                    "NativeRipgrep",
+                    "libmira_ripgrep.so is unavailable; using the Kotlin search fallback",
+                    error,
+                )
+                false
+            }
     }
 
     @JvmStatic

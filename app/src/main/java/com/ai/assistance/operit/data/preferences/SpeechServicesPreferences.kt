@@ -3,6 +3,7 @@ package com.ai.assistance.operit.data.preferences
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -11,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.ai.assistance.operit.api.speech.SpeechServiceFactory
 import com.ai.assistance.operit.api.voice.HttpTtsResponsePipelineStep
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.data.model.SpeechExpressionStrength
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -65,6 +67,8 @@ class SpeechServicesPreferences(private val context: Context) {
         val TTS_CLEANER_REGEXS = stringSetPreferencesKey("tts_cleaner_regexs")
         val TTS_SPEECH_RATE = floatPreferencesKey("tts_speech_rate")
         val TTS_PITCH = floatPreferencesKey("tts_pitch")
+        val EXPRESSIVE_TTS_ENABLED = booleanPreferencesKey("expressive_tts_enabled")
+        val EXPRESSIVE_TTS_STRENGTH = stringPreferencesKey("expressive_tts_strength")
 
         // STT Preference Keys
         val STT_SERVICE_TYPE = stringPreferencesKey("stt_service_type")
@@ -76,6 +80,8 @@ class SpeechServicesPreferences(private val context: Context) {
 
         const val DEFAULT_TTS_SPEECH_RATE = 1.0f
         const val DEFAULT_TTS_PITCH = 1.0f
+        const val DEFAULT_EXPRESSIVE_TTS_ENABLED = true
+        val DEFAULT_EXPRESSIVE_TTS_STRENGTH = SpeechExpressionStrength.NATURAL
 
         // HTTP TTS的默认预设
         val DEFAULT_HTTP_TTS_PRESET = TtsHttpConfig(
@@ -159,6 +165,16 @@ class SpeechServicesPreferences(private val context: Context) {
         prefs[TTS_PITCH] ?: DEFAULT_TTS_PITCH
     }
 
+    val expressiveTtsEnabledFlow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[EXPRESSIVE_TTS_ENABLED] ?: DEFAULT_EXPRESSIVE_TTS_ENABLED
+    }
+
+    val expressiveTtsStrengthFlow: Flow<SpeechExpressionStrength> = dataStore.data.map { prefs ->
+        prefs[EXPRESSIVE_TTS_STRENGTH]
+            ?.let { stored -> runCatching { SpeechExpressionStrength.valueOf(stored) }.getOrNull() }
+            ?: DEFAULT_EXPRESSIVE_TTS_STRENGTH
+    }
+
     // --- STT Flows ---
     val sttServiceTypeFlow: Flow<SpeechServiceFactory.SpeechServiceType> = dataStore.data.map { prefs ->
         parseSttServiceType(prefs[STT_SERVICE_TYPE])
@@ -178,6 +194,14 @@ class SpeechServicesPreferences(private val context: Context) {
     }
 
     // --- Save TTS Settings ---
+    suspend fun saveExpressiveTtsEnabled(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[EXPRESSIVE_TTS_ENABLED] = enabled }
+    }
+
+    suspend fun saveExpressiveTtsStrength(strength: SpeechExpressionStrength) {
+        dataStore.edit { prefs -> prefs[EXPRESSIVE_TTS_STRENGTH] = strength.name }
+    }
+
     suspend fun saveTtsSettings(
         serviceType: VoiceServiceFactory.VoiceServiceType,
         httpConfig: TtsHttpConfig? = null,

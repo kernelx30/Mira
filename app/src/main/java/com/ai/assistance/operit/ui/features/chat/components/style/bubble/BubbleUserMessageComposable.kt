@@ -48,6 +48,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
+import com.ai.assistance.operit.data.model.PreferenceProfile
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
@@ -67,7 +68,6 @@ import com.ai.assistance.operit.ui.theme.waterGlass
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -84,6 +84,8 @@ fun BubbleUserMessageComposable(
     bubbleContentPaddingLeft: Float = 12f,
     bubbleContentPaddingRight: Float = 12f,
     enableDialogs: Boolean = true,
+    isVisualGroupStart: Boolean = true,
+    isVisualGroupEnd: Boolean = true,
 ) {
     val context = LocalContext.current
     val isHiddenPlaceholder =
@@ -105,6 +107,10 @@ fun BubbleUserMessageComposable(
     val customUserAvatarUri by preferencesManager.customUserAvatarUri.collectAsState(initial = null)
     val globalUserAvatarUri by displayPreferencesManager.globalUserAvatarUri.collectAsState(initial = null)
     val globalUserName by displayPreferencesManager.globalUserName.collectAsState(initial = null)
+    val activeUserProfile by
+        preferencesManager.getUserPreferencesFlow().collectAsState(
+            initial = PreferenceProfile(id = "default", name = "Default"),
+        )
     val showUserName by preferencesManager.showUserName.collectAsState(initial = true)
     val avatarShapePref by preferencesManager.avatarShape.collectAsState(initial = UserPreferencesManager.AVATAR_SHAPE_CIRCLE)
     val avatarCornerRadius by preferencesManager.avatarCornerRadius.collectAsState(initial = 8f)
@@ -139,29 +145,34 @@ fun BubbleUserMessageComposable(
     val proxySenderName = if (isHiddenPlaceholder) null else parseResult.proxySenderName
 
     val isProxySender = !proxySenderName.isNullOrBlank()
-    val proxyAvatarUri by remember(proxySenderName) {
-        if (isProxySender) {
-            try {
-                runBlocking {
-                    val characterCard = characterCardManager.findCharacterCardByName(proxySenderName!!)
-                    if (characterCard != null) {
-                        preferencesManager.getAiAvatarForCharacterCardFlow(characterCard.id)
-                    } else {
+    val proxyAvatarUri by
+        produceState<String?>(initialValue = null, proxySenderName) {
+            val avatarFlow =
+                if (isProxySender) {
+                    runCatching {
+                        characterCardManager.findCharacterCardByName(proxySenderName!!)?.let { card ->
+                            preferencesManager.getAiAvatarForCharacterCardFlow(card.id)
+                        } ?: preferencesManager.customAiAvatarUri
+                    }.getOrElse {
                         preferencesManager.customAiAvatarUri
                     }
+                } else {
+                    preferencesManager.customAiAvatarUri
                 }
-            } catch (_: Exception) {
-                preferencesManager.customAiAvatarUri
-            }
-        } else {
-            preferencesManager.customAiAvatarUri
+            avatarFlow.collect { value = it }
         }
-    }.collectAsState(initial = null)
 
-    val avatarUri = remember(customUserAvatarUri, globalUserAvatarUri, proxyAvatarUri, isProxySender) {
+    val avatarUri = remember(
+        activeUserProfile.avatarUri,
+        customUserAvatarUri,
+        globalUserAvatarUri,
+        proxyAvatarUri,
+        isProxySender,
+    ) {
         when {
             isProxySender && !proxyAvatarUri.isNullOrEmpty() -> proxyAvatarUri
             isProxySender -> null
+            activeUserProfile.avatarUri.isNotEmpty() -> activeUserProfile.avatarUri
             !customUserAvatarUri.isNullOrEmpty() -> customUserAvatarUri
             !globalUserAvatarUri.isNullOrEmpty() -> globalUserAvatarUri
             else -> null
@@ -174,9 +185,20 @@ fun BubbleUserMessageComposable(
             CircleShape
         }
     }
-    val resolvedDisplayName = if (isProxySender) proxySenderName else globalUserName
-    val shouldShowResolvedName = !isHiddenPlaceholder && if (isProxySender) true else showUserName
-    val shouldShowAvatar = !isHiddenPlaceholder && bubbleShowAvatar
+    val resolvedDisplayName =
+        if (isProxySender) {
+            proxySenderName
+        } else {
+            activeUserProfile.displayName.ifBlank { globalUserName.orEmpty() }
+        }
+    val shouldShowResolvedName =
+        !isHiddenPlaceholder &&
+            isVisualGroupStart &&
+            if (isProxySender) true else showUserName
+    val shouldShowAvatar =
+        !isHiddenPlaceholder &&
+            bubbleShowAvatar &&
+            if (bubbleWideLayoutEnabled) isVisualGroupStart else isVisualGroupEnd
 
     // 添加状态控制内容预览
     val showContentPreview = remember { mutableStateOf(false) }
@@ -385,14 +407,30 @@ fun BubbleUserMessageComposable(
                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                             )
                         } else {
-                            Icon(
-                                imageVector = if (isProxySender) Icons.Default.Assistant else Icons.Default.Person,
-                                contentDescription = "User Avatar",
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(avatarShape),
-                                tint = if (isProxySender) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
-                            )
+                            Surface(
+                                modifier = Modifier.size(32.dp),
+                                shape = avatarShape,
+                                color =
+                                    if (isProxySender) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    },
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (isProxySender) Icons.Default.Assistant else Icons.Default.Person,
+                                        contentDescription = "User Avatar",
+                                        modifier = Modifier.size(18.dp),
+                                        tint =
+                                            if (isProxySender) {
+                                                MaterialTheme.colorScheme.onSecondaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -401,13 +439,13 @@ fun BubbleUserMessageComposable(
             }
 
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val maxBubbleWidth = maxWidth
+                val maxBubbleWidth = maxWidth * 0.78f
                 val bubbleShape =
-                    if (bubbleRoundedCornersEnabled) {
-                        RoundedCornerShape(20.dp, 4.dp, 20.dp, 20.dp)
-                    } else {
-                        RoundedCornerShape(0.dp)
-                    }
+                    userBubbleShape(
+                        roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                        isVisualGroupStart = isVisualGroupStart,
+                        isVisualGroupEnd = isVisualGroupEnd,
+                    )
                 val bubbleModifier =
                     Modifier
                         .widthIn(max = if (isHiddenPlaceholder) minOf(maxBubbleWidth, 320.dp) else maxBubbleWidth)
@@ -425,9 +463,9 @@ fun BubbleUserMessageComposable(
                             contentPadding =
                                 PaddingValues(
                                     start = bubbleContentPaddingLeft.dp,
-                                    top = if (isHiddenPlaceholder) 0.dp else 12.dp,
+                                    top = if (isHiddenPlaceholder) 0.dp else 8.dp,
                                     end = bubbleContentPaddingRight.dp,
-                                    bottom = if (isHiddenPlaceholder) 0.dp else 12.dp,
+                                    bottom = if (isHiddenPlaceholder) 0.dp else 8.dp,
                                 ),
                         ) {
                             if (isHiddenPlaceholder) {
@@ -472,12 +510,7 @@ fun BubbleUserMessageComposable(
                                 } else {
                                     effectiveBackgroundColor
                                 },
-                            tonalElevation =
-                                if (liquidGlassEnabled || waterGlassEnabled || isHiddenPlaceholder) {
-                                    0.dp
-                                } else {
-                                    2.dp
-                                },
+                            tonalElevation = 0.dp,
                         ) {
                             if (isHiddenPlaceholder) {
                                 Box(
@@ -500,9 +533,9 @@ fun BubbleUserMessageComposable(
                                     modifier =
                                         Modifier.padding(
                                             start = bubbleContentPaddingLeft.dp,
-                                            top = 12.dp,
+                                            top = 8.dp,
                                             end = bubbleContentPaddingRight.dp,
-                                            bottom = 12.dp,
+                                            bottom = 8.dp,
                                         ),
                                     color = effectiveTextColor,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -546,13 +579,13 @@ fun BubbleUserMessageComposable(
                 
                 // Message bubble
                 BoxWithConstraints {
-                    val maxBubbleWidth = maxWidth * 0.85f
+                    val maxBubbleWidth = maxWidth * 0.78f
                     val bubbleShape =
-                        if (bubbleRoundedCornersEnabled) {
-                            RoundedCornerShape(20.dp, 4.dp, 20.dp, 20.dp)
-                        } else {
-                            RoundedCornerShape(0.dp)
-                        }
+                        userBubbleShape(
+                            roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                            isVisualGroupStart = isVisualGroupStart,
+                            isVisualGroupEnd = isVisualGroupEnd,
+                        )
                     val bubbleModifier =
                         Modifier
                             .widthIn(max = if (isHiddenPlaceholder) minOf(maxBubbleWidth, 320.dp) else maxBubbleWidth)
@@ -566,9 +599,9 @@ fun BubbleUserMessageComposable(
                             contentPadding =
                                 PaddingValues(
                                     start = bubbleContentPaddingLeft.dp,
-                                    top = if (isHiddenPlaceholder) 0.dp else 12.dp,
+                                    top = if (isHiddenPlaceholder) 0.dp else 8.dp,
                                     end = bubbleContentPaddingRight.dp,
-                                    bottom = if (isHiddenPlaceholder) 0.dp else 12.dp,
+                                    bottom = if (isHiddenPlaceholder) 0.dp else 8.dp,
                                 ),
                         ) {
                             if (isHiddenPlaceholder) {
@@ -613,12 +646,7 @@ fun BubbleUserMessageComposable(
                                 } else {
                                     effectiveBackgroundColor
                                 },
-                            tonalElevation =
-                                if (liquidGlassEnabled || waterGlassEnabled || isHiddenPlaceholder) {
-                                    0.dp
-                                } else {
-                                    2.dp
-                                }
+                            tonalElevation = 0.dp,
                         ) {
                             if (isHiddenPlaceholder) {
                                 Box(
@@ -641,9 +669,9 @@ fun BubbleUserMessageComposable(
                                     modifier =
                                         Modifier.padding(
                                             start = bubbleContentPaddingLeft.dp,
-                                            top = 12.dp,
+                                            top = 8.dp,
                                             end = bubbleContentPaddingRight.dp,
-                                            bottom = 12.dp,
+                                            bottom = 8.dp,
                                         ),
                                     color = effectiveTextColor,
                                     style = MaterialTheme.typography.bodyMedium
@@ -666,14 +694,30 @@ fun BubbleUserMessageComposable(
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
                 } else {
-                    Icon(
-                        imageVector = if (isProxySender) Icons.Default.Assistant else Icons.Default.Person,
-                        contentDescription = "User Avatar",
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(avatarShape),
-                        tint = if (isProxySender) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
-                    )
+                    Surface(
+                        modifier = Modifier.size(32.dp),
+                        shape = avatarShape,
+                        color =
+                            if (isProxySender) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer
+                            },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isProxySender) Icons.Default.Assistant else Icons.Default.Person,
+                                contentDescription = "User Avatar",
+                                modifier = Modifier.size(18.dp),
+                                tint =
+                                    if (isProxySender) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -755,6 +799,21 @@ fun BubbleUserMessageComposable(
             }
         }
     }
+}
+
+private fun userBubbleShape(
+    roundedCornersEnabled: Boolean,
+    isVisualGroupStart: Boolean,
+    isVisualGroupEnd: Boolean,
+): RoundedCornerShape {
+    if (!roundedCornersEnabled) return RoundedCornerShape(0.dp)
+
+    return RoundedCornerShape(
+        topStart = 16.dp,
+        topEnd = if (isVisualGroupStart) 4.dp else 8.dp,
+        bottomEnd = if (isVisualGroupEnd) 16.dp else 8.dp,
+        bottomStart = 16.dp,
+    )
 }
 
 data class MessageParseResult(
@@ -1052,47 +1111,54 @@ private fun AttachmentTag(
             else -> attachment.filename
         }
 
-    Surface(
+    val canOpenAttachment =
+        enabled &&
+            (
+                attachment.content.isNotEmpty() ||
+                    attachment.id.startsWith("/") ||
+                    attachment.id.startsWith("content://") ||
+                    attachment.id.startsWith("file://") ||
+                    attachment.id.startsWith("media_pool:") ||
+                    attachment.type.startsWith("image/")
+            )
+    Box(
         modifier =
-            Modifier.height(24.dp)
-                .padding(vertical = 2.dp)
+            Modifier
+                .widthIn(min = 48.dp)
+                .heightIn(min = 48.dp)
                 .clickable(
-                    enabled =
-                        enabled &&
-                            (
-                                attachment.content.isNotEmpty() ||
-                                    attachment.id.startsWith("/") ||
-                                    attachment.id.startsWith("content://") ||
-                                    attachment.id.startsWith("file://") ||
-                                    attachment.id.startsWith("media_pool:") ||
-                                    attachment.type.startsWith("image/")
-                            ),
-                    onClick = { onClick(attachment) }
+                    enabled = canOpenAttachment,
+                    onClick = { onClick(attachment) },
                 ),
-        shape = RoundedCornerShape(12.dp),
-        color = backgroundColor.copy(alpha = 0.5f)
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.height(28.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = backgroundColor.copy(alpha = 0.5f),
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(12.dp),
-                tint = textColor.copy(alpha = 0.8f)
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = textColor.copy(alpha = 0.8f),
+                )
 
-            Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
-            Text(
-                text = displayLabel,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = textColor,
-                modifier = Modifier.widthIn(max = 120.dp)
-            )
+                Text(
+                    text = displayLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = textColor,
+                    modifier = Modifier.widthIn(max = 120.dp),
+                )
+            }
         }
     }
 }

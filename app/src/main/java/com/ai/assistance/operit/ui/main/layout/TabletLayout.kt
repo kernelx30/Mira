@@ -4,6 +4,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -26,8 +27,8 @@ import com.ai.assistance.operit.ui.main.TopBarTitleContent
 import com.ai.assistance.operit.ui.main.navigation.NavigationEntrySpec
 import com.ai.assistance.operit.ui.main.navigation.RouteEntry
 import com.ai.assistance.operit.ui.main.components.AppContent
-import com.ai.assistance.operit.ui.main.components.CollapsedDrawerContent
 import com.ai.assistance.operit.ui.main.components.DrawerContent
+import com.ai.assistance.operit.ui.main.components.MateNavigationRail
 import com.ai.assistance.operit.ui.main.components.rememberNavigationDrawerAppearance
 import com.ai.assistance.operit.ui.main.screens.Screen
 import com.ai.assistance.operit.ui.theme.waterGlass
@@ -66,6 +67,19 @@ fun TabletLayout(
         topBarActions: @Composable RowScope.() -> Unit = {},
         topBarTitleContent: TopBarTitleContent? = null
 ) {
+        fun selectPrimaryDestination(item: NavItem) {
+                val screen =
+                        when (item) {
+                                NavItem.AiChat -> Screen.AiChat
+                                NavItem.AssistantConfig -> Screen.AssistantConfig
+                                NavItem.MemoryBase -> Screen.MemoryBase
+                                NavItem.Toolbox -> Screen.Toolbox
+                                NavItem.Settings -> Screen.Settings
+                                else -> return
+                        }
+                onDrawerItemSelected(screen)
+        }
+
         val drawerAppearance = rememberNavigationDrawerAppearance()
         val sidebarWidthAnimationDurationMillis = 280
         val sidebarContentFadeDurationMillis = 160
@@ -94,25 +108,9 @@ fun TabletLayout(
                         label = "sidebarWidth"
                 )
 
-        // 使用Box作为顶层容器，这样可以允许子元素重叠
-        Box(modifier = Modifier.fillMaxSize()) {
-                // 计算主内容区域的宽度（屏幕宽度减去侧边栏宽度），轻微调整动画时间
-                val contentWidth by
-                        animateDpAsState(
-                                targetValue =
-                                        if (isSidebarWidthExpanded)
-                                                androidx.compose.ui.platform.LocalConfiguration
-                                                        .current
-                                                        .screenWidthDp
-                                                        .dp - tabletSidebarWidth + 1.dp // 增加1dp解决右侧白线问题
-                                        else
-                                                androidx.compose.ui.platform.LocalConfiguration
-                                                        .current
-                                                        .screenWidthDp
-                                                        .dp - collapsedTabletSidebarWidth + 1.dp, // 增加1dp解决右侧白线问题
-                                animationSpec = tween(durationMillis = sidebarWidthAnimationDurationMillis),
-                                label = "contentWidth"
-                        )
+        // Use measured constraints so width follows rotation and freeform window changes immediately.
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val contentWidth = (maxWidth - animatedSidebarWidth + 1.dp).coerceAtLeast(0.dp)
 
                 // 侧边栏区域，使用动画宽度，无圆角以完全遮住背景
                 Surface(
@@ -153,15 +151,10 @@ fun TabletLayout(
                                                 onNavigationEntrySelected = onNavigationEntrySelected
                                         )
                                 } else {
-                                        CollapsedDrawerContent(
-                                                navItems = navItems,
-                                                pluginEntries = pluginSidebarEntries,
+                                        MateNavigationRail(
                                                 selectedItem = selectedItem,
-                                                selectedRouteId = selectedRouteId,
-                                                isNetworkAvailable = isNetworkAvailable,
-                                                appearance = drawerAppearance,
-                                                onScreenSelected = onDrawerItemSelected,
-                                                onNavigationEntrySelected = onNavigationEntrySelected
+                                                onSelect = ::selectPrimaryDestination,
+                                                onMore = onToggleSidebar,
                                         )
                                 }
                         }

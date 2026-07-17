@@ -26,7 +26,8 @@ import androidx.navigation.NavController
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.common.NavItem
 import com.ai.assistance.operit.ui.features.about.screens.AboutScreen
-import com.ai.assistance.operit.ui.features.assistant.screens.AssistantConfigScreen
+import com.ai.assistance.operit.ui.features.assistant.screens.PersonaScreen
+import com.ai.assistance.operit.ui.features.assistant.screens.CompanionPresenceScreen
 import com.ai.assistance.operit.ui.features.chat.screens.AIChatScreen
 import com.ai.assistance.operit.ui.features.demo.screens.ShizukuDemoScreen
 import com.ai.assistance.operit.ui.features.help.screens.HelpScreen
@@ -60,6 +61,7 @@ import com.ai.assistance.operit.ui.features.settings.screens.ModelPromptsSetting
 import com.ai.assistance.operit.ui.features.settings.screens.TagMarketScreen
 import com.ai.assistance.operit.ui.features.settings.screens.SettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.SpeechServicesSettingsScreen
+import com.ai.assistance.operit.ui.features.settings.screens.VoiceAndCallSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ThemeSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.ToolPermissionSettingsScreen
 import com.ai.assistance.operit.ui.features.settings.screens.UserPreferencesGuideScreen
@@ -147,6 +149,10 @@ sealed class Screen(
                     onNavigateToModelConfig = { navigateTo(ModelConfig) },
                     onNavigateToModelPrompts = { navigateTo(ModelPromptsSettings) },
                     onNavigateToPackageManager = { navigateTo(Packages) },
+                    onNavigateToPersona = { navigateTo(AssistantConfig) },
+                    onNavigateToMemory = { navigateTo(MemoryBase) },
+                    onNavigateToVoiceSettings = { navigateTo(SpeechServicesSettings) },
+                    onNavigateToCapabilities = { navigateTo(Toolbox) },
                     onLoading = onLoading,
                     onError = onError,
                     onGestureConsumed = onGestureConsumed
@@ -598,8 +604,29 @@ sealed class Screen(
                     navigateToWaifuModeSettings = { navigateTo(WaifuModeSettings) },
                     navigateToTokenUsageStatistics = { navigateTo(TokenUsageStatistics) },
                     navigateToContextSummarySettings = { navigateTo(ContextSummarySettings) },
-                    navigateToLayoutAdjustmentSettings = { navigateTo(LayoutAdjustmentSettings) }
+                    navigateToLayoutAdjustmentSettings = { navigateTo(LayoutAdjustmentSettings) },
+                    navigateToCapabilities = { navigateTo(Toolbox) },
+                    navigateToPackageManager = { navigateTo(Packages) },
+                    navigateToTerminalSetup = { navigateTo(TerminalSetup) },
+                    navigateToCompanionSettings = { navigateTo(AssistantConfig) },
+                    navigateToCompanionPresence = { navigateTo(CompanionPresenceSettings) },
             )
+        }
+    }
+
+    data object CompanionPresenceSettings :
+            Screen(navItem = NavItem.Settings, titleRes = R.string.settings_section_proactive_companion) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
+            CompanionPresenceScreen()
         }
     }
 
@@ -703,7 +730,11 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
-            AssistantConfigScreen()
+            PersonaScreen(
+                onNavigateToMarket = { navigateTo(TagMarket) },
+                onNavigateToPersonaGeneration = { navigateTo(PersonaCardGeneration) },
+                onNavigateToChatManagement = { navigateTo(ChatHistorySettings) },
+            )
         }
     }
 
@@ -836,7 +867,6 @@ sealed class Screen(
             )
         }
     }
-    // 添加SpeechServicesSettings屏幕定义
     data object SpeechServicesSettings :
             Screen(navItem = NavItem.Settings, titleRes = R.string.screen_title_speech_services_settings) {
         @Composable
@@ -849,9 +879,28 @@ sealed class Screen(
                 onError: (String) -> Unit,
                 onGestureConsumed: (Boolean) -> Unit
         ) {
+            VoiceAndCallSettingsScreen(
+                onNavigateToAdvancedServices = { navigateTo(SpeechServicesAdvancedSettings) },
+                onNavigateToTextToSpeech = { navigateTo(TextToSpeech) },
+            )
+        }
+    }
+
+    data object SpeechServicesAdvancedSettings :
+            Screen(navItem = NavItem.Settings, titleRes = R.string.screen_title_speech_services_advanced) {
+        @Composable
+        override fun Content(
+                navController: NavController,
+                navigateTo: ScreenNavigationHandler,
+                onGoBack: () -> Unit,
+                hasBackgroundImage: Boolean,
+                onLoading: (Boolean) -> Unit,
+                onError: (String) -> Unit,
+                onGestureConsumed: (Boolean) -> Unit
+        ) {
             SpeechServicesSettingsScreen(
                 onBackPressed = onGoBack,
-                onNavigateToTextToSpeech = { navigateTo(TextToSpeech) }
+                onNavigateToTextToSpeech = { navigateTo(TextToSpeech) },
             )
         }
     }
@@ -1233,7 +1282,7 @@ sealed class Screen(
     }
 
     data object TerminalSetup :
-            Screen(navItem = NavItem.Toolbox, titleRes = R.string.screen_title_terminal) {
+            Screen(navItem = NavItem.Toolbox, titleRes = R.string.screen_title_terminal_setup) {
         @Composable
         override fun Content(
                 navController: NavController,
@@ -1519,5 +1568,3 @@ object GestureStateHolder {
     // 聊天界面手势是否被消费的状态
     var isChatScreenGestureConsumed: Boolean = false
 }
-
-

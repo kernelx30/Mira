@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Debug
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.R
 import androidx.lifecycle.Lifecycle
@@ -30,6 +31,22 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
+internal const val ANR_WARNING_THRESHOLD_MS = 1_000L
+internal const val ANR_BLOCKED_THRESHOLD_MS = 5_000L
+
+internal enum class MainThreadHealth {
+    HEALTHY,
+    WARNING,
+    BLOCKED,
+}
+
+internal fun classifyMainThreadDelay(delayMs: Long): MainThreadHealth =
+    when {
+        delayMs >= ANR_BLOCKED_THRESHOLD_MS -> MainThreadHealth.BLOCKED
+        delayMs >= ANR_WARNING_THRESHOLD_MS -> MainThreadHealth.WARNING
+        else -> MainThreadHealth.HEALTHY
+    }
+
 /**
  * ANR监控器，用于跟踪和记录可能导致ANR的主线程阻塞
  * 
@@ -43,10 +60,7 @@ class AnrMonitor(
     private val tag: String = "AnrMonitor"
 ) {
     companion object {
-        // 默认阈值设置
-        private const val ANR_THRESHOLD_MS = 1000L     // 1秒，标准ANR阈值
-        private const val WARNING_THRESHOLD_MS = 500L // 0.5秒，警告阈值
-        private const val SAMPLING_INTERVAL_MS = 100L  // 100毫秒采样间隔
+        private const val SAMPLING_INTERVAL_MS = 250L
         private const val MAX_STACK_TRACES = 10        // 最大堆栈跟踪数
         
         // 主线程名称
@@ -54,7 +68,10 @@ class AnrMonitor(
     }
     
     private val running = AtomicBoolean(false)
-    private val lastResponseTime = AtomicLong(System.currentTimeMillis())
+    private val probePostedAt = AtomicLong(0L)
+    private val probePending = AtomicBoolean(false)
+    private val warningReportedForCurrentBlock = AtomicBoolean(false)
+    private val anrReportedForCurrentBlock = AtomicBoolean(false)
     private var monitoringJob: Job? = null
     private val mainThreadHandler = Handler(Looper.getMainLooper())
     
@@ -88,7 +105,10 @@ class AnrMonitor(
         }
         
         AppLogger.d(tag, "启动ANR监控器")
-        lastResponseTime.set(System.currentTimeMillis())
+        probePostedAt.set(0L)
+        probePending.set(false)
+        warningReportedForCurrentBlock.set(false)
+        anrReportedForCurrentBlock.set(false)
         
         // 尝试获取主线程引用
         try {
@@ -157,26 +177,26 @@ class AnrMonitor(
      * 报告主线程正常响应
      */
     fun reportThreadHealthy() {
-        lastResponseTime.set(System.currentTimeMillis())
+        warningReportedForCurrentBlock.set(false)
+        anrReportedForCurrentBlock.set(false)
     }
     
     /**
      * 报告主线程响应缓慢
      */
     fun reportSlowResponse(responseTime: Long) {
-        if (responseTime > WARNING_THRESHOLD_MS) {
-            warningCount.incrementAndGet()
-            if (responseTime > maxBlockDuration.get()) {
-                maxBlockDuration.set(responseTime)
-            }
-            
-            if (responseTime > ANR_THRESHOLD_MS) {
-                val anrCount = anrCount.incrementAndGet()
-                AppLogger.e(tag, "检测到可能的ANR! 响应时间: ${responseTime}ms, 这是第${anrCount}次ANR")
+        maxBlockDuration.accumulateAndGet(responseTime, ::maxOf)
+        when (classifyMainThreadDelay(responseTime)) {
+            MainThreadHealth.BLOCKED -> {
+                val count = anrCount.incrementAndGet()
+                AppLogger.e(tag, "检测到可能的ANR! 响应时间: ${responseTime}ms, 这是第${count}次ANR")
                 captureFullThreadDump()
-            } else {
+            }
+            MainThreadHealth.WARNING -> {
+                warningCount.incrementAndGet()
                 AppLogger.w(tag, "主线程响应缓慢: ${responseTime}ms")
             }
+            MainThreadHealth.HEALTHY -> Unit
         }
     }
     
@@ -191,34 +211,43 @@ class AnrMonitor(
      * 检查主线程健康状态
      */
     private fun checkMainThreadHealth() {
-        mainThreadHandler.post {
-            reportThreadHealthy()
+        if (probePending.compareAndSet(false, true)) {
+            val postedAt = SystemClock.uptimeMillis()
+            probePostedAt.set(postedAt)
+            val accepted =
+                mainThreadHandler.post {
+                    if (running.get()) {
+                        reportThreadHealthy()
+                    }
+                    probePending.set(false)
+                }
+            if (!accepted) {
+                probePending.set(false)
+                AppLogger.w(tag, "主线程探针提交失败")
+            }
+            return
         }
 
-        val now = System.currentTimeMillis()
-        val lastResponse = lastResponseTime.get()
-        val timeSinceLastResponse = now - lastResponse
-        
-        if (timeSinceLastResponse > WARNING_THRESHOLD_MS) {
-            // 主线程可能被阻塞
-            val message = context.getString(R.string.anr_main_thread_not_responding, timeSinceLastResponse)
-            
-            if (timeSinceLastResponse > ANR_THRESHOLD_MS) {
-                // 已超过ANR阈值
-                AppLogger.e(tag, "$message - 可能发生ANR!")
-                anrCount.incrementAndGet()
-                
-                // 记录堆栈跟踪 - 使用增强的堆栈捕获
-                captureFullThreadDump()
-                
-                if (timeSinceLastResponse > maxBlockDuration.get()) {
-                    maxBlockDuration.set(timeSinceLastResponse)
+        val timeSinceLastResponse =
+            (SystemClock.uptimeMillis() - probePostedAt.get()).coerceAtLeast(0L)
+        maxBlockDuration.accumulateAndGet(timeSinceLastResponse, ::maxOf)
+        val message = context.getString(R.string.anr_main_thread_not_responding, timeSinceLastResponse)
+        when (classifyMainThreadDelay(timeSinceLastResponse)) {
+            MainThreadHealth.BLOCKED -> {
+                if (anrReportedForCurrentBlock.compareAndSet(false, true)) {
+                    warningReportedForCurrentBlock.set(true)
+                    anrCount.incrementAndGet()
+                    AppLogger.e(tag, "$message - 可能发生ANR!")
+                    captureFullThreadDump()
                 }
-            } else {
-                // 超过警告阈值但未到ANR阈值
-                AppLogger.w(tag, "$message - 警告")
-                warningCount.incrementAndGet()
             }
+            MainThreadHealth.WARNING -> {
+                if (warningReportedForCurrentBlock.compareAndSet(false, true)) {
+                    warningCount.incrementAndGet()
+                    AppLogger.w(tag, "$message - 警告")
+                }
+            }
+            MainThreadHealth.HEALTHY -> Unit
         }
     }
     
@@ -424,4 +453,4 @@ class AnrMonitor(
             AppLogger.e(tag, "保存ANR报告失败", e)
         }
     }
-} 
+}

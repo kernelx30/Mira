@@ -2,12 +2,14 @@
   <a href="README.md">中文版</a> | <span>English</span>
 </div>
 
+> **Mira branch:** This fork makes character companionship, long-term memory, and voice interaction the default experience, with a quieter Material 3 interface. Operit's full Skill, MCP, maps, Shizuku, terminal, workflow, auto-click, and device-control capabilities remain available. Its application ID is `com.ai.assistance.mira`, so it can be installed alongside upstream Operit.
+
 <div align="center">
-  <img src="https://img.shields.io/github/last-commit/AAswordman/Operit" alt="Last Commit">
+  <img src="https://img.shields.io/github/last-commit/kernelx30/Mira" alt="Last Commit">
   <img src="https://img.shields.io/badge/Platform-Android_8.0%2B-brightgreen.svg" alt="Platform">
-  <a href="https://github.com/AAswordman/Operit/releases/latest"><img src="https://img.shields.io/github/v/release/AAswordman/Operit" alt="Latest Release"></a>
+  <a href="https://github.com/kernelx30/Mira/releases/latest"><img src="https://img.shields.io/github/v/release/kernelx30/Mira" alt="Latest Release"></a>
   <br>
-  <a href="https://github.com/AAswordman/Operit/stargazers"><img src="https://img.shields.io/github/stars/AAswordman/Operit" alt="GitHub Stars"></a>
+  <a href="https://github.com/kernelx30/Mira/stargazers"><img src="https://img.shields.io/github/stars/kernelx30/Mira" alt="GitHub Stars"></a>
   <a href="https://aaswordman.github.io/OperitWeb"><img src="https://img.shields.io/badge/📖-User_Guide-blue.svg" alt="User Guide"></a>
   <a href="https://www.patreon.com/c/aaswordsman"><img src="https://img.shields.io/badge/🌍-Patreon-f96854.svg" alt="Patreon"></a>
   <a href="https://afdian.com/a/aaswordsman"><img src="https://img.shields.io/badge/💖-Support_Development-ff6b6b.svg" alt="Support Development"></a>
@@ -16,13 +18,12 @@
   <a href="mailto:aaswordsman@foxmail.com"><img src="https://img.shields.io/badge/📧-Email-red.svg" alt="Email"></a>
   <a href="https://qm.qq.com/q/Sa4fKEH7sO"><img src="https://img.shields.io/badge/💬-QQ_Group-blue.svg" alt="QQ Group"></a>
   <a href="https://discord.gg/YnV9MWurRF"><img src="https://img.shields.io/badge/🎮-Discord-5865F2.svg" alt="Discord"></a>
-  <a href="https://github.com/AAswordman/Operit/issues"><img src="https://img.shields.io/badge/🐛-Issues-orange.svg" alt="Issues"></a>
+  <a href="https://github.com/kernelx30/Mira/issues"><img src="https://img.shields.io/badge/🐛-Issues-orange.svg" alt="Issues"></a>
 </div>
 
 <div align="center">
-  <img src="app/src/main/assets/logo.svg" width="120" height="120" alt="Operit Logo">
-  <h1>Operit AI - Your Intelligent Assistant</h1>
-  <p>📱 <b>The first fully functional, standalone AI assistant for mobile devices with powerful tool-calling capabilities</b> 📱</p>
+  <h1>Mira - Local AI Companion</h1>
+  <p>📱 <b>Companionship, long-term memory, and voice interaction backed by full agent tooling</b> 📱</p>
 </div>
 
 <div align="center">
@@ -38,7 +39,7 @@
 
 ## 🌟 Project Introduction
 
-**Operit AI** is the first fully functional AI assistant application on mobile devices that runs **completely standalone** (except for external API calls) on your Android device. It features powerful **tool-calling capabilities**, **Deep Search**, **workflows & automation**, an **intelligent Memory Vault**, and highly customizable **User Personality** and **Character Cards**, with **MNN/llama.cpp local inference**, an **MCP/Skill ecosystem**, and a **multi-language UI**. It's more than just a chat interface—it's an **all-in-one assistant** deeply integrated with Android permissions and various tools, now featuring a built-in **Ubuntu 24 Environment** for unprecedented functionality.
+**Mira** is an Android local AI companion built on Operit. It makes **character companionship**, **long-term memory**, **proactive reminders**, and **voice interaction** the default experience while retaining upstream **tool calling**, **Deep Search**, **workflows and automation**, the **MCP/Skill ecosystem**, **MNN/llama.cpp local inference**, and the Ubuntu 24 terminal environment.
 
 ---
 

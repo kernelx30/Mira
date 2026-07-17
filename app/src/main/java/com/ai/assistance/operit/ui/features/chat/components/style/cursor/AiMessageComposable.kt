@@ -23,6 +23,8 @@ import com.ai.assistance.operit.ui.features.chat.components.rememberRevisableTex
 import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRenderer
 import com.ai.assistance.operit.ui.features.chat.components.part.ThinkToolsXmlNodeGrouper
 import com.ai.assistance.operit.ui.features.chat.components.LinkPreviewDialog
+import com.ai.assistance.operit.core.chat.CompanionEmojiMarkup
+import com.ai.assistance.operit.ui.features.chat.components.style.common.CompanionEmojiImage
 import com.ai.assistance.operit.util.markdown.toCharStream
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
@@ -32,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.onSizeChanged
 import com.ai.assistance.operit.ui.theme.ProvideAiMarkdownTextLayoutSettings
+import java.io.File
 
 /**
  * A composable function for rendering AI response messages in a Cursor IDE style. Supports text
@@ -71,6 +74,32 @@ fun AiMessageComposable(
     
     // 创建并保存StreamMarkdownRenderer的状态，使用message.timestamp作为key确保同一条消息共享状态
     val rendererState = remember(message.timestamp) { StreamMarkdownRendererState() }
+    val companionEmoji = remember(message.content, message.contentStream, overrideStream) {
+        if (message.contentStream == null && overrideStream == null) {
+            CompanionEmojiMarkup.parseStandalone(
+                content = message.content,
+                customEmojiRoot = File(context.filesDir, "custom_emoji"),
+            )
+        } else {
+            null
+        }
+    }
+
+    if (companionEmoji != null) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .onSizeChanged { size ->
+                        heightMemory?.updateMeasured(message.timestamp, size.height)
+                    },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            CompanionEmojiImage(content = companionEmoji)
+        }
+        return
+    }
 
     // 创建自定义XML渲染器
     val xmlRenderer = remember(

@@ -169,6 +169,9 @@ fun MessageEditor(
                 ) {
                     Text(
                         if (showResendButton) context.getString(R.string.edit_message) else context.getString(R.string.modify_memory),
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -182,7 +185,7 @@ fun MessageEditor(
                         IconButton(
                             onClick = onCancel,
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(48.dp)
                                 .clip(CircleShape)
                         ) {
                             Icon(
@@ -478,6 +481,7 @@ private fun XmlTagItem(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(min = 48.dp)
                     .clickable(onClick = { expanded = !expanded })
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -569,13 +573,13 @@ private fun ActionIconButton(
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(28.dp)
+            .size(48.dp)
             .clip(CircleShape)
     ) {
         Icon(
             icon,
             contentDescription = contentDescription,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

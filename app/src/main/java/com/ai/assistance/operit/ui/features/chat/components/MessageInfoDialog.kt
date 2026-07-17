@@ -91,6 +91,10 @@ fun MessageInfoDialog(
                         rightLabel = stringResource(R.string.message_info_sent_at),
                         rightValue = formatTimestamp(message.sentAt)
                     )
+                    MessageInfoSingleColumnRow(
+                        label = stringResource(R.string.message_info_completed_at),
+                        value = formatTimestamp(message.completedAt)
+                    )
                     MessageInfoTwoColumnRow(
                         leftLabel = stringResource(R.string.message_info_wait_duration),
                         leftValue = formatDuration(message.waitDurationMs),
@@ -130,6 +134,25 @@ private fun MessageInfoCard(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content
+        )
+    }
+}
+
+@Composable
+private fun MessageInfoSingleColumnRow(
+    label: String,
+    value: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }

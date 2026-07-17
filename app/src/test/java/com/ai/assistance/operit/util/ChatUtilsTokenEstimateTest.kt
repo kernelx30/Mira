@@ -13,7 +13,7 @@ class ChatUtilsTokenEstimateTest {
         assertEquals(2, ChatUtils.estimateTokenCount("abcdefgh"))
     }
 
-    @Test fun estimateTokenCount_chineseOnlyUsesHigherWeight() {
-        assertEquals(4, ChatUtils.estimateTokenCount("你好世"))
+    @Test fun estimateTokenCount_chineseOnlyRoundsToNearestToken() {
+        assertEquals(5, ChatUtils.estimateTokenCount("你好世"))
     }
 }

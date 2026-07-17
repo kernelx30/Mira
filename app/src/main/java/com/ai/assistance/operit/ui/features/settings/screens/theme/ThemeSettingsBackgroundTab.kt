@@ -327,12 +327,12 @@ internal fun rememberThemeSettingsBackgroundRuntime(
             onPrimaryColor =
                 if (isNightMode) android.graphics.Color.WHITE else android.graphics.Color.BLACK
         } catch (e: Exception) {
-            primaryColor = if (isNightMode) 0xFF9C27B0.toInt() else 0xFF6200EE.toInt()
-            statusBarColor = if (isNightMode) 0xFF7B1FA2.toInt() else 0xFF3700B3.toInt()
+            primaryColor = if (isNightMode) 0xFF7ED5CE.toInt() else 0xFF167A75.toInt()
+            statusBarColor = if (isNightMode) 0xFF00504C.toInt() else 0xFF0E5D59.toInt()
             surfaceColor =
-                if (isNightMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                if (isNightMode) 0xFF111816.toInt() else 0xFFFFF8EE.toInt()
             onPrimaryColor =
-                if (isNightMode) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                if (isNightMode) 0xFF003735.toInt() else android.graphics.Color.WHITE
         }
 
         val cropOptions =

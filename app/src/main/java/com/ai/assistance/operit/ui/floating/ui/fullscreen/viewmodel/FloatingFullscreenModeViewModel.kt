@@ -12,12 +12,15 @@ import com.ai.assistance.operit.ui.floating.FloatContext
 import com.ai.assistance.operit.ui.floating.ui.fullscreen.XmlTextProcessor
 import com.ai.assistance.operit.ui.floating.ui.pet.AvatarEmotionManager
 import com.ai.assistance.operit.ui.floating.voice.SpeechInteractionManager
+import com.ai.assistance.operit.ui.floating.voice.VoiceCallSessionState
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.TtsSegmenter
 import com.ai.assistance.operit.util.stream.Stream
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -28,6 +31,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TAG = "FloatingFullscreenViewModel"
 private const val FULLSCREEN_TTS_CAPTURE_SUPPRESS_MS = 1200L
+private const val VOICE_SEND_ACCEPT_TIMEOUT_MS = 15_000L
+private const val VOICE_TURN_START_TIMEOUT_MS = 8_000L
+private const val VOICE_TURN_COMPLETE_TIMEOUT_MS = 180_000L
 
 data class VoiceAvatarMotionRequest(
     val emotion: AvatarEmotion = AvatarEmotion.IDLE,
@@ -60,6 +66,8 @@ class FloatingFullscreenModeViewModel(
     var isStreamingTtsMuted by mutableStateOf(false)
     var voiceAvatarMotionRequest by mutableStateOf(VoiceAvatarMotionRequest())
         private set
+    var sessionState by mutableStateOf<VoiceCallSessionState>(VoiceCallSessionState.Idle)
+        private set
     
     val isInitialLoad = mutableStateOf(true)
 
@@ -67,9 +75,12 @@ class FloatingFullscreenModeViewModel(
      private var activeAiStreamIdentity: Int? = null
      private var activeAiMessageTimestamp: Long? = null
      private var ttsSpeakJob: Job? = null
+     private var lastSpokenStaticMessageKey: String? = null
 
     private val wakePrefs by lazy { WakeWordPreferences(context.applicationContext) }
     private var inactivityTimeoutSeconds: Int = WakeWordPreferences.DEFAULT_VOICE_CALL_INACTIVITY_TIMEOUT_SECONDS
+    private var bargeInEnabled: Boolean = WakeWordPreferences.DEFAULT_VOICE_CALL_BARGE_IN_ENABLED
+    private var silenceTimeoutMs: Long = WakeWordPreferences.DEFAULT_VOICE_CALL_SILENCE_TIMEOUT_MS.toLong()
     private var prefsJob: Job? = null
     private var inactivityJob: Job? = null
     private var lastVoiceActivityAtMs: Long = 0L
@@ -88,24 +99,26 @@ class FloatingFullscreenModeViewModel(
     val speechManager = SpeechInteractionManager(
         context = context,
         coroutineScope = coroutineScope,
-        onSpeechResult = { text, _ -> 
-            // 收到最终语音结果后直接发送，不再写入底部输入框
-            val finalText = text.trim()
-            if (finalText.isNotEmpty()) {
-                aiMessage = context.getString(R.string.floating_thinking)
-                coroutineScope.launch {
-                    startVoiceAvatarThinking()
-                    prepareVoiceCaptureForAiTurn()
-                    try {
-                        maybeAutoAttachByKeyword(finalText)
-                    } catch (_: Exception) {
-                    }
-                    floatContext.onSendMessage?.invoke(finalText, PromptFunctionType.VOICE)
-                    awaitAiTurnAndResumeVoiceCapture()
-                }
+        onSpeechResult = { text, _ ->
+            dispatchVoiceMessage(text)
+        },
+        onStateChange = { msg -> aiMessage = msg },
+        onSessionStateChange = { state ->
+            sessionState = state
+            if (
+                state is VoiceCallSessionState.Speaking &&
+                    bargeInEnabled &&
+                    isWaveActive &&
+                    !isRecording
+            ) {
+                startVoiceCapture(cancelAiIfWorking = false)
             }
         },
-        onStateChange = { msg -> aiMessage = msg }
+        onAudioFocusGained = {
+            if (isWaveActive && !isVoiceCapturePausedForAi && !speechManager.isRecording) {
+                startVoiceCapture()
+            }
+        },
     )
     
     // 代理属性，方便 UI 访问
@@ -151,29 +164,110 @@ class FloatingFullscreenModeViewModel(
         }
     }
 
-    private fun awaitAiTurnAndResumeVoiceCapture() {
+    private fun dispatchVoiceMessage(
+        rawText: String,
+        beforeSend: suspend () -> Unit = { maybeAutoAttachByKeyword(rawText.trim()) },
+        allowEmpty: Boolean = false,
+    ) {
+        val text = rawText.trim()
+        if (text.isEmpty() && !allowEmpty && floatContext.attachments.isEmpty()) return
+
+        val turnBaselineTimestamp = floatContext.messages.lastOrNull()?.timestamp ?: Long.MIN_VALUE
+        aiMessage = context.getString(R.string.floating_thinking)
+        sessionState = VoiceCallSessionState.Sending
+        startVoiceAvatarThinking()
+        prepareVoiceCaptureForAiTurn()
+
+        coroutineScope.launch {
+            runCatching { beforeSend() }
+                .onFailure { AppLogger.w(TAG, "Voice attachment preparation failed", it) }
+
+            val accepted = awaitVoiceMessageAccepted(text)
+            if (!accepted) {
+                recoverVoiceCallAfterFailure(context.getString(R.string.mira_voice_send_failed))
+                return@launch
+            }
+
+            sessionState = VoiceCallSessionState.Thinking
+            awaitAiTurnAndResumeVoiceCapture(turnBaselineTimestamp)
+        }
+    }
+
+    private suspend fun awaitVoiceMessageAccepted(text: String): Boolean {
+        val resolved = CompletableDeferred<Boolean>()
+        val callback = floatContext.onSendMessageWithResult
+        if (callback == null) {
+            val legacyCallback = floatContext.onSendMessage ?: return false
+            legacyCallback(text, PromptFunctionType.VOICE)
+            return true
+        }
+
+        val reserved = callback(text, PromptFunctionType.VOICE) { accepted ->
+            if (!resolved.isCompleted) resolved.complete(accepted)
+        }
+        if (!reserved) return false
+        return withTimeoutOrNull(VOICE_SEND_ACCEPT_TIMEOUT_MS) { resolved.await() } == true
+    }
+
+    private fun awaitAiTurnAndResumeVoiceCapture(turnBaselineTimestamp: Long) {
         if (!isWaveActive || !shouldResumeVoiceCaptureAfterAiTurn) return
         resumeVoiceCaptureJob?.cancel()
         resumeVoiceCaptureJob = coroutineScope.launch {
-            delay(120)
-            var observedAiBusy = false
-            while (isActive && isWaveActive && shouldResumeVoiceCaptureAfterAiTurn) {
-                val busy = isAiBusyOrSpeaking()
-                if (busy) {
-                    observedAiBusy = true
-                }
-                if (observedAiBusy && !busy) {
-                    shouldResumeVoiceCaptureAfterAiTurn = false
-                    isVoiceCapturePausedForAi = false
-                    // AI 这一轮结束后，总是从此刻重新开始计算空闲超时。
-                    lastVoiceActivityAtMs = System.currentTimeMillis()
-                    if (!speechManager.isRecording && !speechManager.isProcessingSpeech) {
-                        startVoiceCapture()
+            val turnStarted = withTimeoutOrNull(VOICE_TURN_START_TIMEOUT_MS) {
+                while (isActive && isWaveActive && shouldResumeVoiceCaptureAfterAiTurn) {
+                    val latestAiTimestamp =
+                        floatContext.messages.lastOrNull { it.sender == "ai" }?.timestamp
+                            ?: Long.MIN_VALUE
+                    if (isAiBusyOrSpeaking() || latestAiTimestamp > turnBaselineTimestamp) {
+                        return@withTimeoutOrNull true
                     }
-                    return@launch
+                    delay(100L)
                 }
-                delay(120)
+                false
+            } == true
+
+            if (!turnStarted) {
+                recoverVoiceCallAfterFailure(context.getString(R.string.mira_voice_response_start_timeout))
+                return@launch
             }
+
+            val completed = withTimeoutOrNull(VOICE_TURN_COMPLETE_TIMEOUT_MS) {
+                do {
+                    delay(120L)
+                } while (
+                    isActive &&
+                        isWaveActive &&
+                        shouldResumeVoiceCaptureAfterAiTurn &&
+                        (isAiBusyOrSpeaking() || ttsSpeakJob?.isActive == true)
+                )
+                isActive && isWaveActive && shouldResumeVoiceCaptureAfterAiTurn
+            } == true
+
+            if (!completed) {
+                floatContext.onCancelMessage?.invoke()
+                stopCurrentTtsPlayback()
+                recoverVoiceCallAfterFailure(context.getString(R.string.mira_voice_response_timeout))
+                return@launch
+            }
+
+            resumeVoiceCaptureAfterTurn()
+        }
+    }
+
+    private fun recoverVoiceCallAfterFailure(message: String) {
+        sessionState = VoiceCallSessionState.Error(message, recoverable = true)
+        aiMessage = message
+        resumeVoiceCaptureAfterTurn()
+    }
+
+    private fun resumeVoiceCaptureAfterTurn() {
+        shouldResumeVoiceCaptureAfterAiTurn = false
+        isVoiceCapturePausedForAi = false
+        lastVoiceActivityAtMs = System.currentTimeMillis()
+        if (isWaveActive && !speechManager.isRecording && !speechManager.isProcessingSpeech) {
+            startVoiceCapture()
+        } else if (!isWaveActive) {
+            sessionState = VoiceCallSessionState.Idle
         }
     }
 
@@ -189,7 +283,8 @@ class FloatingFullscreenModeViewModel(
 
          // If we are switching to a new message, stop any previous stream collector.
          // This avoids duplicate collectors (and duplicated replay) when the upstream SharedStream replays history.
-         if (activeAiMessageTimestamp != null && activeAiMessageTimestamp != message.timestamp) {
+         val messageChanged = activeAiMessageTimestamp != message.timestamp
+         if (activeAiMessageTimestamp != null && messageChanged) {
              aiStreamJob?.cancel()
              aiStreamJob = null
              activeAiStreamIdentity = null
@@ -202,7 +297,9 @@ class FloatingFullscreenModeViewModel(
             return
         }
         
-        stopCurrentTtsPlayback()
+        if (messageChanged) {
+            stopCurrentTtsPlayback()
+        }
         
         when (message.sender) {
             "think" -> {
@@ -210,6 +307,7 @@ class FloatingFullscreenModeViewModel(
                 aiStreamJob = null
                 activeAiStreamIdentity = null
                 aiMessage = context.getString(R.string.floating_thinking)
+                sessionState = VoiceCallSessionState.Thinking
             }
             "ai" -> {
                 val stream = message.contentStream
@@ -230,7 +328,11 @@ class FloatingFullscreenModeViewModel(
                     aiStreamJob?.cancel()
                     aiStreamJob = null
                     activeAiStreamIdentity = null
-                    handleStaticResponse(message.content)
+                    val messageKey = buildVoiceAvatarMessageKey(message)
+                    if (lastSpokenStaticMessageKey != messageKey) {
+                        lastSpokenStaticMessageKey = messageKey
+                        handleStaticResponse(message.content, ttsCleanerRegexs)
+                    }
                 }
             }
         }
@@ -260,9 +362,10 @@ class FloatingFullscreenModeViewModel(
         trySpeak(sb.toString(), isFirstSentence, cleaners, armMicSuppression = isFirstSentence)
     }
 
-    private fun handleStaticResponse(content: String) {
+    private fun handleStaticResponse(content: String, cleaners: List<String>) {
         val plainContent = stripVoiceAvatarTags(content)
         aiMessage = plainContent
+        trySpeak(plainContent, interrupt = true, cleaners = cleaners, armMicSuppression = true)
     }
 
     private fun trySpeak(
@@ -298,7 +401,7 @@ class FloatingFullscreenModeViewModel(
             coroutineScope.launch {
                 try {
                     previousJob?.join()
-                    speechManager.voiceService.speak(text, interrupt)
+                    speechManager.speakExpressively(text, interrupt)
                 } catch (_: kotlinx.coroutines.CancellationException) {
                 } catch (e: Exception) {
                     AppLogger.e(TAG, "TTS playback failed", e)
@@ -308,13 +411,13 @@ class FloatingFullscreenModeViewModel(
 
     // ===== 语音交互 =====
 
-    fun startVoiceCapture() {
+    fun startVoiceCapture(cancelAiIfWorking: Boolean = true) {
         // 如果AI正在生成，尝试取消
         val lastMessage = floatContext.messages.lastOrNull()
         val isAiWorking = lastMessage?.sender == "think" || 
                           (lastMessage?.sender == "ai" && lastMessage.contentStream != null)
         
-        if (isAiWorking) {
+        if (isAiWorking && cancelAiIfWorking) {
             floatContext.onCancelMessage?.invoke()
         }
         
@@ -412,29 +515,73 @@ class FloatingFullscreenModeViewModel(
     }
 
     fun handleRecognitionResult(resultText: String, isFinal: Boolean) {
-        if (isWaveActive && System.currentTimeMillis() < suppressRecognitionUntilMs) {
+        val speaking = speechManager.voiceService.isSpeaking
+        if (
+            isWaveActive &&
+                System.currentTimeMillis() < suppressRecognitionUntilMs &&
+                (!bargeInEnabled || !speaking || isLikelyPlaybackEcho(resultText))
+        ) {
             return
         }
         if (isWaveActive && resultText.isNotBlank()) {
             lastVoiceActivityAtMs = System.currentTimeMillis()
         }
         // 委托给 Manager 处理，波浪模式下启用自动静默发送
-        speechManager.handleRecognitionResult(resultText, isFinal, autoSendSilence = isWaveActive)
+        if (isWaveActive && speechManager.voiceService.isSpeaking) {
+            if (isLikelyPlaybackEcho(resultText)) return
+            if (resultText.isNotBlank()) {
+                sessionState = VoiceCallSessionState.Interrupted
+                stopCurrentTtsPlayback()
+                floatContext.onCancelMessage?.invoke()
+                suppressRecognitionUntilMs = 0L
+            }
+        }
+        speechManager.handleRecognitionResult(
+            resultText = resultText,
+            isFinal = isFinal,
+            autoSendSilence = isWaveActive,
+            silenceTimeoutMs = silenceTimeoutMs,
+        )
     }
+
+    private fun isLikelyPlaybackEcho(recognizedText: String): Boolean {
+        val recognized = normalizeSpeechForComparison(recognizedText)
+        val spoken = normalizeSpeechForComparison(speechManager.currentSpokenText)
+        if (recognized.length < 4 || spoken.length < 4) return false
+        if (spoken.contains(recognized)) return true
+        if (recognized.contains(spoken) && spoken.length >= 6) return true
+
+        val prefixLength = minOf(recognized.length, spoken.length, 16)
+        if (prefixLength < 6) return false
+        val matchingPrefix =
+            (0 until prefixLength).count { index -> recognized[index] == spoken[index] }
+        return matchingPrefix.toFloat() / prefixLength >= 0.78f
+    }
+
+    private fun normalizeSpeechForComparison(text: String): String =
+        text.lowercase().filter { it.isLetterOrDigit() }
 
     // ===== 初始化与清理 =====
 
      suspend fun initialize(autoEnterVoiceChat: Boolean = false, wakeLaunched: Boolean = false) {
-         speechManager.initialize()
+         val speechReady = speechManager.initialize()
          cancelPendingVoiceCaptureResume()
          prefsJob?.cancel()
          prefsJob = coroutineScope.launch {
-             wakePrefs.voiceCallInactivityTimeoutSecondsFlow.collectLatest { seconds ->
-                 inactivityTimeoutSeconds = seconds.coerceIn(1, 600)
+             combine(
+                 wakePrefs.voiceCallInactivityTimeoutSecondsFlow,
+                 wakePrefs.voiceCallBargeInEnabledFlow,
+                 wakePrefs.voiceCallSilenceTimeoutMsFlow,
+             ) { inactivitySeconds, bargeIn, silenceMs ->
+                 Triple(inactivitySeconds, bargeIn, silenceMs)
+             }.collectLatest { (inactivitySeconds, bargeIn, silenceMs) ->
+                 inactivityTimeoutSeconds = inactivitySeconds.coerceIn(1, 600)
+                 bargeInEnabled = bargeIn
+                 silenceTimeoutMs = silenceMs.toLong().coerceIn(700L, 4_000L)
              }
          }
          isInitialLoad.value = true
-         isWaveActive = autoEnterVoiceChat
+         isWaveActive = autoEnterVoiceChat && speechReady
          showBottomControls = true
          hasInitializedVoiceAvatarFromSnapshot = false
          lastHandledVoiceAvatarMessageKey = null
@@ -449,7 +596,7 @@ class FloatingFullscreenModeViewModel(
              aiMessage = context.getString(R.string.floating_hold_microphone_to_speak)
          }
 
-         if (autoEnterVoiceChat) {
+         if (autoEnterVoiceChat && speechReady) {
              enterWaveMode(wakeLaunched = wakeLaunched, enableAutoTimeout = true)
          }
      }
@@ -469,7 +616,8 @@ class FloatingFullscreenModeViewModel(
 
          aiStreamJob?.cancel()
          aiStreamJob = null
-         activeAiStreamIdentity = null
+        activeAiStreamIdentity = null
+        lastSpokenStaticMessageKey = null
 
         wakeEnterJob?.cancel()
         wakeEnterJob = null
@@ -552,13 +700,9 @@ class FloatingFullscreenModeViewModel(
     
     fun sendEditedMessage() {
         if (editableText.isNotBlank()) {
-            startVoiceAvatarThinking()
-            prepareVoiceCaptureForAiTurn()
-            floatContext.onSendMessage?.invoke(editableText, PromptFunctionType.VOICE)
-            awaitAiTurnAndResumeVoiceCapture()
+            dispatchVoiceMessage(editableText)
             isEditMode = false
             editableText = ""
-            aiMessage = context.getString(R.string.floating_thinking)
         }
     }
     
@@ -578,15 +722,11 @@ class FloatingFullscreenModeViewModel(
         hasOcrSelection = false
         aiMessage = context.getString(R.string.floating_thinking)
 
-        startVoiceAvatarThinking()
-        prepareVoiceCaptureForAiTurn()
-
-        coroutineScope.launch {
-            try {
+        dispatchVoiceMessage(
+            rawText = text,
+            allowEmpty = true,
+            beforeSend = {
                 maybeAutoAttachByKeyword(text)
-            } catch (_: Exception) {
-            }
-            try {
                 val attachmentDelegate = floatContext.chatService?.getChatCore()?.getAttachmentDelegate()
                 if (shouldCaptureScreen) {
                     attachmentDelegate?.captureScreenContent()
@@ -597,13 +737,8 @@ class FloatingFullscreenModeViewModel(
                 if (shouldCaptureLocation) {
                     attachmentDelegate?.captureLocation()
                 }
-                // hasOcrSelection 的附件已经在 FloatingScreenOcrScreen 中添加了
-            } catch (_: Exception) {
-            }
-
-            floatContext.onSendMessage?.invoke(text, PromptFunctionType.VOICE)
-            awaitAiTurnAndResumeVoiceCapture()
-        }
+            },
+        )
     }
 
     private suspend fun maybeAutoAttachByKeyword(text: String) {

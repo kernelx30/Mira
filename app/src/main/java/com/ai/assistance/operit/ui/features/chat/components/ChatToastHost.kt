@@ -31,7 +31,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -47,6 +49,7 @@ fun ChatToastHost(
     maxHeight: Dp = 240.dp,
 ) {
     val scrollState = rememberScrollState()
+    val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
 
     LaunchedEffect(message) {
         if (message == null) return@LaunchedEffect
@@ -82,9 +85,15 @@ fun ChatToastHost(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
                 )
             ) {
+                val estimatedCharsPerLine = (24 / fontScale).toInt().coerceAtLeast(8)
                 val estimatedLines = message
                     ?.lineSequence()
-                    ?.sumOf { line -> max(1, (line.length + 23) / 24) }
+                    ?.sumOf { line ->
+                        max(
+                            1,
+                            (line.length + estimatedCharsPerLine - 1) / estimatedCharsPerLine,
+                        )
+                    }
                     ?: 1
                 val isCompactMessage = estimatedLines <= 2
 
@@ -93,7 +102,7 @@ fun ChatToastHost(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_simple_foreground),
+                        painter = painterResource(id = R.drawable.ic_mira_logo),
                         contentDescription = null,
                         modifier = Modifier
                             .size(36.dp),
@@ -125,11 +134,11 @@ fun ChatToastHost(
                     }
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.close),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )

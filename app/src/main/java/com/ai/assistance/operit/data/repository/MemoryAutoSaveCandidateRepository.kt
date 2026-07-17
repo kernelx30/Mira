@@ -15,11 +15,23 @@ class MemoryAutoSaveCandidateRepository(
     private val store = ObjectBoxManager.get(context, profileId)
     private val candidateBox: Box<MemoryAutoSaveCandidate> = store.boxFor()
 
+    @Synchronized
     fun enqueue(
         chatId: String,
         triggerMessageTimestamp: Long,
         sourceType: String = MemoryAutoSaveCandidate.SOURCE_TYPE_REPLY_FINALIZED_AUTO
     ): Long {
+        if (chatId.isBlank() || triggerMessageTimestamp <= 0L) return 0L
+        candidateBox
+            .query(MemoryAutoSaveCandidate_.chatId.equal(chatId))
+            .build()
+            .find()
+            .firstOrNull {
+                it.triggerMessageTimestamp == triggerMessageTimestamp &&
+                    it.sourceType == sourceType
+            }
+            ?.let { return it.id }
+
         val now = Date()
         val candidate =
             MemoryAutoSaveCandidate(
@@ -36,23 +48,38 @@ class MemoryAutoSaveCandidateRepository(
     fun enqueueSelectedUserMessages(
         chatId: String,
         triggerMessageTimestamps: List<Long>
-    ) {
+    ): Int {
         val normalizedTimestamps =
             triggerMessageTimestamps
                 .filter { it > 0L }
                 .distinct()
                 .sorted()
-        if (chatId.isBlank() || normalizedTimestamps.isEmpty()) return
-        normalizedTimestamps.forEach { timestamp ->
+        if (chatId.isBlank() || normalizedTimestamps.isEmpty()) return 0
+
+        val queuedTimestamps =
+            candidateBox
+                .query(MemoryAutoSaveCandidate_.chatId.equal(chatId))
+                .build()
+                .find()
+                .asSequence()
+                .filter {
+                    MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
+                }
+                .map { it.triggerMessageTimestamp }
+                .toHashSet()
+        val newTimestamps = normalizedTimestamps.filterNot(queuedTimestamps::contains)
+        newTimestamps.forEach { timestamp ->
             enqueue(
                 chatId = chatId,
                 triggerMessageTimestamp = timestamp,
                 sourceType = MemoryAutoSaveCandidate.SOURCE_TYPE_SELECTED_USER_MESSAGE
             )
         }
+        return newTimestamps.size
     }
 
     fun getPendingAndFailedCandidates(): List<MemoryAutoSaveCandidate> {
+        recoverStaleProcessing()
         return candidateBox
             .query(
                 MemoryAutoSaveCandidate_.status
@@ -66,6 +93,33 @@ class MemoryAutoSaveCandidateRepository(
             .build()
             .find()
             .sortedBy { it.createdAt.time }
+    }
+
+    fun getProcessableCandidates(nowMs: Long = System.currentTimeMillis()): List<MemoryAutoSaveCandidate> {
+        recoverStaleProcessing(nowMs)
+        return getPendingAndFailedCandidates().filter { candidate ->
+            candidate.status == MemoryAutoSaveCandidate.STATUS_PENDING ||
+                candidate.nextAttemptAtMs <= nowMs
+        }
+    }
+
+    fun recoverStaleProcessing(nowMs: Long = System.currentTimeMillis()): Int {
+        val staleBefore = nowMs - MemoryAutoSaveCandidate.PROCESSING_STALE_AFTER_MS
+        val stale =
+            candidateBox.all.filter {
+                it.status == MemoryAutoSaveCandidate.STATUS_PROCESSING &&
+                    it.updatedAt.time <= staleBefore
+            }
+        if (stale.isEmpty()) return 0
+        val now = Date(nowMs)
+        stale.forEach { candidate ->
+            candidate.status = MemoryAutoSaveCandidate.STATUS_PENDING
+            candidate.updatedAt = now
+            candidate.nextAttemptAtMs = 0L
+            candidate.lastError = "Recovered after interrupted processing"
+        }
+        candidateBox.put(stale)
+        return stale.size
     }
 
     fun countPendingAndFailedChats(): Int {
@@ -88,6 +142,7 @@ class MemoryAutoSaveCandidateRepository(
             candidate.status = MemoryAutoSaveCandidate.STATUS_PROCESSING
             candidate.updatedAt = now
             candidate.lastError = ""
+            candidate.nextAttemptAtMs = 0L
         }
         candidateBox.put(candidates)
     }
@@ -100,6 +155,7 @@ class MemoryAutoSaveCandidateRepository(
             candidate.status = MemoryAutoSaveCandidate.STATUS_PENDING
             candidate.updatedAt = now
             candidate.lastError = ""
+            candidate.nextAttemptAtMs = 0L
         }
         candidateBox.put(candidates)
     }
@@ -119,6 +175,8 @@ class MemoryAutoSaveCandidateRepository(
             candidate.attemptCount += 1
             candidate.lastError = normalizedError
             candidate.updatedAt = now
+            candidate.nextAttemptAtMs =
+                now.time + MemoryAutoSaveCandidate.retryDelayMs(candidate.attemptCount)
         }
         candidateBox.put(candidates)
     }

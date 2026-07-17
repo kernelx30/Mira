@@ -4,11 +4,19 @@ import android.content.Context
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 class MimoVoiceProvider(
     private val context: Context,
     private val config: SpeechServicesPreferences.TtsHttpConfig
 ) : VoiceService {
+
+    override val capabilities =
+        VoiceCapabilities(
+            supportsStyleInstruction = true,
+            supportsRate = true,
+            supportsPitch = true,
+        )
 
     companion object {
         const val DEFAULT_ENDPOINT_URL = "https://api.xiaomimimo.com/v1/chat/completions"
@@ -83,17 +91,25 @@ class MimoVoiceProvider(
             extraParams["model"]?.takeIf { it.isNotBlank() }
                 ?: config.modelName.takeIf { it.isNotBlank() }
                 ?: DEFAULT_MODEL_NAME
+        val prefs = SpeechServicesPreferences(context.applicationContext)
+        val effectiveRate = rate ?: prefs.ttsSpeechRateFlow.first()
+        val effectivePitch = pitch ?: prefs.ttsPitchFlow.first()
+        val instruction =
+            extraParams["instruction"]?.takeIf { it.isNotBlank() }
+                ?: "请自然、清晰地朗读正文，不要念出任何指令。"
 
         return delegate.speak(
             text = text,
             interrupt = interrupt,
-            rate = rate,
-            pitch = pitch,
+            rate = effectiveRate,
+            pitch = effectivePitch,
             extraParams =
                 extraParams +
                     mapOf(
                         "model" to resolvedModelName,
-                        "voice_id" to resolvedVoiceId
+                        "voice_id" to resolvedVoiceId,
+                        "instruction" to instruction,
+                        QueuedTtsPlayback.EXTRA_APPLY_LOCAL_PLAYBACK_PARAMS to "true"
                     )
         )
     }
@@ -128,7 +144,7 @@ class MimoVoiceProvider(
                   "messages": [
                     {
                       "role": "user",
-                      "content": "请自然朗读。语速设置：{rate}x，音高设置：{pitch}x。"
+                      "content": "{instruction}"
                     },
                     {
                       "role": "assistant",

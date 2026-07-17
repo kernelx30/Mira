@@ -13,7 +13,6 @@ object ChatMarkupRegex {
     private val toolTagNameRegex = Regex("^$TOOL_TAG_NAME_REGEX_SOURCE$", RegexOption.IGNORE_CASE)
     private val toolResultTagNameRegex = Regex("^$TOOL_RESULT_TAG_NAME_REGEX_SOURCE$", RegexOption.IGNORE_CASE)
     private val openingTagNameRegex = Regex("<([A-Za-z][A-Za-z0-9_]*)")
-    private val toolStartTagRegex = Regex("<(?:$TOOL_TAG_NAME_REGEX_SOURCE)\\b", RegexOption.IGNORE_CASE)
     private val toolResultStartTagRegex = Regex("<(?:$TOOL_RESULT_TAG_NAME_REGEX_SOURCE)\\b", RegexOption.IGNORE_CASE)
     private val metaProviderAttrRegex = Regex("""\bprovider\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
     private val metaBodyRegex = Regex(
@@ -215,7 +214,9 @@ object ChatMarkupRegex {
     }
 
     fun containsToolTag(content: String): Boolean {
-        return toolStartTagRegex.containsMatchIn(content)
+        return openingTagNameRegex.findAll(content).any { match ->
+            isToolTagName(match.groupValues.getOrNull(1))
+        }
     }
 
     fun containsToolResultTag(content: String): Boolean {

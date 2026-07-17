@@ -18,4 +18,26 @@ class TtsSegmenterTest {
     fun sentenceEndingDot_stillSplitsNormally() {
         assertEquals(listOf("第一句.", "第二句"), TtsSegmenter.split("第一句.第二句"))
     }
+
+    @Test
+    fun naturalBlocks_mergeShortSentences() {
+        assertEquals(
+            listOf("第一句。 第二句。", "第三句。"),
+            TtsSegmenter.splitNaturalBlocks("第一句。第二句。第三句。"),
+        )
+    }
+
+    @Test
+    fun naturalBlockBuffer_emitsAfterTargetLength() {
+        val buffer =
+            TtsNaturalBlockBuffer(
+                minBlockLength = 12,
+                maxBlockLength = 30,
+                minSegmentCount = 3,
+            )
+
+        assertEquals(emptyList<String>(), buffer.append("第一句。"))
+        assertEquals(listOf("第一句。 第二句比较长。"), buffer.append("第二句比较长。"))
+        assertEquals(null, buffer.flush())
+    }
 }

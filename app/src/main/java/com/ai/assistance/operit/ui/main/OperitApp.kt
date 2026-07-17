@@ -55,6 +55,8 @@ import androidx.compose.runtime.DisposableEffect
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.update.screens.UpdateScreen
 import com.ai.assistance.operit.util.AppLogger
+import com.ai.assistance.operit.ui.adaptive.LocalAdaptiveWindowMetrics
+import com.ai.assistance.operit.ui.adaptive.rememberAdaptiveWindowMetrics
 
 // 为TopAppBar的actions提供CompositionLocal
 // 它允许子组件（如AIChatScreen）向上提供它们的action Composable
@@ -102,6 +104,7 @@ fun OperitApp(
     val remoteAnnouncementPreferences = remember { RemoteAnnouncementPreferences(context) }
     var navigationRevision by remember { mutableStateOf(0) }
     val configuration = LocalConfiguration.current
+    val adaptiveWindowMetrics = rememberAdaptiveWindowMetrics()
     val navigationModel = remember(context, configuration, navigationRevision) { AppRouteCatalog.build(context) }
 
     val routerState = remember {
@@ -284,16 +287,16 @@ fun OperitApp(
     // Tablet mode sidebar state
     var isTabletSidebarExpanded by remember { mutableStateOf(false) }
     var tabletSidebarWidth by remember { mutableStateOf(280.dp) } // 侧边栏默认宽度
-    val collapsedTabletSidebarWidth = 64.dp // 收起时的宽度
+    val collapsedTabletSidebarWidth = 96.dp
 
     // Device screen size calculation
-    val screenWidthDp = configuration.screenWidthDp
+    val screenWidthDp = adaptiveWindowMetrics.widthDp
 
     // Determine if using tablet layout based on screen width
     // Using Material Design 3 guidelines:
-    // - Less than 600dp: phone
-    // - 600dp and above: tablet
-    val useTabletLayout = screenWidthDp >= 600
+    // Medium-width portrait devices still need the phone navigation model. A permanent
+    // rail at 600dp made the conversation feel like a management console and hid core actions.
+    val useTabletLayout = adaptiveWindowMetrics.usesPermanentNavigation
 
     var remoteAnnouncement by remember { mutableStateOf<RemoteAnnouncementDisplay?>(null) }
 
@@ -307,11 +310,11 @@ fun OperitApp(
     val navItems = listOf(
         NavItem.AiChat,
         NavItem.AssistantConfig,
-        NavItem.Packages,
         NavItem.MemoryBase,
         NavItem.Toolbox,
-        NavItem.ShizukuCommands,
+        NavItem.Packages,
         NavItem.Workflow,
+        NavItem.ShizukuCommands,
         NavItem.Settings,
         NavItem.Help,
         NavItem.About
@@ -352,7 +355,7 @@ fun OperitApp(
     val showFpsCounter = displayPreferencesManager.showFpsCounter.collectAsState(initial = false).value
     val enableNavigationAnimation =
         displayPreferencesManager.enableNavigationAnimation
-            .collectAsState(initial = true)
+            .collectAsState(initial = false)
             .value
 
     // Create an instance of MCPRepository
@@ -367,7 +370,7 @@ fun OperitApp(
     }
 
     // Calculate drawer width for phone mode
-    val drawerWidth = (screenWidthDp * 0.75).dp // Drawer width is 3/4 of screen width
+    val drawerWidth = adaptiveWindowMetrics.drawerWidthDp.dp
 
     // Main app container
     Box(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
@@ -415,6 +418,7 @@ fun OperitApp(
         }
         CompositionLocalProvider(
             LocalAppNavigationModel provides navigationModel,
+            LocalAdaptiveWindowMetrics provides adaptiveWindowMetrics,
             LocalTopBarActions provides { actions: @Composable RowScope.() -> Unit ->
                 topBarActions = actions
             },

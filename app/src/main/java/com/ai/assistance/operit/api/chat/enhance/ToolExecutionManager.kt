@@ -45,6 +45,7 @@ object ToolExecutionManager {
     private val toolRuntimeContextThreadLocal = ThreadLocal<ToolRuntimeContext?>()
 
     data class ToolRuntimeContext(
+        val callerChatId: String? = null,
         val callerCardId: String? = null,
         val toolExposureMode: ToolExposureMode = ToolExposureMode.FULL
     )
@@ -522,6 +523,7 @@ object ToolExecutionManager {
         }
         val toolRuntimeContext =
             ToolRuntimeContext(
+                callerChatId = callerChatId,
                 callerCardId = callerCardId,
                 toolExposureMode = toolExposureMode
             )
@@ -537,7 +539,7 @@ object ToolExecutionManager {
                 toolExposureDeniedResults.add(deniedResult)
                 toolHandler.notifyToolExecutionResult(invocation.tool, deniedResult)
                 val toolResultStatusContent =
-                    ConversationMarkupManager.formatToolResultForMessage(deniedResult)
+                    ConversationMarkupManager.formatToolResultForMessage(deniedResult, context)
                 collector.emit(ensureEndsWithNewline(toolResultStatusContent))
             }
         }
@@ -560,7 +562,7 @@ object ToolExecutionManager {
                 roleCardDeniedResults.add(deniedResult)
                 toolHandler.notifyToolExecutionResult(invocation.tool, deniedResult)
                 val toolResultStatusContent =
-                    ConversationMarkupManager.formatToolResultForMessage(deniedResult)
+                    ConversationMarkupManager.formatToolResultForMessage(deniedResult, context)
                 collector.emit(ensureEndsWithNewline(toolResultStatusContent))
             }
         }
@@ -582,7 +584,7 @@ object ToolExecutionManager {
                         errorResult?.let {
                             permissionDeniedResults.add(it)
                             val toolResultStatusContent =
-                                ConversationMarkupManager.formatToolResultForMessage(it)
+                                ConversationMarkupManager.formatToolResultForMessage(it, context)
                             collector.emit(ensureEndsWithNewline(toolResultStatusContent))
                         }
                     }
@@ -598,7 +600,7 @@ object ToolExecutionManager {
                     toolHandler.notifyToolExecutionResult(invocation.tool, interceptedResult)
                     toolHandler.notifyToolExecutionFinished(invocation.tool)
                     val toolResultStatusContent =
-                        ConversationMarkupManager.formatToolResultForMessage(interceptedResult)
+                        ConversationMarkupManager.formatToolResultForMessage(interceptedResult, context)
                     collector.emit(ensureEndsWithNewline(toolResultStatusContent))
                 }
             }
@@ -644,6 +646,7 @@ object ToolExecutionManager {
                         toolHandler = toolHandler,
                         packageManager = packageManager,
                         collector = collector,
+                        context = context,
                         runtimeContext = toolRuntimeContext
                     )
                 executionResults[invocation] = result
@@ -658,6 +661,7 @@ object ToolExecutionManager {
                     toolHandler = toolHandler,
                     packageManager = packageManager,
                     collector = collector,
+                    context = context,
                     runtimeContext = toolRuntimeContext
                 )
             executionResults[invocation] = result
@@ -685,6 +689,7 @@ object ToolExecutionManager {
         toolHandler: AIToolHandler,
         packageManager: PackageManager,
         collector: StreamCollector<String>,
+        context: Context,
         runtimeContext: ToolRuntimeContext
     ): ToolResult {
         val toolName = invocation.tool.name
@@ -718,7 +723,7 @@ object ToolExecutionManager {
                     collectedResults.add(result)
                     // 实时输出每个结果
                     val toolResultStatusContent =
-                        ConversationMarkupManager.formatToolResultForMessage(result)
+                        ConversationMarkupManager.formatToolResultForMessage(result, context)
                     collector.emit(ensureEndsWithNewline(toolResultStatusContent))
                 }
 

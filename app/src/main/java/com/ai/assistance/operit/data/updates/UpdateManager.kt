@@ -4,6 +4,7 @@ import android.content.Context
 import com.ai.assistance.operit.util.AppLogger
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.api.GitHubApiService
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
@@ -133,6 +134,13 @@ class UpdateManager private constructor(private val context: Context) {
     private suspend fun checkForUpdatesInternal(currentVersion: String): UpdateStatus {
         return withContext(Dispatchers.IO) {
             try {
+                val repoOwner = BuildConfig.UPDATE_REPO_OWNER.trim()
+                val repoName = BuildConfig.UPDATE_REPO_NAME.trim()
+                if (repoOwner.isBlank() || repoName.isBlank()) {
+                    AppLogger.i(TAG, "Update repository is not configured for this build")
+                    return@withContext UpdateStatus.Error(context.getString(R.string.update_source_not_configured))
+                }
+
                 val betaEnabled = try {
                     UserPreferencesManager.getInstance(context).isBetaPlanEnabled()
                 } catch (_: Exception) {
@@ -158,21 +166,6 @@ class UpdateManager private constructor(private val context: Context) {
                     } else {
                         null
                     }
-
-                // 从字符串资源中获取GitHub仓库信息
-                val aboutWebsite = context.getString(R.string.about_website)
-
-                // 解析GitHub仓库链接 - 处理HTML格式
-                val htmlContent = aboutWebsite.replace("&lt;", "<").replace("&gt;", ">")
-                val githubUrlPattern = "https://github.com/([^/\"<>]+)/([^/\"<>]+)".toRegex()
-                val matchResult = githubUrlPattern.find(htmlContent)
-
-                val (repoOwner, repoName) =
-                        if (matchResult != null) {
-                            Pair(matchResult.groupValues[1], matchResult.groupValues[2])
-                        } else {
-                            Pair("AAswordman", "Operit") // 默认值
-                        }
 
                 val githubReleaseUtil = GithubReleaseUtil(context)
                 val releaseInfo = githubReleaseUtil.fetchLatestReleaseInfo(repoOwner, repoName)
@@ -223,8 +216,9 @@ class UpdateManager private constructor(private val context: Context) {
     private suspend fun tryFetchLatestPatchUpdate(currentVersion: String): UpdateStatus? {
         val api = GitHubApiService(context)
 
-        val owner = "AAswordman"
-        val repo = "OperitNightlyRelease"
+        val owner = BuildConfig.UPDATE_PATCH_REPO_OWNER.trim()
+        val repo = BuildConfig.UPDATE_PATCH_REPO_NAME.trim()
+        if (owner.isBlank() || repo.isBlank()) return null
 
         AppLogger.d(TAG, "tryFetchLatestPatchUpdate(): currentVersion=$currentVersion repo=$owner/$repo")
         val result = api.getRepositoryReleases(owner = owner, repo = repo, page = 1, perPage = 20)

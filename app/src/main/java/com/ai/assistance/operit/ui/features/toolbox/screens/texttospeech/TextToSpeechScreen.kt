@@ -35,6 +35,9 @@ import java.net.ProtocolException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import com.ai.assistance.operit.api.voice.TtsException
+import com.ai.assistance.operit.api.voice.ExpressiveTtsDirector
+import com.ai.assistance.operit.api.voice.VoiceCapabilities
+import kotlinx.coroutines.flow.first
 
 /** 文本转语音演示屏幕 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +55,13 @@ fun TextToSpeechScreen(navController: NavController) {
         }
         
         // 状态变量
-        var inputText by remember { mutableStateOf("") }
+        val previewSamples =
+                listOf(
+                        stringResource(R.string.tts_preview_daily) to stringResource(R.string.tts_preview_daily_text),
+                        stringResource(R.string.tts_preview_comfort) to stringResource(R.string.tts_preview_comfort_text),
+                        stringResource(R.string.tts_preview_teasing) to stringResource(R.string.tts_preview_teasing_text),
+                )
+        var inputText by remember { mutableStateOf(previewSamples.first().second) }
         var speechRate by remember { mutableStateOf(1.0f) }
         var speechPitch by remember { mutableStateOf(1.0f) }
         var isInitialized by remember { mutableStateOf(false) }
@@ -141,6 +150,37 @@ fun TextToSpeechScreen(navController: NavController) {
                 }
         }
 
+        suspend fun speakDirected(currentVoiceService: VoiceService): Boolean {
+                val expressiveEnabled = prefs.expressiveTtsEnabledFlow.first()
+                val strength = prefs.expressiveTtsStrengthFlow.first()
+                val requests =
+                        ExpressiveTtsDirector.plan(
+                                content = inputText,
+                                capabilities =
+                                        if (expressiveEnabled) {
+                                                currentVoiceService.capabilities
+                                        } else {
+                                                VoiceCapabilities.PLAIN
+                                        },
+                                baseRate = speechRate,
+                                basePitch = speechPitch,
+                                expressionScale = strength.scale,
+                        )
+                var success = requests.isNotEmpty()
+                requests.forEachIndexed { index, request ->
+                        if (!success) return@forEachIndexed
+                        success =
+                                currentVoiceService.speak(
+                                        text = request.text,
+                                        interrupt = index == 0,
+                                        rate = request.rate,
+                                        pitch = request.pitch,
+                                        extraParams = request.extraParams,
+                                )
+                }
+                return success
+        }
+
         // 播放文本
         @SuppressLint("StringFormatMatches")
         fun speakText() {
@@ -159,8 +199,7 @@ fun TextToSpeechScreen(navController: NavController) {
                 coroutineScope.launch {
                         try {
                                 val currentVoiceService = refreshVoiceService()
-                                val success =
-                                        currentVoiceService.speak(inputText, true, speechRate, speechPitch)
+                                val success = speakDirected(currentVoiceService)
                                 if (!success) {
                                         error = context.getString(R.string.tts_speak_failed)
                                         errorDetails = context.getString(R.string.tts_speak_error_details)
@@ -181,6 +220,33 @@ fun TextToSpeechScreen(navController: NavController) {
                                 refreshVoiceService().stop()
                         } catch (e: Exception) {
                                 error = context.getString(R.string.tts_stop_error, e.message ?: "Unknown error")
+                        }
+                }
+        }
+
+        fun restartSpeakingWithCurrentSettings() {
+                if (!isSpeaking || inputText.isBlank()) return
+
+                coroutineScope.launch {
+                        try {
+                                val currentVoiceService = refreshVoiceService()
+                                currentVoiceService.stop()
+                                val success = speakDirected(currentVoiceService)
+                                if (!success) {
+                                        error = context.getString(R.string.tts_speak_failed)
+                                        errorDetails = context.getString(R.string.tts_speak_error_details)
+                                }
+                                debugInfo =
+                                        context.getString(
+                                                R.string.tts_debug_params_with_service,
+                                                inputText,
+                                                speechRate,
+                                                speechPitch,
+                                                currentVoiceService.javaClass.simpleName
+                                        )
+                        } catch (e: Exception) {
+                                error = context.getString(R.string.tts_speak_error, e.message ?: "Unknown error")
+                                errorDetails = handleTtsError(e)
                         }
                 }
         }
@@ -217,6 +283,22 @@ fun TextToSpeechScreen(navController: NavController) {
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                 )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                        previewSamples.forEach { (label, sample) ->
+                                                FilterChip(
+                                                        selected = inputText == sample,
+                                                        onClick = { inputText = sample },
+                                                        label = { Text(label, maxLines = 1) },
+                                                        modifier = Modifier.weight(1f),
+                                                )
+                                        }
+                                }
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -266,6 +348,7 @@ fun TextToSpeechScreen(navController: NavController) {
                                 Slider(
                                         value = speechRate,
                                         onValueChange = { speechRate = it },
+                                        onValueChangeFinished = { restartSpeakingWithCurrentSettings() },
                                         valueRange = 0.5f..2.0f,
                                         steps = 5,
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
@@ -283,6 +366,7 @@ fun TextToSpeechScreen(navController: NavController) {
                                 Slider(
                                         value = speechPitch,
                                         onValueChange = { speechPitch = it },
+                                        onValueChangeFinished = { restartSpeakingWithCurrentSettings() },
                                         valueRange = 0.5f..2.0f,
                                         steps = 5,
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)

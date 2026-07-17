@@ -13,6 +13,7 @@ import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -99,6 +100,11 @@ class CustomEmojiRepository private constructor(private val context: Context) {
         sourceUri: Uri
     ): Result<CustomEmoji> = withContext(Dispatchers.IO) {
         try {
+            if (!isValidCategoryName(category)) {
+                return@withContext Result.failure(
+                    IllegalArgumentException(context.getString(R.string.invalid_category_name))
+                )
+            }
             initializeBuiltinEmojis(target)
 
             val extension = getFileExtension(sourceUri) ?: return@withContext Result.failure(
@@ -155,11 +161,13 @@ class CustomEmojiRepository private constructor(private val context: Context) {
                     IllegalArgumentException(context.getString(R.string.emoji_not_exist, emojiId))
                 )
 
-            val file = getEmojiFile(target, emoji)
-            if (file.exists()) {
-                file.delete()
-                AppLogger.d(TAG, "Deleted file: ${file.absolutePath}")
-            }
+            runCatching { getEmojiFile(target, emoji) }
+                .getOrNull()
+                ?.takeIf { it.exists() }
+                ?.let { file ->
+                    file.delete()
+                    AppLogger.d(TAG, "Deleted file: ${file.absolutePath}")
+                }
 
             preferences.deleteCustomEmoji(target, emojiId)
 
@@ -177,12 +185,17 @@ class CustomEmojiRepository private constructor(private val context: Context) {
 
     suspend fun deleteCategory(target: ActivePrompt, category: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            if (!isValidCategoryName(category)) {
+                return@withContext Result.failure(
+                    IllegalArgumentException(context.getString(R.string.invalid_category_name))
+                )
+            }
             val emojis = preferences.getEmojisForCategory(target, category).first()
             emojis.forEach { emoji ->
-                val file = getEmojiFile(target, emoji)
-                if (file.exists()) {
-                    file.delete()
-                }
+                runCatching { getEmojiFile(target, emoji) }
+                    .getOrNull()
+                    ?.takeIf { it.exists() }
+                    ?.delete()
             }
 
             val categoryDir = getCategoryDir(target, category)
@@ -201,7 +214,12 @@ class CustomEmojiRepository private constructor(private val context: Context) {
     }
 
     fun getEmojiFile(target: ActivePrompt, emoji: CustomEmoji): File {
-        return File(getCategoryDir(target, emoji.emotionCategory), emoji.fileName)
+        val categoryDir = getCategoryDir(target, emoji.emotionCategory)
+        return CustomEmojiStoragePolicy.resolveEmojiFile(
+            categoryDir = categoryDir,
+            fileName = emoji.fileName,
+            supportedExtensions = SUPPORTED_EXTENSIONS,
+        )
     }
 
     fun getEmojiUri(target: ActivePrompt, emoji: CustomEmoji): Uri {
@@ -209,23 +227,34 @@ class CustomEmojiRepository private constructor(private val context: Context) {
     }
 
     fun getEmojisForCategory(target: ActivePrompt, category: String): Flow<List<CustomEmoji>> {
-        return preferences.getEmojisForCategory(target, category)
+        if (!isValidCategoryName(category)) {
+            return kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+        return preferences.getEmojisForCategory(target, category).map { emojis ->
+            emojis.filter(::isValidEmojiMetadata)
+        }
     }
 
     fun getAllCategories(target: ActivePrompt): Flow<List<String>> {
-        return preferences.getAllCategories(target)
+        return preferences.getAllCategories(target).map { categories ->
+            categories.filter(::isValidCategoryName)
+        }
     }
 
     fun getAllEmojis(target: ActivePrompt): Flow<List<CustomEmoji>> {
-        return preferences.getCustomEmojisFlow(target)
+        return preferences.getCustomEmojisFlow(target).map { emojis ->
+            emojis.filter(::isValidEmojiMetadata)
+        }
     }
 
     suspend fun addCategory(target: ActivePrompt, categoryName: String) {
+        require(isValidCategoryName(categoryName)) { "Invalid emoji category: $categoryName" }
         initializeBuiltinEmojis(target)
         preferences.addCategory(target, categoryName)
     }
 
     suspend fun categoryExists(target: ActivePrompt, categoryName: String): Boolean {
+        require(isValidCategoryName(categoryName)) { "Invalid emoji category: $categoryName" }
         initializeBuiltinEmojis(target)
         return getAllCategories(target).first().contains(categoryName)
     }
@@ -239,10 +268,11 @@ class CustomEmojiRepository private constructor(private val context: Context) {
         initializeBuiltinEmojis(source)
         deleteTarget(target)
 
-        val categories = preferences.getAllCategories(source).first()
+        val categories =
+            preferences.getAllCategories(source).first().filter(::isValidCategoryName)
         preferences.setAllCategories(target, categories.toSet())
 
-        val emojis = preferences.getCustomEmojisFlow(source).first()
+        val emojis = preferences.getCustomEmojisFlow(source).first().filter(::isValidEmojiMetadata)
         val copiedEmojis = mutableListOf<CustomEmoji>()
         emojis.forEach { emoji ->
             val sourceFile = getEmojiFile(source, emoji)
@@ -290,7 +320,7 @@ class CustomEmojiRepository private constructor(private val context: Context) {
     }
 
     fun isValidCategoryName(categoryName: String): Boolean {
-        return categoryName.matches(Regex("^[a-z0-9_]+$"))
+        return CustomEmojiStoragePolicy.isValidCategoryName(categoryName)
     }
 
     private suspend fun copyBuiltinEmojisFromAssets(target: ActivePrompt) {
@@ -342,10 +372,7 @@ class CustomEmojiRepository private constructor(private val context: Context) {
     }
 
     private fun getTargetScopeDirName(target: ActivePrompt): String {
-        return when (target) {
-            is ActivePrompt.CharacterCard -> "character_card_${target.id}"
-            is ActivePrompt.CharacterGroup -> "character_group_${target.id}"
-        }
+        return CustomEmojiStoragePolicy.targetScopeDirName(target)
     }
 
     private suspend fun purgeLegacyGlobalStorage() {
@@ -366,12 +393,21 @@ class CustomEmojiRepository private constructor(private val context: Context) {
     }
 
     private fun getTargetBaseDir(target: ActivePrompt): File {
-        return File(context.filesDir, "$EMOJI_DIR/${getTargetScopeDirName(target)}")
+        val emojiRoot = File(context.filesDir, EMOJI_DIR)
+        return File(emojiRoot, getTargetScopeDirName(target)).canonicalFile.also { targetDir ->
+            require(targetDir.parentFile == emojiRoot.canonicalFile) {
+                "Emoji target path escaped the emoji root"
+            }
+        }
     }
 
     private fun getCategoryDir(target: ActivePrompt, category: String): File {
-        return File(getTargetBaseDir(target), category)
+        return CustomEmojiStoragePolicy.resolveCategoryDir(getTargetBaseDir(target), category)
     }
+
+    private fun isValidEmojiMetadata(emoji: CustomEmoji): Boolean =
+        isValidCategoryName(emoji.emotionCategory) &&
+            CustomEmojiStoragePolicy.isValidFileName(emoji.fileName, SUPPORTED_EXTENSIONS)
 
     private fun getFileExtension(uri: Uri): String? {
         return try {

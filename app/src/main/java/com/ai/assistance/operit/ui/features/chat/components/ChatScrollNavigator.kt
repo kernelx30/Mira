@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -66,7 +68,6 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.data.model.ChatMessageLocatorPreview
-import com.ai.assistance.operit.ui.features.chat.components.lazy.LazyListState as ChatLazyListState
 import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
@@ -99,8 +100,8 @@ private data class ChatMessageLocatorEntry(
 internal fun ChatScrollNavigator(
     chatHistory: List<ChatMessage>,
     currentChatId: String? = null,
-    scrollState: ChatLazyListState,
-    minVisibleIndex: Int,
+    scrollState: LazyListState,
+    messageItemStartIndex: Int,
     visibleMessageCount: Int,
     loadLocatorEntries: (suspend (String, String) -> List<ChatMessageLocatorPreview>)? = null,
     onJumpToMessageTimestamp: ((Long) -> Unit)? = null,
@@ -117,7 +118,12 @@ internal fun ChatScrollNavigator(
     var showNavigatorChip by remember { mutableStateOf(false) }
     var userScrollSessionActive by remember { mutableStateOf(false) }
     var showLocatorDialog by remember { mutableStateOf(false) }
-    var currentMessageIndex by remember(chatHistory) {
+    var currentMessageIndex by remember(
+        currentChatId,
+        chatHistory.size,
+        chatHistory.firstOrNull()?.timestamp,
+        chatHistory.lastOrNull()?.timestamp,
+    ) {
         mutableStateOf(chatHistory.lastIndex.takeIf { it >= 0 })
     }
 
@@ -128,13 +134,13 @@ internal fun ChatScrollNavigator(
         }
     }
 
-    LaunchedEffect(scrollState, minVisibleIndex, visibleMessageCount, chatHistory.size) {
+    LaunchedEffect(scrollState, messageItemStartIndex, visibleMessageCount, chatHistory.size) {
         snapshotFlow {
             ChatScrollNavigatorSnapshot(
                 centeredMessageIndex =
                     resolveCenteredMessageIndex(
                         scrollState = scrollState,
-                        minVisibleIndex = minVisibleIndex,
+                        messageItemStartIndex = messageItemStartIndex,
                         visibleMessageCount = visibleMessageCount,
                         totalMessageCount = chatHistory.size,
                     ),
@@ -226,12 +232,16 @@ internal fun ChatScrollNavigator(
 
         Row(
             modifier =
-                Modifier.clickable {
-                    showLocatorDialog = true
-                    showNavigatorChip = false
-                    userScrollSessionActive = false
-                },
+                Modifier
+                    .widthIn(min = 48.dp)
+                    .heightIn(min = 58.dp)
+                    .clickable {
+                        showLocatorDialog = true
+                        showNavigatorChip = false
+                        userScrollSessionActive = false
+                    },
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
         ) {
             Box(
                 modifier =
@@ -336,7 +346,12 @@ internal fun ChatScrollNavigator(
     var showNavigatorChip by remember { mutableStateOf(false) }
     var userScrollSessionActive by remember { mutableStateOf(false) }
     var showLocatorDialog by remember { mutableStateOf(false) }
-    var currentMessageIndex by remember(chatHistory) {
+    var currentMessageIndex by remember(
+        currentChatId,
+        chatHistory.size,
+        chatHistory.firstOrNull()?.timestamp,
+        chatHistory.lastOrNull()?.timestamp,
+    ) {
         mutableStateOf(chatHistory.lastIndex.takeIf { it >= 0 })
     }
     val currentAutoScrollToBottom by rememberUpdatedState(autoScrollToBottom)
@@ -478,18 +493,20 @@ internal fun ChatScrollNavigator(
                 (progressIndex.toFloat() / (progressTotalCount - 1).toFloat()).coerceIn(0f, 1f)
             }
 
-        Box(modifier = Modifier.size(width = 34.dp, height = 114.dp)) {
+        Box(modifier = Modifier.size(width = 48.dp, height = 114.dp)) {
             Row(
                 modifier =
                     Modifier
-                        .align(Alignment.CenterStart)
-                        .offset(x = 4.5.dp)
+                        .align(Alignment.TopCenter)
+                        .widthIn(min = 48.dp)
+                        .heightIn(min = 58.dp)
                         .clickable {
                             showLocatorDialog = true
                             showNavigatorChip = false
                             userScrollSessionActive = false
                         },
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
             ) {
                 Box(
                     modifier =
@@ -546,12 +563,8 @@ internal fun ChatScrollNavigator(
             Box(
                 modifier =
                     Modifier
-                        .size(24.dp)
-                        .align(Alignment.TopStart)
-                        .offset(x = 2.5.dp, y = 90.dp)
-                        .clip(CircleShape)
-                        .background(bubbleColor)
-                        .border(1.dp, navigatorBorderColor, CircleShape)
+                        .size(48.dp)
+                        .align(Alignment.BottomCenter)
                         .clickable {
                             coroutineScope.launch {
                                 if (currentHasNewerDisplayHistory) {
@@ -561,9 +574,15 @@ internal fun ChatScrollNavigator(
                             }
                             currentOnAutoScrollToBottomChange?.invoke(true)
                         },
+                contentAlignment = Alignment.Center,
             ) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                    modifier =
+                        Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(bubbleColor)
+                            .border(1.dp, navigatorBorderColor, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -1038,7 +1057,7 @@ private fun ChatMessageLocatorRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
-                modifier = Modifier.width(90.dp),
+                modifier = Modifier.widthIn(min = 96.dp, max = 116.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1049,12 +1068,15 @@ private fun ChatMessageLocatorRow(
                     ) {
                         Text(
                             text = "${index + 1}",
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         IconButton(
                             onClick = onToggleFavorite,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
                                 imageVector =
@@ -1073,7 +1095,7 @@ private fun ChatMessageLocatorRow(
                                     } else {
                                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
                                     },
-                                modifier = Modifier.size(13.dp),
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }
@@ -1124,8 +1146,8 @@ private fun ChatMessageLocatorRow(
 }
 
 private fun resolveCenteredMessageIndex(
-    scrollState: ChatLazyListState,
-    minVisibleIndex: Int,
+    scrollState: LazyListState,
+    messageItemStartIndex: Int,
     visibleMessageCount: Int,
     totalMessageCount: Int,
 ): Int? {
@@ -1136,12 +1158,16 @@ private fun resolveCenteredMessageIndex(
     val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
     val visibleMessageItem =
         layoutInfo.visibleItemsInfo
-            .filter { it.index in 0 until visibleMessageCount }
+            .filter {
+                it.index in
+                    messageItemStartIndex until (messageItemStartIndex + visibleMessageCount)
+            }
             .minByOrNull { item ->
                 abs((item.offset + item.size / 2f) - viewportCenter)
             } ?: return null
 
-    return (minVisibleIndex + visibleMessageItem.index).coerceIn(0, totalMessageCount - 1)
+    return (visibleMessageItem.index - messageItemStartIndex)
+        .coerceIn(0, totalMessageCount - 1)
 }
 
 private fun resolveCenteredMessageIndex(

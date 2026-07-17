@@ -11,6 +11,8 @@ import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.preferences.CharacterCardToolAccessResolver
 import com.ai.assistance.operit.data.preferences.ResolvedCharacterCardToolAccess
+import com.ai.assistance.operit.data.skill.ChatSkillActivationStore
+import com.ai.assistance.operit.core.tools.skill.SkillManager
 import com.ai.assistance.operit.integrations.tasker.triggerAIAgentAction
 import com.ai.assistance.operit.services.FloatingChatService
 import com.ai.assistance.operit.ui.common.displays.VirtualDisplayOverlay
@@ -904,9 +906,23 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             },
             executor = { tool ->
                 val packageName = tool.parameters.find { it.name == "package_name" }?.value ?: ""
-                handler
+                val result = handler
                     .getOrCreatePackageManager()
                     .executeUsePackageTool(tool.name, packageName)
+                if (result.success) {
+                    val matchedSkillName =
+                        SkillManager.getInstance(context)
+                            .getAvailableSkills()
+                            .keys
+                            .firstOrNull { it.equals(packageName.trim(), ignoreCase = true) }
+                    if (matchedSkillName != null) {
+                        ChatSkillActivationStore.getInstance(context).markActive(
+                            chatId = ToolExecutionManager.currentToolRuntimeContext()?.callerChatId,
+                            skillName = matchedSkillName,
+                        )
+                    }
+                }
+                result
             }
     )
 

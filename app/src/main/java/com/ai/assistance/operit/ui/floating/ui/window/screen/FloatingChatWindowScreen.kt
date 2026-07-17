@@ -74,6 +74,7 @@ import com.ai.assistance.operit.ui.floating.FloatContext
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import android.content.Intent
 import android.net.Uri
@@ -86,7 +87,6 @@ import com.ai.assistance.operit.plugins.chatview.ChatViewEvent
 import com.ai.assistance.operit.plugins.chatview.ChatViewHookParams
 import com.ai.assistance.operit.plugins.chatview.ChatViewHookPluginRegistry
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import java.util.UUID
 
 /** 渲染悬浮窗的窗口模式界面 - 简化版 */
@@ -438,17 +438,18 @@ private fun TitleBar(
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
     val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val coroutineScope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
+            .height(56.dp)
             .background(
                 MaterialTheme.colorScheme.surfaceVariant.copy(
                     alpha = if (viewModel.titleBarHover) 0.3f else 0.2f
                 )
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -465,7 +466,7 @@ private fun TitleBar(
             ) {
                 // 左侧按钮组
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TitleBarButton(
@@ -505,7 +506,7 @@ private fun TitleBar(
 
                 // 右侧按钮组
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // 返回主应用按钮
@@ -513,15 +514,19 @@ private fun TitleBar(
                         icon = Icons.Default.Home,
                         description = stringResource(R.string.floating_back_to_main),
                         onClick = {
-                            // 启动 MainActivity 返回主应用
-                            try {
+                            coroutineScope.launch {
                                 val context = floatContext.chatService
                                 if (context != null) {
-                                    runBlocking {
-                                        try {
-                                            context.getChatCore().syncCurrentChatIdToGlobal()
-                                        } catch (_: Exception) {
-                                        }
+                                    try {
+                                        context.getChatCore().syncCurrentChatIdToGlobal()
+                                    } catch (error: CancellationException) {
+                                        throw error
+                                    } catch (error: Exception) {
+                                        AppLogger.w(
+                                            "FloatingChatWindow",
+                                            "同步当前对话失败，将直接打开主应用",
+                                            error,
+                                        )
                                     }
                                     val intent = Intent(
                                         context,
@@ -530,13 +535,17 @@ private fun TitleBar(
                                         flags =
                                             Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                                     }
-                                    context.startActivity(intent)
+                                    runCatching { context.startActivity(intent) }
+                                        .onFailure { error ->
+                                            AppLogger.e(
+                                                "FloatingChatWindow",
+                                                "启动 MainActivity 失败",
+                                                error,
+                                            )
+                                        }
                                 }
-                            } catch (e: Exception) {
-                                AppLogger.e("FloatingChatWindow", "启动 MainActivity 失败", e)
+                                floatContext.onClose()
                             }
-                            // 然后关闭悬浮窗
-                            floatContext.onClose()
                         }
                     )
                     // 关闭按钮
@@ -562,7 +571,7 @@ private fun TitleBarButton(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(30.dp)
+        modifier = Modifier.size(40.dp)
     ) {
         Icon(
             imageVector = icon,
@@ -583,7 +592,7 @@ private fun MinimizeButton(
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(30.dp)
+            .size(40.dp)
             .background(
                 color = if (viewModel.minimizeHover) primaryColor.copy(alpha = 0.1f) else Color.Transparent,
                 shape = CircleShape
@@ -618,7 +627,7 @@ private fun CloseButton(
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(30.dp)
+            .size(40.dp)
             .background(
                 color = if (viewModel.closeHover) errorColor.copy(alpha = 0.1f) else Color.Transparent,
                 shape = CircleShape
@@ -866,20 +875,22 @@ private fun ChatMessagesView(
         }
 
         // 滚动到底部按钮
-        ScrollToBottomButton(
-            scrollState = scrollState,
-            coroutineScope = coroutineScope,
-            autoScrollToBottom = autoScrollToBottom,
-            hasNewerDisplayHistory = hasNewerDisplayHistory,
-            onRequestLatestMessages = {
-                chatCore?.showLatestMessagesForCurrentChat()
-            },
-            reverseLayout = true,
-            onAutoScrollToBottomChange = onAutoScrollToBottomChange,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp)
-        )
+        key(currentChatId) {
+            ScrollToBottomButton(
+                scrollState = scrollState,
+                coroutineScope = coroutineScope,
+                autoScrollToBottom = autoScrollToBottom,
+                hasNewerDisplayHistory = hasNewerDisplayHistory,
+                onRequestLatestMessages = {
+                    chatCore?.showLatestMessagesForCurrentChat()
+                },
+                reverseLayout = true,
+                onAutoScrollToBottomChange = onAutoScrollToBottomChange,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
+            )
+        }
     }
 }
 
@@ -1397,5 +1408,3 @@ private fun ProcessingStatusIndicator(floatContext: FloatContext) {
         }
     }
 }
-
-

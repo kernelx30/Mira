@@ -7,16 +7,29 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ai.assistance.operit.data.dao.ChatDao
+import com.ai.assistance.operit.data.dao.CompanionMemoryDao
 import com.ai.assistance.operit.data.dao.MessageDao
 import com.ai.assistance.operit.data.dao.MessageVariantDao
 import com.ai.assistance.operit.data.model.ChatEntity
+import com.ai.assistance.operit.data.model.CompanionMemoryEpisodeEntity
+import com.ai.assistance.operit.data.model.CompanionMemoryEdgeEntity
+import com.ai.assistance.operit.data.model.CompanionMemoryEvidenceEntity
+import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
 import com.ai.assistance.operit.data.model.MessageEntity
 import com.ai.assistance.operit.data.model.MessageVariantEntity
 
 /** 应用数据库，包含聊天表和消息表 */
 @Database(
-    entities = [ChatEntity::class, MessageEntity::class, MessageVariantEntity::class],
-    version = 20,
+    entities = [
+        ChatEntity::class,
+        MessageEntity::class,
+        MessageVariantEntity::class,
+        CompanionMemoryRecordEntity::class,
+        CompanionMemoryEvidenceEntity::class,
+        CompanionMemoryEpisodeEntity::class,
+        CompanionMemoryEdgeEntity::class,
+    ],
+    version = 25,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +41,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun messageDao(): MessageDao
 
     abstract fun messageVariantDao(): MessageVariantDao
+
+    abstract fun companionMemoryDao(): CompanionMemoryDao
 
     companion object {
         @Volatile
@@ -218,6 +233,200 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_20_21 =
+            object : Migration(20, 21) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `companion_memory_records` (
+                            `id` TEXT NOT NULL, `profileId` TEXT NOT NULL,
+                            `companionId` TEXT NOT NULL, `conversationId` TEXT NOT NULL,
+                            `scope` TEXT NOT NULL, `type` TEXT NOT NULL,
+                            `subjectKey` TEXT NOT NULL, `predicate` TEXT NOT NULL,
+                            `valueJson` TEXT NOT NULL, `normalizedValue` TEXT NOT NULL,
+                            `status` TEXT NOT NULL, `confidence` REAL NOT NULL,
+                            `importance` REAL NOT NULL, `validFrom` INTEGER,
+                            `validUntil` INTEGER, `createdAt` INTEGER NOT NULL,
+                            `updatedAt` INTEGER NOT NULL, `lastConfirmedAt` INTEGER NOT NULL,
+                            `lastAccessedAt` INTEGER NOT NULL, `sourceKind` TEXT NOT NULL,
+                            `versionOfId` TEXT, `supersedesId` TEXT, `reviewAt` INTEGER,
+                            PRIMARY KEY(`id`)
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_records_profileId_status` ON `companion_memory_records` (`profileId`, `status`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_records_profileId_companionId_scope_status` ON `companion_memory_records` (`profileId`, `companionId`, `scope`, `status`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_records_profileId_scope_type_subjectKey_predicate_status` ON `companion_memory_records` (`profileId`, `scope`, `type`, `subjectKey`, `predicate`, `status`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_records_conversationId` ON `companion_memory_records` (`conversationId`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_records_normalizedValue` ON `companion_memory_records` (`normalizedValue`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_records_updatedAt` ON `companion_memory_records` (`updatedAt`)")
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `companion_memory_evidence` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `memoryId` TEXT NOT NULL, `conversationId` TEXT NOT NULL,
+                            `messageId` INTEGER, `messageTimestamp` INTEGER NOT NULL,
+                            `quote` TEXT NOT NULL, `speaker` TEXT NOT NULL,
+                            `timestamp` INTEGER NOT NULL,
+                            FOREIGN KEY(`memoryId`) REFERENCES `companion_memory_records`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_evidence_memoryId` ON `companion_memory_evidence` (`memoryId`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_evidence_conversationId_messageTimestamp` ON `companion_memory_evidence` (`conversationId`, `messageTimestamp`)")
+                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_companion_memory_evidence_memoryId_conversationId_messageTimestamp_speaker` ON `companion_memory_evidence` (`memoryId`, `conversationId`, `messageTimestamp`, `speaker`)")
+
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `companion_memory_episodes` (
+                            `id` TEXT NOT NULL, `profileId` TEXT NOT NULL,
+                            `companionId` TEXT NOT NULL, `conversationId` TEXT NOT NULL,
+                            `startMessageTimestamp` INTEGER NOT NULL,
+                            `endMessageTimestamp` INTEGER NOT NULL,
+                            `summary` TEXT NOT NULL, `topicTags` TEXT NOT NULL,
+                            `emotionState` TEXT NOT NULL, `outcome` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL, `validUntil` INTEGER,
+                            PRIMARY KEY(`id`)
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_episodes_profileId_companionId_createdAt` ON `companion_memory_episodes` (`profileId`, `companionId`, `createdAt`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_episodes_conversationId_endMessageTimestamp` ON `companion_memory_episodes` (`conversationId`, `endMessageTimestamp`)")
+                    ensureCompanionMemorySearchIndex(db)
+                }
+            }
+
+        private val MIGRATION_21_22 =
+            object : Migration(21, 22) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE chats ADD COLUMN `chatModelConfigId` TEXT")
+                    db.execSQL("ALTER TABLE chats ADD COLUMN `chatModelIndex` INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE chats ADD COLUMN `memoryAutoUpdateOverride` INTEGER")
+                    db.execSQL("ALTER TABLE chats ADD COLUMN `autoReadOverride` INTEGER")
+                    db.execSQL("ALTER TABLE chats ADD COLUMN `isTemporary` INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
+        private val MIGRATION_22_23 =
+            object : Migration(22, 23) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `companion_memory_edges` (
+                            `id` TEXT NOT NULL,
+                            `fromMemoryId` TEXT NOT NULL,
+                            `toMemoryId` TEXT NOT NULL,
+                            `type` TEXT NOT NULL,
+                            `confidence` REAL NOT NULL,
+                            `strength` REAL NOT NULL,
+                            `evidenceMessageIds` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            `validUntil` INTEGER,
+                            `status` TEXT NOT NULL,
+                            PRIMARY KEY(`id`),
+                            FOREIGN KEY(`fromMemoryId`) REFERENCES `companion_memory_records`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                            FOREIGN KEY(`toMemoryId`) REFERENCES `companion_memory_records`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_edges_fromMemoryId_status` ON `companion_memory_edges` (`fromMemoryId`, `status`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_edges_toMemoryId_status` ON `companion_memory_edges` (`toMemoryId`, `status`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_companion_memory_edges_type_status` ON `companion_memory_edges` (`type`, `status`)")
+                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_companion_memory_edges_fromMemoryId_toMemoryId_type_status` ON `companion_memory_edges` (`fromMemoryId`, `toMemoryId`, `type`, `status`)")
+                }
+            }
+
+        private val MIGRATION_23_24 =
+            object : Migration(23, 24) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE chats ADD COLUMN `archived` INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
+        private val MIGRATION_24_25 =
+            object : Migration(24, 25) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    ensureCompanionMemorySearchIndex(db)
+                }
+            }
+
+        private val COMPANION_MEMORY_DATABASE_CALLBACK =
+            object : RoomDatabase.Callback() {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    ensureCompanionMemorySearchIndex(db)
+                }
+
+                override fun onOpen(db: SupportSQLiteDatabase) {
+                    ensureCompanionMemorySearchIndex(db)
+                }
+            }
+
+        private fun ensureCompanionMemorySearchIndex(db: SupportSQLiteDatabase) {
+            val existingCreateSql =
+                db.query(
+                    "SELECT `sql` FROM `sqlite_master` WHERE `type` = 'table' AND `name` = 'companion_memory_fts'",
+                ).use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                }
+            if (companionMemorySearchIndexNeedsRepair(existingCreateSql)) {
+                db.execSQL("DROP TRIGGER IF EXISTS `companion_memory_fts_insert`")
+                db.execSQL("DROP TRIGGER IF EXISTS `companion_memory_fts_update`")
+                db.execSQL("DROP TRIGGER IF EXISTS `companion_memory_fts_delete`")
+                db.execSQL("DROP TABLE IF EXISTS `companion_memory_fts`")
+            }
+            db.execSQL(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS `companion_memory_fts` USING fts4(`recordId`, `searchableText`, tokenize=unicode61)",
+            )
+            db.execSQL("DROP TRIGGER IF EXISTS `companion_memory_fts_insert`")
+            db.execSQL("DROP TRIGGER IF EXISTS `companion_memory_fts_update`")
+            db.execSQL("DROP TRIGGER IF EXISTS `companion_memory_fts_delete`")
+            db.execSQL(
+                """
+                CREATE TRIGGER `companion_memory_fts_insert`
+                AFTER INSERT ON `companion_memory_records`
+                BEGIN
+                    INSERT INTO `companion_memory_fts` (`recordId`, `searchableText`)
+                    SELECT new.`id`, new.`subjectKey` || ' ' || new.`predicate` || ' ' || new.`normalizedValue` || ' ' || new.`valueJson`
+                    WHERE new.`status` = 'ACTIVE';
+                END
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE TRIGGER `companion_memory_fts_update`
+                AFTER UPDATE ON `companion_memory_records`
+                BEGIN
+                    DELETE FROM `companion_memory_fts` WHERE `recordId` = old.`id`;
+                    INSERT INTO `companion_memory_fts` (`recordId`, `searchableText`)
+                    SELECT new.`id`, new.`subjectKey` || ' ' || new.`predicate` || ' ' || new.`normalizedValue` || ' ' || new.`valueJson`
+                    WHERE new.`status` = 'ACTIVE';
+                END
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE TRIGGER `companion_memory_fts_delete`
+                AFTER DELETE ON `companion_memory_records`
+                BEGIN
+                    DELETE FROM `companion_memory_fts` WHERE `recordId` = old.`id`;
+                END
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "DELETE FROM `companion_memory_fts` WHERE `recordId` IN (SELECT `id` FROM `companion_memory_records` WHERE `status` != 'ACTIVE')",
+            )
+            db.execSQL(
+                """
+                INSERT INTO `companion_memory_fts` (`recordId`, `searchableText`)
+                SELECT r.`id`, r.`subjectKey` || ' ' || r.`predicate` || ' ' || r.`normalizedValue` || ' ' || r.`valueJson`
+                FROM `companion_memory_records` r
+                WHERE r.`status` = 'ACTIVE'
+                  AND NOT EXISTS (SELECT 1 FROM `companion_memory_fts` f WHERE f.`recordId` = r.`id`)
+                """.trimIndent(),
+            )
+        }
+
         // 定义从版本2到3的迁移
         private val MIGRATION_2_3 =
             object : Migration(2, 3) {
@@ -334,8 +543,14 @@ abstract class AppDatabase : RoomDatabase() {
                                 MIGRATION_16_17,
                                 MIGRATION_17_18,
                                 MIGRATION_18_19,
-                                MIGRATION_19_20
+                                MIGRATION_19_20,
+                                MIGRATION_20_21,
+                                MIGRATION_21_22,
+                                MIGRATION_22_23,
+                                MIGRATION_23_24,
+                                MIGRATION_24_25,
                             ) // 添加新的迁移
+                            .addCallback(COMPANION_MEMORY_DATABASE_CALLBACK)
                             .build()
                     INSTANCE = instance
                     instance
@@ -353,3 +568,7 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+
+internal fun companionMemorySearchIndexNeedsRepair(createSql: String?): Boolean =
+    createSql != null &&
+        !Regex("\\bUSING\\s+fts[345]\\b", RegexOption.IGNORE_CASE).containsMatchIn(createSql)

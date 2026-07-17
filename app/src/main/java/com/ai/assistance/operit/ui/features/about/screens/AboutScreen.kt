@@ -7,7 +7,6 @@ import android.net.Uri
 import android.text.Html
 import android.text.method.LinkMovementMethod
 import android.widget.TextView
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -53,12 +51,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.ai.assistance.operit.ui.components.CustomScaffold
+import com.ai.assistance.operit.ui.common.MiraLogo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private const val GITHUB_PROJECT_URL = "https://github.com/AAswordman/Operit"
+private const val GITHUB_PROJECT_URL = "https://github.com/kernelx30/Mira"
+private const val UPSTREAM_PROJECT_URL = "https://github.com/AAswordman/Operit"
 
 private enum class PatchUpdatePhase {
     SELECTING_MIRROR,
@@ -863,10 +863,9 @@ fun AboutScreen(
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_launcher_simple_foreground),
+                            MiraLogo(
                                 contentDescription = stringResource(R.string.app_logo_description),
-                                modifier = Modifier.size(80.dp)
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }
@@ -879,10 +878,25 @@ fun AboutScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
+                        text = stringResource(id = R.string.brand_tagline),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    Text(
                         text = stringResource(id = R.string.about_version, appVersion),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 2.dp)
+                    )
+                    Text(
+                        text = stringResource(id = R.string.about_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .widthIn(max = 560.dp)
+                            .padding(top = 10.dp),
                     )
                 }
             }
@@ -957,6 +971,21 @@ fun AboutScreen(
                         subtitleText = GITHUB_PROJECT_URL,
                         onClick = {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_PROJECT_URL)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(start = 66.dp))
+
+                    SettingsRow(
+                        icon = Icons.Default.ForkRight,
+                        iconTint = MaterialTheme.colorScheme.secondary,
+                        title = stringResource(id = R.string.upstream_project),
+                        subtitleText = UPSTREAM_PROJECT_URL,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(UPSTREAM_PROJECT_URL)).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             context.startActivity(intent)

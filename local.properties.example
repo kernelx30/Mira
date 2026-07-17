@@ -7,3 +7,9 @@
 
 # The callback URL should be operit://github-oauth-callback
 GITHUB_CLIENT_ID="YOUR_OWN_GITHUB_CLIENT_ID_HERE"
+
+# Operit Mate release repositories. Leave blank until this fork has its own release channel.
+UPDATE_REPO_OWNER="kernelx30"
+UPDATE_REPO_NAME="Mira"
+UPDATE_PATCH_REPO_OWNER=""
+UPDATE_PATCH_REPO_NAME=""

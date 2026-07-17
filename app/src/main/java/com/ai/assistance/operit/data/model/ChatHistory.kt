@@ -24,6 +24,12 @@ data class ChatHistory(
     val parentChatId: String? = null,
     val characterCardName: String? = null,
     val characterGroupId: String? = null,
+    val chatModelConfigId: String? = null,
+    val chatModelIndex: Int = 0,
+    val memoryAutoUpdateOverride: Boolean? = null,
+    val autoReadOverride: Boolean? = null,
+    val isTemporary: Boolean = false,
     val locked: Boolean = false,
-    val pinned: Boolean = false
+    val pinned: Boolean = false,
+    val archived: Boolean = false,
 )

@@ -73,7 +73,7 @@ class OperitDataDocumentsProvider : DocumentsProvider() {
                 DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
         )
         row.add(DocumentsContract.Root.COLUMN_ICON, android.R.drawable.ic_menu_manage)
-        row.add(DocumentsContract.Root.COLUMN_TITLE, "Operit Data")
+        row.add(DocumentsContract.Root.COLUMN_TITLE, "Mira Data")
         row.add(DocumentsContract.Root.COLUMN_SUMMARY, dataRootCanonicalPath)
         row.add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, DOC_ID_ROOT)
         row.add(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, dataRootCanonical.usableSpace)

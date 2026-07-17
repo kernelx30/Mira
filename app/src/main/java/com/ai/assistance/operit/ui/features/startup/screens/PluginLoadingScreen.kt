@@ -28,11 +28,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -56,13 +59,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.mcp.MCPLocalServer
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import com.ai.assistance.operit.data.mcp.plugins.MCPStarter
+import com.ai.assistance.operit.ui.common.MiraLogo
 import com.ai.assistance.operit.ui.features.startup.components.SmoothLinearProgressIndicator
+import com.ai.assistance.operit.ui.main.navigation.AppRouterGateway
+import com.ai.assistance.operit.ui.main.navigation.RouteEntrySource
+import com.ai.assistance.operit.ui.main.screens.Screen
+import com.ai.assistance.operit.ui.main.screens.ScreenRouteRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -109,6 +116,8 @@ fun PluginLoadingScreen(
         isExpanded: Boolean,
         onToggleExpansion: () -> Unit,
         onSkip: () -> Unit = {},
+        showTerminalSetupAction: Boolean = false,
+        onOpenTerminalSetup: () -> Unit = {},
         onPluginClick: (PluginInfo) -> Unit = {},
         modifier: Modifier = Modifier
 ) {
@@ -139,6 +148,8 @@ fun PluginLoadingScreen(
                         pluginsTotal,
                         pluginsList,
                         onSkip,
+                        showTerminalSetupAction,
+                        onOpenTerminalSetup,
                         onCollapse = onToggleExpansion,
                         onPluginClick = onPluginClick
                     )
@@ -190,9 +201,9 @@ private fun CollapsedLoadingIndicator(
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        shadowElevation = 8.dp
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 1.dp,
+        shadowElevation = 3.dp
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -221,21 +232,23 @@ private fun ExpandedLoadingView(
     pluginsTotal: Int,
     pluginsList: List<PluginInfo>,
     onSkip: () -> Unit,
+    showTerminalSetupAction: Boolean,
+    onOpenTerminalSetup: () -> Unit,
     onCollapse: () -> Unit,
     onPluginClick: (PluginInfo) -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 450.dp), // Constrain height
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        shadowElevation = 8.dp
+            .heightIn(max = 420.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 1.dp,
+        shadowElevation = 4.dp
     ) {
         Box(modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)) {
+            .padding(horizontal = 20.dp, vertical = 12.dp)) {
             // 折叠按钮
             IconButton(onClick = onCollapse, modifier = Modifier
                 .align(Alignment.TopStart)
@@ -262,24 +275,35 @@ private fun ExpandedLoadingView(
                     modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp)
+                                .padding(horizontal = 8.dp, vertical = 16.dp)
             ) {
-                // 应用名称/Logo
-                Text(
-                        text = stringResource(id = R.string.plugin_app_name),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 32.sp
+                MiraLogo(
+                        modifier = Modifier.size(56.dp).clip(MaterialTheme.shapes.medium),
+                        contentDescription = stringResource(R.string.app_logo_description)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                        text = stringResource(id = R.string.plugin_app_name),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                        text = stringResource(id = R.string.brand_tagline),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // 使用平滑过渡的进度条组件
                 SmoothLinearProgressIndicator(
                         progress = progress,
                         modifier = Modifier.fillMaxWidth(),
-                        height = 8.dp,
+                        height = 6.dp,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         progressColor = MaterialTheme.colorScheme.primary,
                         intermediateSteps = 20, // 增加中间步骤数量，使过渡更加平滑
@@ -312,15 +336,32 @@ private fun ExpandedLoadingView(
                 )
 
                 // 移除此处的跳过按钮
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // 插件列表
+                if (showTerminalSetupAction) {
+                    Button(
+                        onClick = onOpenTerminalSetup,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Terminal,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.termux_wizard_node_install))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 if (pluginsList.isNotEmpty()) {
                     Text(
                             text = stringResource(id = R.string.plugin_loading_status_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -347,14 +388,7 @@ private fun ExpandedLoadingView(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 底部版权信息
-                Text(
-                        text = stringResource(id = R.string.about_copyright),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
@@ -483,6 +517,9 @@ class PluginLoadingState {
     // 是否展开
     private val _isExpanded = MutableStateFlow(false)
     val isExpanded: StateFlow<Boolean> = _isExpanded
+
+    private val _needsTerminalSetup = MutableStateFlow(false)
+    val needsTerminalSetup: StateFlow<Boolean> = _needsTerminalSetup
 
     // 插件列表及其状态
     private val _plugins = MutableStateFlow<List<PluginInfo>>(emptyList())
@@ -723,6 +760,7 @@ class PluginLoadingState {
         _isVisible.value = false
         _hasTimedOut.value = false
         _isExpanded.value = false
+        _needsTerminalSetup.value = false
     }
 
     // 添加方法来初始化MCP服务器并启动插件
@@ -732,6 +770,7 @@ class PluginLoadingState {
             return
         }
 
+        _needsTerminalSetup.value = false
         mcpInitJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
                 // 更新初始状态
@@ -913,6 +952,7 @@ class PluginLoadingState {
                     totalCount: Int,
                     status: MCPStarter.PluginInitStatus
             ) {
+                _needsTerminalSetup.value = status == MCPStarter.PluginInitStatus.NODEJS_MISSING
                 // 根据初始化状态显示不同的消息
                 when (status) {
                     MCPStarter.PluginInitStatus.NODEJS_MISSING -> {
@@ -987,6 +1027,7 @@ fun PluginLoadingScreenWithState(loadingState: PluginLoadingState, modifier: Mod
     val pluginsTotal by loadingState.pluginsTotal.collectAsState()
     val plugins by loadingState.plugins.collectAsState()
     val isExpanded by loadingState.isExpanded.collectAsState()
+    val needsTerminalSetup by loadingState.needsTerminalSetup.collectAsState()
     val pluginLogs by loadingState.pluginLogs.collectAsState()
 
     var selectedLogPluginId by remember { mutableStateOf<String?>(null) }
@@ -1026,6 +1067,14 @@ fun PluginLoadingScreenWithState(loadingState: PluginLoadingState, modifier: Mod
             isExpanded = isExpanded,
             onToggleExpansion = { loadingState.toggleExpansion() },
             onSkip = { loadingState.skip() },
+            showTerminalSetupAction = needsTerminalSetup,
+            onOpenTerminalSetup = {
+                loadingState.skip()
+                AppRouterGateway.navigate(
+                    routeId = ScreenRouteRegistry.routeIdOf(Screen.TerminalSetup),
+                    source = RouteEntrySource.DEFAULT,
+                )
+            },
             onPluginClick = { plugin -> selectedLogPluginId = plugin.id },
             modifier = modifier
     )

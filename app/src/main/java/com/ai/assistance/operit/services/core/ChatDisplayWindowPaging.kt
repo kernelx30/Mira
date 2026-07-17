@@ -3,8 +3,10 @@ package com.ai.assistance.operit.services.core
 import com.ai.assistance.operit.data.model.ChatMessageLocatorPreview
 import com.ai.assistance.operit.data.model.ChatMessage
 
-internal const val DISPLAY_PAGE_TRIGGER_COUNT = 5
-internal const val MAX_DISPLAY_PAGE_COUNT = 2
+// Keep a substantial recent window in memory so ordinary conversations do not
+// immediately expose the manual history pager.
+internal const val DISPLAY_PAGE_TRIGGER_COUNT = 20
+internal const val MAX_DISPLAY_PAGE_COUNT = 3
 
 internal data class DisplayPageRange(
     val startIndex: Int,

@@ -33,11 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
-
-data class PendingQueueMessageItem(
-    val id: Long,
-    val text: String
-)
+import com.ai.assistance.operit.data.model.PendingQueueMessageItem
 
 @Composable
 fun PendingMessageQueuePanel(
@@ -161,7 +157,7 @@ private fun QueueIconAction(
 ) {
     Box(
         modifier = Modifier
-            .size(26.dp)
+            .size(48.dp)
             .clip(RoundedCornerShape(6.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center

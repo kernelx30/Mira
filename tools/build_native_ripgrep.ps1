@@ -66,9 +66,9 @@ foreach ($target in $Targets) {
     Set-Item -Path "Env:$envName" -Value $linker
     cargo build --manifest-path (Join-Path $crateDir "Cargo.toml") --release --target $target | Out-Host
 
-    $source = Join-Path $crateDir "target\$target\release\liboperit_ripgrep.so"
+    $source = Join-Path $crateDir "target\$target\release\libmira_ripgrep.so"
     $destinationDir = Join-Path $repoRoot "app\src\main\jniLibs\$($config.Abi)"
     New-Item -ItemType Directory -Force -Path $destinationDir | Out-Null
-    Copy-Item -LiteralPath $source -Destination (Join-Path $destinationDir "liboperit_ripgrep.so") -Force
-    Write-Host "Built $target -> $destinationDir\liboperit_ripgrep.so"
+    Copy-Item -LiteralPath $source -Destination (Join-Path $destinationDir "libmira_ripgrep.so") -Force
+    Write-Host "Built $target -> $destinationDir\libmira_ripgrep.so"
 }

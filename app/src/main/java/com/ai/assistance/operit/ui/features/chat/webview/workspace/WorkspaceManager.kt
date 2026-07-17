@@ -339,7 +339,10 @@ fun WorkspaceManager(
     // 当前活动的编辑器引用
     var activeEditor by remember { mutableStateOf<com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.NativeCodeEditor?>(null) }
     val density = LocalDensity.current
-    val isImeVisible = WindowInsets.ime.getBottom(density) > 0
+    val imeInsets = WindowInsets.ime
+    val isImeVisible by remember(imeInsets, density) {
+        derivedStateOf { imeInsets.getBottom(density) > 0 }
+    }
 
     LaunchedEffect(isImeVisible) {
         if (isImeVisible) {
@@ -600,7 +603,7 @@ fun WorkspaceManager(
                                 saveFile(currentFile)
                                 unsavedFiles = unsavedFiles - currentFile.path
                             },
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.Save,
@@ -613,8 +616,7 @@ fun WorkspaceManager(
                         val isPreview = filePreviewStates[currentFile.path] ?: false
                         IconButton(
                                 onClick = { togglePreview(currentFile.path) },
-                                // 限制按钮大小，使其与标签高度(40.dp)保持一致，防止撑开父布局
-                                modifier = Modifier.size(40.dp)
+                                modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                     if (isPreview) Icons.Default.Edit else Icons.Default.Visibility,
@@ -625,7 +627,7 @@ fun WorkspaceManager(
                         IconButton(
                             onClick = { activePreviewWebView?.goBack() },
                             enabled = activePreviewCanGoBack,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.ChevronLeft,
@@ -636,7 +638,7 @@ fun WorkspaceManager(
                         IconButton(
                             onClick = { activePreviewWebView?.goForward() },
                             enabled = activePreviewCanGoForward,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.ChevronRight,
@@ -646,7 +648,7 @@ fun WorkspaceManager(
                         }
                         IconButton(
                             onClick = { activePreviewWebView?.reload() },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.Default.Refresh,
@@ -657,7 +659,7 @@ fun WorkspaceManager(
                         if (isCommandPreviewVisible) {
                             IconButton(
                                 onClick = { showCommandBrowserPreview = false },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     Icons.Default.Close,
@@ -1544,7 +1546,7 @@ fun VSCodeTab(
 
     Box(
             modifier =
-                    Modifier.height(40.dp) // 增加高度
+                    Modifier.height(48.dp)
                             .background(
                                     backgroundColor,
                                     shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
@@ -1580,7 +1582,7 @@ fun VSCodeTab(
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
                         onClick = onClose,
-                        modifier = Modifier.size(22.dp).padding(2.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         if (isUnsaved) {
                             Icon(

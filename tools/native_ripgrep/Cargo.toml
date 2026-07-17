@@ -1,5 +1,5 @@
 [package]
-name = "operit_ripgrep"
+name = "mira_ripgrep"
 version = "0.1.0"
 edition = "2021"
 

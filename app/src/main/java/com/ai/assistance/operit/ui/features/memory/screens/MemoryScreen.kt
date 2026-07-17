@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
@@ -34,7 +35,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +59,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.ActivePrompt
+import com.ai.assistance.operit.data.model.CharacterCardMemoryProfileBindingMode
+import com.ai.assistance.operit.data.model.CompanionMemoryScope
+import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
+import com.ai.assistance.operit.data.model.CompanionMemoryTarget
 import com.ai.assistance.operit.data.model.ToolParameter
+import com.ai.assistance.operit.data.preferences.ActivePromptManager
+import com.ai.assistance.operit.data.preferences.CharacterCardManager
+import com.ai.assistance.operit.data.preferences.CharacterGroupCardManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.BatchDeleteConfirmDialog
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.DocumentViewDialog
@@ -86,7 +100,10 @@ import androidx.compose.ui.text.input.ImeAction
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.MemorySearchSettingsDialog
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.MemorySearchSimulationDialog
+import com.ai.assistance.operit.ui.features.memory.screens.graph.model.Edge
 import com.ai.assistance.operit.ui.main.components.LocalIsCurrentScreen
+import com.ai.assistance.operit.data.repository.decodedLabel
+import com.ai.assistance.operit.data.repository.decodedValue
 
 @Composable
 fun MemorySearchBar(
@@ -94,7 +111,9 @@ fun MemorySearchBar(
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     onSettingsClick: () -> Unit,
-    onMenuClick: () -> Unit
+    onMenuClick: () -> Unit,
+    isGraphView: Boolean,
+    onImportClick: () -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     Row(
@@ -104,12 +123,14 @@ fun MemorySearchBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        IconButton(onClick = onMenuClick) {
-            Icon(
-                Icons.Default.Folder, 
-                contentDescription = "Toggle Folders",
-                tint = MaterialTheme.colorScheme.primary
-            )
+        if (isGraphView) {
+            IconButton(onClick = onMenuClick) {
+                Icon(
+                    Icons.Default.Folder,
+                    contentDescription = "Toggle Folders",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
         OutlinedTextField(
             value = query,
@@ -123,14 +144,110 @@ fun MemorySearchBar(
                 onSearch()
             })
         )
-        IconButton(onClick = onSettingsClick) {
-            Icon(
-                Icons.Default.Settings,
-                contentDescription = stringResource(R.string.memory_search_settings_title),
-                tint = MaterialTheme.colorScheme.secondary
-            )
+        if (!isGraphView) {
+            IconButton(onClick = onImportClick) {
+                Icon(
+                    Icons.Default.UploadFile,
+                    contentDescription = stringResource(R.string.mate_memory_import),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+        }
+        if (isGraphView) {
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.memory_search_settings_title),
+                    tint = MaterialTheme.colorScheme.secondary,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun MemoryViewModeTabs(
+    showGraphView: Boolean,
+    onGraphViewChange: (Boolean) -> Unit,
+) {
+    TabRow(selectedTabIndex = if (showGraphView) 1 else 0) {
+        Tab(
+            selected = !showGraphView,
+            onClick = { onGraphViewChange(false) },
+            text = { Text(stringResource(R.string.mate_memory_archive_title)) },
+        )
+        Tab(
+            selected = showGraphView,
+            onClick = { onGraphViewChange(true) },
+            text = { Text(stringResource(R.string.mate_memory_graph_title)) },
+        )
+    }
+}
+
+@Composable
+private fun CompanionGraphMemoryDialog(
+    record: CompanionMemoryRecordEntity,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                record.decodedLabel()
+                    ?: stringResource(R.string.mate_memory_graph_node_title),
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(record.decodedValue(), style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text =
+                        stringResource(
+                            R.string.mate_memory_graph_node_meta,
+                            record.scope,
+                            record.type,
+                            (record.confidence * 100).toInt(),
+                        ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (record.reviewAt != null) {
+                    Text(
+                        stringResource(R.string.mate_memory_status_review),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        },
+    )
+}
+
+@Composable
+private fun CompanionGraphEdgeDialog(
+    edge: Edge,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.mate_memory_graph_edge_title)) },
+        text = {
+            Text(
+                edge.label ?: stringResource(R.string.mate_memory_edge_relates_to),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.close))
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -140,6 +257,13 @@ fun MemoryScreen() {
     val profileList by preferencesManager.profileListFlow.collectAsState(initial = emptyList())
     val activeProfileId by
     preferencesManager.activeProfileIdFlow.collectAsState(initial = "default")
+    val activePromptManager = remember(context) { ActivePromptManager.getInstance(context) }
+    val characterCardManager = remember(context) { CharacterCardManager.getInstance(context) }
+    val characterGroupManager = remember(context) { CharacterGroupCardManager.getInstance(context) }
+    val activePrompt by
+        activePromptManager.activePromptFlow.collectAsState(
+            initial = ActivePrompt.CharacterCard(CharacterCardManager.DEFAULT_CHARACTER_CARD_ID),
+        )
 
     // 获取所有配置文件的名称映射(id -> name)
     val profileNameMap = remember { mutableStateMapOf<String, String>() }
@@ -154,8 +278,46 @@ fun MemoryScreen() {
 
     var selectedProfileId by remember { mutableStateOf(activeProfileId) }
     var showFolderNavigator by remember { mutableStateOf(false) }
+    var showGraphView by rememberSaveable { mutableStateOf(false) }
+    var defaultMemoryCategoryTag by rememberSaveable { mutableStateOf("Relationship") }
+    var defaultMemoryScope by remember { mutableStateOf(CompanionMemoryScope.RELATIONSHIP) }
+    var activeMemoryTarget by remember {
+        mutableStateOf(
+            CompanionMemoryTarget(characterId = CharacterCardManager.DEFAULT_CHARACTER_CARD_ID)
+        )
+    }
 
-    LaunchedEffect(activeProfileId) { selectedProfileId = activeProfileId }
+    LaunchedEffect(activePrompt, activeProfileId) {
+        when (val prompt = activePrompt) {
+                is ActivePrompt.CharacterCard -> {
+                    val card = characterCardManager.getCharacterCard(prompt.id)
+                    activeMemoryTarget = CompanionMemoryTarget(
+                        characterId = card.id,
+                        characterName = card.name,
+                    )
+                    val bindingMode =
+                        CharacterCardMemoryProfileBindingMode.normalize(card.memoryProfileBindingMode)
+                    val boundProfileId = card.memoryProfileId?.takeIf { it.isNotBlank() }
+                    selectedProfileId =
+                        if (
+                            bindingMode == CharacterCardMemoryProfileBindingMode.FIXED_PROFILE &&
+                                boundProfileId != null
+                        ) {
+                            boundProfileId
+                        } else {
+                            activeProfileId
+                        }
+                }
+                is ActivePrompt.CharacterGroup -> {
+                    val group = characterGroupManager.getCharacterGroupCard(prompt.id)
+                    activeMemoryTarget = CompanionMemoryTarget(
+                        characterGroupId = prompt.id,
+                        characterGroupName = group?.name.orEmpty(),
+                    )
+                    selectedProfileId = activeProfileId
+                }
+        }
+    }
 
     val viewModel: MemoryViewModel =
         viewModel(
@@ -260,10 +422,11 @@ fun MemoryScreen() {
 
     CustomScaffold(
         floatingActionButton = {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            if (showGraphView) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 // 只有在框选模式下才显示"确认删除"按钮
                 if (uiState.isBoxSelectionMode) {
                     FloatingActionButton(
@@ -325,6 +488,7 @@ fun MemoryScreen() {
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Create Memory")
                 }
+                }
             }
         }
     ) { padding ->
@@ -346,7 +510,29 @@ fun MemoryScreen() {
                         viewModel.searchMemories()
                     },
                     onSettingsClick = { viewModel.showSearchSettingsDialog(true) },
-                    onMenuClick = { showFolderNavigator = !showFolderNavigator }
+                    onMenuClick = { showFolderNavigator = !showFolderNavigator },
+                    isGraphView = showGraphView,
+                    onImportClick = {
+                        filePickerLauncher.launch(
+                            arrayOf(
+                                "text/*",
+                                "application/pdf",
+                                "application/msword",
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            ),
+                        )
+                    },
+                )
+                MemoryViewModeTabs(
+                    showGraphView = showGraphView,
+                    onGraphViewChange = { nextGraphView ->
+                        showGraphView = nextGraphView
+                        showFolderNavigator = false
+                        viewModel.toggleLinkingMode(false)
+                        viewModel.toggleBoxSelectionMode(false)
+                        viewModel.clearSelection()
+                        if (nextGraphView) viewModel.loadMemoryGraph()
+                    },
                 )
 
                 Box(
@@ -354,19 +540,61 @@ fun MemoryScreen() {
                         .weight(1f)
                         .fillMaxSize()
                 ) {
-                    // 图谱区域（始终挂载，避免 isLoading 切换时重建 GraphVisualizer）
-                    GraphVisualizer(
-                        graph = uiState.graph,
-                        modifier = Modifier.fillMaxSize(),
-                        selectedNodeId = uiState.selectedNodeId,
-                        boxSelectedNodeIds = uiState.boxSelectedNodeIds, // 传递框选节点
-                        isBoxSelectionMode = uiState.isBoxSelectionMode, // 传递模式状态
-                        linkingNodeIds = uiState.linkingNodeIds,
-                        selectedEdgeId = uiState.selectedEdge?.id,
-                        onNodeClick = { node -> viewModel.selectNode(node) },
-                        onEdgeClick = { edge -> viewModel.selectEdge(edge) },
-                        onNodesSelected = { nodeIds -> viewModel.addNodesToSelection(nodeIds) } // 传递回调
-                    )
+                    if (showGraphView) {
+                        if (uiState.graph.nodes.isEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.AccountTree,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(42.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    text = stringResource(R.string.mate_memory_graph_empty_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(top = 12.dp),
+                                )
+                                Text(
+                                    text = stringResource(R.string.mate_memory_graph_empty_desc),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 6.dp),
+                                )
+                            }
+                        } else {
+                            GraphVisualizer(
+                                graph = uiState.graph,
+                                modifier = Modifier.fillMaxSize(),
+                                selectedNodeId = uiState.selectedNodeId,
+                                boxSelectedNodeIds = uiState.boxSelectedNodeIds,
+                                isBoxSelectionMode = uiState.isBoxSelectionMode,
+                                linkingNodeIds = uiState.linkingNodeIds,
+                                selectedEdgeId = uiState.selectedEdge?.id ?: uiState.selectedCompanionEdge?.id,
+                                onNodeClick = { node -> viewModel.selectNode(node) },
+                                onEdgeClick = { edge -> viewModel.selectEdge(edge) },
+                                onNodesSelected = { nodeIds -> viewModel.addNodesToSelection(nodeIds) },
+                            )
+                        }
+                    } else {
+                        CompanionMemoryArchive(
+                            memories = uiState.memories,
+                            activeProfileId = selectedProfileId,
+                            activeTarget = activeMemoryTarget,
+                            searchQuery = uiState.searchQuery,
+                            onMemoryClick = viewModel::selectMemory,
+                            onAddMemory = { scope, categoryTag ->
+                                defaultMemoryScope = scope
+                                defaultMemoryCategoryTag = categoryTag
+                                viewModel.startEditing(null)
+                            },
+                            onCompanionStatusChange = viewModel::updateCompanionStatus,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
 
                     if (uiState.isLoading) {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -375,7 +603,7 @@ fun MemoryScreen() {
             }
             // 左侧文件夹导航 (Overlay)
             AnimatedVisibility(
-                visible = showFolderNavigator,
+                visible = showGraphView && showFolderNavigator,
                 enter = slideInHorizontally(initialOffsetX = { -it }),
                 exit = slideOutHorizontally(targetOffsetX = { -it })
             ) {
@@ -488,12 +716,20 @@ fun MemoryScreen() {
             } else if (uiState.selectedMemory != null) {
                 MemoryInfoDialog(
                     memory = uiState.selectedMemory!!,
+                    showAdvancedFields = showGraphView,
                     onDismiss = { viewModel.clearSelection() },
                     onEdit = {
                         viewModel.startEditing(uiState.selectedMemory)
                         viewModel.clearSelection() // 关闭当前对话框
                     },
                     onDelete = { viewModel.deleteMemory(uiState.selectedMemory!!.id) }
+                )
+            }
+
+            uiState.selectedCompanionMemory?.let { record ->
+                CompanionGraphMemoryDialog(
+                    record = record,
+                    onDismiss = { viewModel.clearSelection() },
                 )
             }
 
@@ -508,6 +744,13 @@ fun MemoryScreen() {
                         viewModel.clearSelection() // 同样, 点击编辑后关闭
                     },
                     onDelete = { viewModel.deleteEdge(selectedEdge.id) }
+                )
+            }
+
+            uiState.selectedCompanionEdge?.let { edge ->
+                CompanionGraphEdgeDialog(
+                    edge = edge,
+                    onDismiss = { viewModel.clearSelection() },
                 )
             }
 
@@ -536,11 +779,25 @@ fun MemoryScreen() {
                 EditMemoryDialog(
                     memory = uiState.editingMemory,
                     allFolderPaths = uiState.folderPaths,
+                    showAdvancedFields = showGraphView,
+                    defaultCategoryTag = defaultMemoryCategoryTag,
+                    defaultScope = defaultMemoryScope,
+                    profileId = selectedProfileId,
+                    activeTarget = activeMemoryTarget,
                     onDismiss = { viewModel.cancelEditing() },
-                    onSave = { memory, title, content, contentType, source, credibility, importance, folderPath, tags ->
+                    onSave = { memory, title, content, contentType, source, credibility, importance, folderPath, tags, ownership ->
                         if (memory == null) {
-                            // 创建新记忆的逻辑（如果需要的话）
-                             viewModel.createMemory(title, content, contentType)
+                            viewModel.createMemory(
+                                title = title,
+                                content = content,
+                                contentType = contentType,
+                                source = source,
+                                credibility = credibility,
+                                importance = importance,
+                                folderPath = folderPath,
+                                tags = tags,
+                                ownership = ownership,
+                            )
                         } else {
                             viewModel.updateMemory(
                                 memory = memory,
@@ -551,7 +808,8 @@ fun MemoryScreen() {
                                 newCredibility = credibility,
                                 newImportance = importance,
                                 newFolderPath = folderPath,
-                                newTags = tags
+                                newTags = tags,
+                                ownership = ownership,
                             )
                         }
                     }

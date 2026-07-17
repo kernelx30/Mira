@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.ui.main.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.ai.assistance.operit.ui.theme.liquidGlass
 
 /** Displays a header in the navigation drawer */
 @Composable
@@ -44,46 +43,33 @@ fun CompactNavigationDrawerItem(
         appearance: NavigationDrawerAppearance,
         onClick: () -> Unit
 ) {
-    val itemShape = MaterialTheme.shapes.small
-    val glassBaseColor = appearance.buttonContainerColor
-    val selectedGlassOverlayColor =
-            if (selected) {
-                    appearance.selectedContainerColor.copy(alpha = 0.18f)
-            } else {
-                    Color.Transparent
-            }
+    val itemShape = MaterialTheme.shapes.extraSmall
     Surface(
             modifier =
                     Modifier.fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                            .height(40.dp)
-                            .liquidGlass(
-                                    enabled = appearance.buttonLiquidGlassEnabled,
-                                    shape = itemShape,
-                                    containerColor = glassBaseColor,
-                                    shadowElevation = if (selected) 6.dp else 4.dp,
-                                    borderWidth = 0.5.dp,
-                                    blurRadius = 12.dp,
-                                    overlayAlphaBoost = 0.04f,
-                                    enableLens = false
-                            )
-                            .clip(itemShape)
-                            .background(selectedGlassOverlayColor),
+                            .padding(horizontal = 12.dp, vertical = 2.dp)
+                            .height(48.dp),
             onClick = onClick,
-            color =
-                    if (appearance.buttonLiquidGlassEnabled) {
-                            Color.Transparent
-                    } else if (selected) {
-                            appearance.selectedContainerColor
-                    } else {
-                            Color.Transparent
-                    },
+            color = if (selected) appearance.selectedContainerColor else Color.Transparent,
             shape = itemShape
     ) {
         Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                    modifier =
+                            Modifier.width(3.dp)
+                                    .height(22.dp)
+                                    .background(
+                                            if (selected) appearance.selectedContentColor
+                                            else Color.Transparent,
+                                            MaterialTheme.shapes.extraSmall
+                                    )
+            )
+
+            Spacer(modifier = Modifier.width(11.dp))
+
             Icon(
                     imageVector = icon,
                     contentDescription = null,

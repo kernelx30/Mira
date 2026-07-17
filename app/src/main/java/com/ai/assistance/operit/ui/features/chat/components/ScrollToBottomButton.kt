@@ -19,10 +19,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.chat.components.lazy.LazyListState as ChatLazyListState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -49,7 +52,10 @@ fun ScrollToBottomButton(
     modifier: Modifier = Modifier
 ) {
     var showScrollButton by remember { mutableStateOf(false) }
-    val isDragged by scrollState.interactionSource.collectIsDraggedAsState()
+    val isDragged = scrollState.interactionSource.collectIsDraggedAsState()
+    val currentAutoScrollToBottom by rememberUpdatedState(autoScrollToBottom)
+    val currentHasNewerDisplayHistory by rememberUpdatedState(hasNewerDisplayHistory)
+    val currentOnAutoScrollToBottomChange by rememberUpdatedState(onAutoScrollToBottomChange)
 
     LaunchedEffect(scrollState) {
         var lastPosition = scrollState.value
@@ -59,16 +65,16 @@ fun ScrollToBottomButton(
                 if (scrollState.isScrollInProgress) {
                     val scrolledUp = currentPosition < lastPosition
                     if (scrolledUp) {
-                        if (autoScrollToBottom && isDragged) {
-                            onAutoScrollToBottomChange(false)
+                        if (currentAutoScrollToBottom && isDragged.value) {
+                            currentOnAutoScrollToBottomChange(false)
                             showScrollButton = true
                         }
                     } else {
                         val isAtBottom =
                             scrollState.value >= scrollState.maxValue &&
-                                !hasNewerDisplayHistory
-                        if (isAtBottom && !autoScrollToBottom) {
-                            onAutoScrollToBottomChange(true)
+                                !currentHasNewerDisplayHistory
+                        if (isAtBottom && !currentAutoScrollToBottom) {
+                            currentOnAutoScrollToBottomChange(true)
                             showScrollButton = false
                         }
                     }
@@ -78,7 +84,12 @@ fun ScrollToBottomButton(
     }
 
     ScrollToBottomButtonContent(
-        visible = showScrollButton,
+        visible =
+            shouldShowScrollToBottomButton(
+                autoScrollToBottom = autoScrollToBottom,
+                gestureRequestedButton = showScrollButton,
+                hasNewerDisplayHistory = hasNewerDisplayHistory,
+            ),
         modifier = modifier,
         onClick = {
             coroutineScope.launch {
@@ -102,9 +113,11 @@ fun ScrollToBottomButton(
     modifier: Modifier = Modifier
 ) {
     var showScrollButton by remember { mutableStateOf(false) }
-    val isDragged by scrollState.interactionSource.collectIsDraggedAsState()
+    val isDragged = scrollState.interactionSource.collectIsDraggedAsState()
+    val currentAutoScrollToBottom by rememberUpdatedState(autoScrollToBottom)
+    val currentOnAutoScrollToBottomChange by rememberUpdatedState(onAutoScrollToBottomChange)
 
-    // 核心滚动逻辑 - 监听用户的手动滚动行为
+    // Effect 生命周期只绑定滚动状态，动态参数通过 rememberUpdatedState 保持实时。
     LaunchedEffect(scrollState) {
         var lastIndex = scrollState.firstVisibleItemIndex
         var lastOffset = scrollState.firstVisibleItemScrollOffset
@@ -122,14 +135,14 @@ fun ScrollToBottomButton(
                         currentIndex < lastIndex ||
                             (currentIndex == lastIndex && currentOffset < lastOffset)
                     if (scrolledUp) {
-                        if (autoScrollToBottom && isDragged) {
-                            onAutoScrollToBottomChange(false)
+                        if (currentAutoScrollToBottom && isDragged.value) {
+                            currentOnAutoScrollToBottomChange(false)
                             showScrollButton = true
                         }
                     } else {
                         val isAtBottom = scrollState.isAtBottom()
-                        if (isAtBottom && !autoScrollToBottom) {
-                            onAutoScrollToBottomChange(true)
+                        if (isAtBottom && !currentAutoScrollToBottom) {
+                            currentOnAutoScrollToBottomChange(true)
                             showScrollButton = false
                         }
                     }
@@ -140,7 +153,11 @@ fun ScrollToBottomButton(
     }
 
     ScrollToBottomButtonContent(
-        visible = showScrollButton,
+        visible =
+            shouldShowScrollToBottomButton(
+                autoScrollToBottom = autoScrollToBottom,
+                gestureRequestedButton = showScrollButton,
+            ),
         modifier = modifier,
         onClick = {
             coroutineScope.launch {
@@ -164,7 +181,11 @@ fun ScrollToBottomButton(
     modifier: Modifier = Modifier
 ) {
     var showScrollButton by remember { mutableStateOf(false) }
-    val isDragged by scrollState.interactionSource.collectIsDraggedAsState()
+    val isDragged = scrollState.interactionSource.collectIsDraggedAsState()
+    val currentAutoScrollToBottom by rememberUpdatedState(autoScrollToBottom)
+    val currentHasNewerDisplayHistory by rememberUpdatedState(hasNewerDisplayHistory)
+    val currentReverseLayout by rememberUpdatedState(reverseLayout)
+    val currentOnAutoScrollToBottomChange by rememberUpdatedState(onAutoScrollToBottomChange)
 
     LaunchedEffect(scrollState) {
         var lastIndex = scrollState.firstVisibleItemIndex
@@ -180,7 +201,7 @@ fun ScrollToBottomButton(
             .collect { (currentIndex, currentOffset, _) ->
                 if (scrollState.isScrollInProgress) {
                     val movedAwayFromBottom =
-                        if (reverseLayout) {
+                        if (currentReverseLayout) {
                             currentIndex > lastIndex ||
                                 (currentIndex == lastIndex && currentOffset > lastOffset)
                         } else {
@@ -188,16 +209,16 @@ fun ScrollToBottomButton(
                                 (currentIndex == lastIndex && currentOffset < lastOffset)
                         }
                     if (movedAwayFromBottom) {
-                        if (autoScrollToBottom && isDragged) {
-                            onAutoScrollToBottomChange(false)
+                        if (currentAutoScrollToBottom && isDragged.value) {
+                            currentOnAutoScrollToBottomChange(false)
                             showScrollButton = true
                         }
                     } else {
                         val isAtBottom =
-                            scrollState.isAtBottom(reverseLayout = reverseLayout) &&
-                                !hasNewerDisplayHistory
-                        if (isAtBottom && !autoScrollToBottom) {
-                            onAutoScrollToBottomChange(true)
+                            scrollState.isAtBottom(reverseLayout = currentReverseLayout) &&
+                                !currentHasNewerDisplayHistory
+                        if (isAtBottom && !currentAutoScrollToBottom) {
+                            currentOnAutoScrollToBottomChange(true)
                             showScrollButton = false
                         }
                     }
@@ -208,7 +229,12 @@ fun ScrollToBottomButton(
     }
 
     ScrollToBottomButtonContent(
-        visible = showScrollButton,
+        visible =
+            shouldShowScrollToBottomButton(
+                autoScrollToBottom = autoScrollToBottom,
+                gestureRequestedButton = showScrollButton,
+                hasNewerDisplayHistory = hasNewerDisplayHistory,
+            ),
         modifier = modifier,
         onClick = {
             coroutineScope.launch {
@@ -249,12 +275,18 @@ private fun ScrollToBottomButtonContent(
         ) {
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = "Scroll to bottom",
+                contentDescription = stringResource(R.string.history_scroll_to_bottom),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
+
+internal fun shouldShowScrollToBottomButton(
+    autoScrollToBottom: Boolean,
+    gestureRequestedButton: Boolean,
+    hasNewerDisplayHistory: Boolean = false,
+): Boolean = gestureRequestedButton || !autoScrollToBottom || hasNewerDisplayHistory
 
 private fun ChatLazyListState.isAtBottom(): Boolean {
     val layoutInfo = layoutInfo

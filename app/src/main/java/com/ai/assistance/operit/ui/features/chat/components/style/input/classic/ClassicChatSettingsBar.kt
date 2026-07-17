@@ -379,8 +379,7 @@ fun ClassicChatSettingsBar(
                 showPluginsSection = false
             },
             modifier = Modifier
-                .padding(vertical = 8.dp, horizontal = 2.dp)
-                .size(28.dp)
+                .size(48.dp)
                 .align(Alignment.BottomEnd)
         ) {
             Icon(
@@ -822,7 +821,7 @@ private fun SettingItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 36.dp)
+            .heightIn(min = 48.dp)
             .padding(horizontal = 12.dp)
             .semantics {
                 contentDescription = title
@@ -845,7 +844,7 @@ private fun SettingItem(
                 .clearAndSetSemantics {}
         )
         // 详情按钮（左侧）
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
@@ -919,7 +918,7 @@ private fun SettingSliderItem(
                 modifier = Modifier.size(16.dp)
             )
             // Info button
-            IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = stringResource(R.string.details),
@@ -932,9 +931,10 @@ private fun SettingSliderItem(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
             )
-            Spacer(modifier = Modifier.weight(1f))
             BasicTextField(
                 value = textValue,
                 onValueChange = { newText ->
@@ -944,7 +944,7 @@ private fun SettingSliderItem(
                     }
                 },
                 modifier = Modifier
-                    .width(50.dp)
+                    .width(64.dp)
                     .background(
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                         RoundedCornerShape(4.dp)
@@ -972,7 +972,7 @@ private fun SettingSliderItem(
             )
 
             // Here is the fix for alignment
-            Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.CenterStart) {
+            Box(modifier = Modifier.width(32.dp), contentAlignment = Alignment.CenterStart) {
                 if (unitText != null) {
                     Text(
                         text = unitText,
@@ -994,7 +994,7 @@ private fun SettingSliderItem(
             onValueChangeFinished = { onValueChange(sliderValue) },
             valueRange = valueRange,
             steps = steps,
-            modifier = Modifier.fillMaxWidth().height(24.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
         )
     }
 }
@@ -1052,7 +1052,7 @@ private fun ClassicSettingsFoldSection(
         Row(
             modifier =
                 Modifier.fillMaxWidth()
-                    .heightIn(min = 36.dp)
+                    .heightIn(min = 48.dp)
                     .clickable { onExpandedChange(!expanded) }
                     .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -1149,7 +1149,7 @@ private fun ToolPermissionSettingItem(
                     modifier =
                         Modifier
                             .weight(1f)
-                            .height(28.dp)
+                            .heightIn(min = 48.dp)
                             .clip(RoundedCornerShape(999.dp))
                             .background(
                                 if (isSelected) MaterialTheme.colorScheme.primary
@@ -1182,7 +1182,7 @@ private fun ToolPermissionSettingItem(
                             else MaterialTheme.colorScheme.onSurface,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -1196,7 +1196,7 @@ private fun ToolPermissionSettingItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp)
+                .heightIn(min = 48.dp)
                 .clickable(onClick = onManageToolsClick),
             contentAlignment = Alignment.Center
         ) {
@@ -1248,7 +1248,7 @@ private fun ThinkingSettingsItem(
                         onValueChange = { onToggle() },
                         role = Role.Switch
                     )
-                    .heightIn(min = 36.dp)
+                    .heightIn(min = 48.dp)
                     .padding(horizontal = 8.dp)
         ) {
             Row(
@@ -1261,7 +1261,7 @@ private fun ThinkingSettingsItem(
                     tint = iconTint,
                     modifier = Modifier.size(16.dp).clearAndSetSemantics {}
                 )
-                IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+                IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
                     Icon(
                         imageVector = Icons.Outlined.Info,
                         contentDescription = stringResource(R.string.details),
@@ -1318,7 +1318,7 @@ private fun ThinkingSettingsItem(
         Row(
             modifier =
                     Modifier.fillMaxWidth()
-                            .heightIn(min = 36.dp)
+                            .heightIn(min = 48.dp)
                             .semantics { contentDescription = accessibilityDesc }
                             .clickable { onExpandedChange(!expanded) }
                             .padding(horizontal = 12.dp),
@@ -1330,7 +1330,7 @@ private fun ThinkingSettingsItem(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp).clearAndSetSemantics {}
             )
-            IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = stringResource(R.string.details),
@@ -1447,7 +1447,7 @@ private fun MemorySelectorItem(
         Row(
                 modifier =
                         Modifier.fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .semantics {
                     contentDescription = accessibilityDesc
                 }
@@ -1464,7 +1464,7 @@ private fun MemorySelectorItem(
                     .clearAndSetSemantics {}
             )
             // 详情按钮（左侧）
-            IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = stringResource(R.string.details),
@@ -1550,7 +1550,7 @@ private fun MemorySelectorItem(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(30.dp)
+                        .heightIn(min = 48.dp)
                         .clickable(onClick = onManageClick),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1596,7 +1596,7 @@ private fun ModelSelectorItem(
         Row(
                 modifier =
                         Modifier.fillMaxWidth()
-                .heightIn(min = 36.dp)
+                .heightIn(min = 48.dp)
                 .semantics {
                     contentDescription = accessibilityDesc
                 }
@@ -1615,7 +1615,7 @@ private fun ModelSelectorItem(
                     .clearAndSetSemantics {}
             )
             // 详情按钮（左侧）
-            IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = stringResource(R.string.details),
@@ -1813,7 +1813,7 @@ private fun ModelSelectorItem(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(30.dp)
+                        .heightIn(min = 48.dp)
                         .clickable(onClick = onManageClick),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1835,7 +1835,7 @@ private fun ActionSettingItem(
     Row(
         modifier =
                 Modifier.fillMaxWidth()
-                        .heightIn(min = 36.dp)
+                        .heightIn(min = 48.dp)
                         .padding(vertical = 2.dp)
                         .padding(horizontal = 3.dp)
                         .border(
@@ -1864,7 +1864,7 @@ private fun ActionSettingItem(
                 .clearAndSetSemantics {}
         )
         // 详情按钮（左侧）
-        IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
+        IconButton(onClick = onInfoClick, modifier = Modifier.size(48.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),

@@ -175,7 +175,7 @@ fun ToolPromptManagerDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(34.dp)
+                            .heightIn(min = 48.dp)
                             .clickable(onClick = onManagePackagesClick),
                         contentAlignment = Alignment.Center,
                     ) {

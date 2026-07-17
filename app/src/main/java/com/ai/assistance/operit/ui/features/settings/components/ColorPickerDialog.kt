@@ -33,10 +33,10 @@ import kotlin.math.*
  */
 val materialColors = listOf(
     // Material Design primary colors
-    Color(0xFF6200EE), // Purple 500 (Material primary)
-    Color(0xFF3700B3), // Purple 700 (Material primary variant)
-    Color(0xFF03DAC6), // Teal 200 (Material secondary)
-    Color(0xFF018786), // Teal 700 (Material secondary variant)
+    Color(0xFF167A75), // Mira teal
+    Color(0xFFE88A9A), // Mira rose
+    Color(0xFFF3C55D), // Mira gold
+    Color(0xFF1D2527), // Mira ink
     Color(0xFF1976D2), // Blue 700
     Color(0xFF0D47A1), // Blue 900
     Color(0xFF1E88E5), // Blue 600

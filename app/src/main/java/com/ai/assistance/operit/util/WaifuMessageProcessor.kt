@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.util
 
 import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
 import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.repository.CustomEmojiRepository
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.Locale
 
 /**
  * Waifu模式消息处理器
@@ -32,12 +34,23 @@ object WaifuMessageProcessor {
         Regex("(?:[。！？~～.!?…]|\\.{3})\\s*$")
     private val HORIZONTAL_RULE_REGEX = Regex("^[-_*]{3,}$")
     private val MARKDOWN_ENTITY_REGEX = Regex("""!?\[[^\]]*?\]\([^)]*?\)""")
+    private val CUSTOM_EMOJI_MARKDOWN_REGEX =
+        Regex(
+            """!\[[^\]]*]\(file:[^)]*/custom_emoji/[^)]*\)""",
+            RegexOption.IGNORE_CASE,
+        )
     private val BARE_URL_REGEX = Regex("""https?://$URL_CHARS+""")
     private val EMAIL_ADDRESS_REGEX = Regex("""[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}""")
     private val DOMAIN_URL_REGEX =
         Regex("""(?<![@\w])(?:www\.)?(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?::\d+)?(?:[/?#]$URL_CHARS*)?""")
     private val ENTITY_PLACEHOLDER_REGEX =
         Regex("${Regex.escape(ENTITY_PLACEHOLDER_PREFIX)}\\d+${Regex.escape(ENTITY_PLACEHOLDER_SUFFIX)}")
+    private val EMOTION_TAG_REGEX =
+        Regex("""<emotion>\s*([a-z0-9_]+)\s*</emotion>""", RegexOption.IGNORE_CASE)
+    private val EMOTION_CATEGORY_REGEX = Regex("^[a-z0-9_]+$")
+    private const val MAX_EMOJIS_PER_REPLY = 1
+    private const val MIN_SEGMENT_TYPING_DELAY_MS = 60L
+    private const val MAX_SEGMENT_TYPING_DELAY_MS = 480L
     
     private var customEmojiRepository: CustomEmojiRepository? = null
     private var activePromptManager: ActivePromptManager? = null
@@ -46,6 +59,20 @@ object WaifuMessageProcessor {
         private val removePunctuation: Boolean = false
     ) {
         private val emittedSegments = mutableListOf<String>()
+        private val resolvedEmotions = mutableMapOf<Int, ResolvedEmotion>()
+
+        private fun resolveEmotion(emotion: String, occurrenceIndex: Int): String? {
+            val normalizedEmotion = normalizeEmotion(emotion) ?: return null
+            val cached = resolvedEmotions[occurrenceIndex]
+            if (cached?.emotion == normalizedEmotion) {
+                return cached.markdown
+            }
+
+            return resolveEmotionMarkdown(normalizedEmotion).also { markdown ->
+                resolvedEmotions[occurrenceIndex] =
+                    ResolvedEmotion(emotion = normalizedEmotion, markdown = markdown)
+            }
+        }
 
         fun collectStableSegments(content: String): List<String> {
             return collectSegments(
@@ -53,6 +80,7 @@ object WaifuMessageProcessor {
                     content = buildRenderableContentForWaifu(content),
                     removePunctuation = removePunctuation,
                     includeTrailingIncomplete = false,
+                    emotionResolver = ::resolveEmotion,
                 )
             )
         }
@@ -63,6 +91,7 @@ object WaifuMessageProcessor {
                     content = buildRenderableContentForWaifu(content),
                     removePunctuation = removePunctuation,
                     includeTrailingIncomplete = true,
+                    emotionResolver = ::resolveEmotion,
                 )
             )
         }
@@ -117,7 +146,9 @@ object WaifuMessageProcessor {
             val blockType = blockGroup.tag ?: MarkdownProcessorType.PLAIN_TEXT
             when (blockType) {
                 MarkdownProcessorType.XML_BLOCK -> {
-                    blockGroup.stream.collect { }
+                    val blockBuilder = StringBuilder()
+                    blockGroup.stream.collect { blockBuilder.append(it) }
+                    appendRenderableText(buildRenderableContentForWaifu(blockBuilder.toString()))
                 }
 
                 MarkdownProcessorType.CODE_BLOCK,
@@ -144,6 +175,7 @@ object WaifuMessageProcessor {
         sourceStream: Stream<String>,
         removePunctuation: Boolean = false,
         charDelayMs: Int,
+        synchronizeWithSpeech: Boolean = false,
     ): Stream<String> = stream {
         coroutineScope {
             val segmentQueue = Channel<String>(Channel.UNLIMITED)
@@ -177,12 +209,92 @@ object WaifuMessageProcessor {
 
                 emit(segment)
                 nextSendAtMs =
-                    SystemClock.elapsedRealtime() + segment.length.toLong() * charDelayMs.toLong()
+                    SystemClock.elapsedRealtime() +
+                        calculateSegmentRevealDelayMs(
+                            segmentLength = segment.length,
+                            charDelayMs = charDelayMs,
+                            synchronizeWithSpeech = synchronizeWithSpeech,
+                        )
             }
 
             producerJob.join()
         }
     }
+
+    internal fun calculateSegmentTypingDelayMs(segmentLength: Int, charDelayMs: Int): Long {
+        if (segmentLength <= 0 || charDelayMs <= 0) return 0L
+        return (segmentLength.toLong() * charDelayMs.toLong())
+            .coerceIn(MIN_SEGMENT_TYPING_DELAY_MS, MAX_SEGMENT_TYPING_DELAY_MS)
+    }
+
+    internal fun calculateSegmentRevealDelayMs(
+        segmentLength: Int,
+        charDelayMs: Int,
+        synchronizeWithSpeech: Boolean,
+    ): Long {
+        // The collector waits for the active TTS block to finish. Keep only a short
+        // conversational pause here instead of estimating audio duration from text.
+        return calculateSegmentTypingDelayMs(segmentLength, charDelayMs)
+    }
+
+    internal fun appendSegmentToReply(current: String, segment: String): String {
+        val addition = segment.trim()
+        if (addition.isEmpty()) return current
+        if (current.isBlank()) return addition
+
+        val previous = current.last()
+        val next = addition.first()
+        val separator =
+            when {
+                previous == '\n' || next == '\n' -> ""
+                previous == '`' || next == '`' -> "\n\n"
+                previous.isLetterOrDigit() && next.isLetterOrDigit() &&
+                    previous.code < 128 && next.code < 128 -> " "
+                else -> ""
+            }
+        return current + separator + addition
+    }
+
+    internal fun findMissingFinalSegments(
+        finalContent: String,
+        emittedSegments: List<String>,
+        removePunctuation: Boolean = false,
+    ): List<String> {
+        val finalSegments = splitMessageBySentences(finalContent, removePunctuation)
+        return findMissingFinalSegments(finalSegments, emittedSegments)
+    }
+
+    internal fun findMissingFinalSegments(
+        finalSegments: List<String>,
+        emittedSegments: List<String>,
+    ): List<String> {
+        if (finalSegments.isEmpty()) return emptyList()
+
+        val finalCombined = finalSegments.joinToString(separator = "").comparisonKey()
+        val emittedCombined = emittedSegments.joinToString(separator = "").comparisonKey()
+        if (finalCombined == emittedCombined) return emptyList()
+
+        val remainingEmitted = emittedSegments.map(::normalizeSegmentForComparison).toMutableList()
+        return finalSegments.filter { segment ->
+            val normalized = normalizeSegmentForComparison(segment)
+            val matchedIndex = remainingEmitted.indexOf(normalized)
+            if (matchedIndex >= 0) {
+                remainingEmitted.removeAt(matchedIndex)
+                false
+            } else {
+                true
+            }
+        }
+    }
+
+    private fun normalizeSegmentForComparison(segment: String): String =
+        segment
+            .replace(Regex("!\\[([^]]+)]\\([^)]+\\)"), "![$1]")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+    private fun String.comparisonKey(): String =
+        normalizeSegmentForComparison(this).replace(" ", "")
 
     fun streamTtsText(sourceStream: Stream<String>): Stream<Char> = stream {
         var lastCharWasNewline = true
@@ -268,6 +380,9 @@ object WaifuMessageProcessor {
         content: String,
         removePunctuation: Boolean,
         includeTrailingIncomplete: Boolean,
+        emotionResolver: (String, Int) -> String? = { emotion, _ ->
+            resolveEmotionMarkdown(emotion)
+        },
     ): List<String> {
         if (content.isBlank()) return emptyList()
 
@@ -315,6 +430,8 @@ object WaifuMessageProcessor {
             }
 
         val resultWithPlaceholders = mutableListOf<String>()
+        var emotionOccurrenceIndex = 0
+        var renderedEmojiCount = 0
 
         for ((segmentIndex, segment) in segments.withIndex()) {
             if (segment.isProtected) {
@@ -328,7 +445,17 @@ object WaifuMessageProcessor {
             val contentWithoutThinking = ChatUtils.removeThinkingContent(segment.content)
             if (contentWithoutThinking.isBlank()) continue
 
-            val separatedContent = separateEmotionAndText(contentWithoutThinking)
+            val separatedContent =
+                separateEmotionAndTextInternal(contentWithoutThinking) { emotion ->
+                    val occurrenceIndex = emotionOccurrenceIndex++
+                    if (renderedEmojiCount >= MAX_EMOJIS_PER_REPLY) {
+                        null
+                    } else {
+                        emotionResolver(emotion, occurrenceIndex)?.also {
+                            renderedEmojiCount++
+                        }
+                    }
+                }
 
             for (item in separatedContent) {
                 // 如果这个item是表情包（包含![开头的），直接添加
@@ -698,7 +825,13 @@ object WaifuMessageProcessor {
                     builder.append(block.rawContent)
                 }
 
-                StructuredAssistantContentParser.BlockKind.XML -> Unit
+                StructuredAssistantContentParser.BlockKind.XML -> {
+                    if (block.closed && block.tagName.equals("emotion", ignoreCase = true)) {
+                        builder.append(block.rawContent)
+                    } else if (block.tagName.equals("speech", ignoreCase = true)) {
+                        builder.append(block.content)
+                    }
+                }
             }
         }
 
@@ -730,6 +863,8 @@ object WaifuMessageProcessor {
             .replace(ChatMarkupRegex.toolResultSelfClosingTag, "")
             // 移除emotion标签（因为已经在processEmotionTags中处理过了）
             .replace(ChatMarkupRegex.emotionTag, "")
+            // 表情包只负责视觉表达，不应让 TTS 念出情绪分类或本地文件路径。
+            .replace(CUSTOM_EMOJI_MARKDOWN_REGEX, " ")
             
             // --- 新增：移除Markdown相关标记 ---
             // 1. 移除图片和链接，保留替代文本或链接文本
@@ -850,30 +985,16 @@ object WaifuMessageProcessor {
      */
     fun processEmotionTags(content: String): String {
         if (content.isBlank()) return content
-        
-        // 匹配<emotion>标签的正则表达式
-        val emotionRegex = Regex("<emotion>([^<]+)</emotion>")
-        
-        return emotionRegex.replace(content) { matchResult ->
-            val emotion = matchResult.groupValues[1].trim()
-            val emojiPath = getRandomEmojiPath(emotion)
-            
-            if (emojiPath != null) {
-                // 判断是自定义表情（绝对路径）还是assets表情（相对路径）
-                val imageUrl = if (emojiPath.startsWith("/")) {
-                    // 自定义表情：使用绝对路径
-                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
-                    "file://$encodedPath"
-                } else {
-                    // assets表情：使用相对路径
-                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
-                    "file:///android_asset/emoji/$encodedPath"
-                }
-                "![$emotion]($imageUrl)"
-            } else {
-                // 如果找不到对应的表情，返回原始文本
-                matchResult.value
+        var renderedEmojiCount = 0
+
+        return EMOTION_TAG_REGEX.replace(content) { matchResult ->
+            if (renderedEmojiCount >= MAX_EMOJIS_PER_REPLY) {
+                return@replace ""
             }
+
+            resolveEmotionMarkdown(matchResult.groupValues[1])
+                ?.also { renderedEmojiCount++ }
+                .orEmpty()
         }
     }
     
@@ -883,55 +1004,61 @@ object WaifuMessageProcessor {
      * @return 包含文本内容和表情包内容的列表，表情包会单独作为一个元素
      */
     fun separateEmotionAndText(content: String): List<String> {
+        var renderedEmojiCount = 0
+        return separateEmotionAndTextInternal(content) { emotion ->
+            if (renderedEmojiCount >= MAX_EMOJIS_PER_REPLY) {
+                null
+            } else {
+                resolveEmotionMarkdown(emotion)?.also { renderedEmojiCount++ }
+            }
+        }
+    }
+
+    private fun separateEmotionAndTextInternal(
+        content: String,
+        emotionResolver: (String) -> String?,
+    ): List<String> {
         if (content.isBlank()) return listOf(content)
-        
+
+        val matches = EMOTION_TAG_REGEX.findAll(content).toList()
+        if (matches.isEmpty()) return listOf(content)
+
         val result = mutableListOf<String>()
-        val emotionRegex = Regex("<emotion>([^<]+)</emotion>")
-        
-        // 找到所有emotion标签的位置
-        val matches = emotionRegex.findAll(content)
         var lastEnd = 0
-        
+
         for (match in matches) {
-            // 添加emotion标签之前的文本（如果有的话）
             val beforeText = content.substring(lastEnd, match.range.first).trim()
             if (beforeText.isNotEmpty()) {
                 result.add(beforeText)
             }
-            
-            // 处理emotion标签
-            val emotion = match.groupValues[1].trim()
-            val emojiPath = getRandomEmojiPath(emotion)
-            
-            if (emojiPath != null) {
-                // 判断是自定义表情（绝对路径）还是assets表情（相对路径）
-                val imageUrl = if (emojiPath.startsWith("/")) {
-                    // 自定义表情：使用绝对路径
-                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
-                    "file://$encodedPath"
-                } else {
-                    // assets表情：使用相对路径
-                    val encodedPath = emojiPath.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
-                    "file:///android_asset/emoji/$encodedPath"
-                }
-                result.add("![$emotion]($imageUrl)")
-            }
-            
+
+            emotionResolver(match.groupValues[1])?.let(result::add)
             lastEnd = match.range.last + 1
         }
-        
-        // 添加最后一个emotion标签之后的文本（如果有的话）
+
         val afterText = content.substring(lastEnd).trim()
         if (afterText.isNotEmpty()) {
             result.add(afterText)
         }
-        
-        // 如果没有找到任何emotion标签，返回原始内容
-        if (result.isEmpty()) {
-            result.add(content)
-        }
-        
+
         return result
+    }
+
+    private fun normalizeEmotion(emotion: String): String? {
+        val normalized = emotion.trim().lowercase(Locale.ROOT)
+        return normalized.takeIf(EMOTION_CATEGORY_REGEX::matches)
+    }
+
+    private fun resolveEmotionMarkdown(emotion: String): String? {
+        val normalizedEmotion = normalizeEmotion(emotion) ?: return null
+        val emojiPath = getRandomEmojiPath(normalizedEmotion) ?: return null
+        val imageUrl =
+            if (emojiPath.startsWith("/")) {
+                Uri.fromFile(File(emojiPath)).toString()
+            } else {
+                "file:///android_asset/emoji/${Uri.encode(emojiPath, "/")}"
+            }
+        return "![$normalizedEmotion]($imageUrl)"
     }
     
     /**
@@ -977,4 +1104,9 @@ object WaifuMessageProcessor {
             return null
         }
     }
+
+    private data class ResolvedEmotion(
+        val emotion: String,
+        val markdown: String?,
+    )
 } 

@@ -2,6 +2,7 @@ package com.ai.assistance.operit.services.core
 
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.api.chat.EnhancedAIService
+import com.ai.assistance.operit.data.model.ContextWindowUsage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,9 @@ class TokenStatisticsDelegate(
     private val _currentWindowSize = MutableStateFlow(0L)
     val currentWindowSizeFlow: StateFlow<Long> = _currentWindowSize.asStateFlow()
 
+    private val _contextWindowUsage = MutableStateFlow(ContextWindowUsage.Empty)
+    val contextWindowUsageFlow: StateFlow<ContextWindowUsage> = _contextWindowUsage.asStateFlow()
+
     private val _perRequestTokenCount = MutableStateFlow<Pair<Int, Int>?>(null)
     val perRequestTokenCountFlow: StateFlow<Pair<Int, Int>?> = _perRequestTokenCount.asStateFlow()
 
@@ -44,6 +48,7 @@ class TokenStatisticsDelegate(
     private val cumulativeInputTokensByChatKey = ConcurrentHashMap<String, Long>()
     private val cumulativeOutputTokensByChatKey = ConcurrentHashMap<String, Long>()
     private val lastWindowSizeByChatKey = ConcurrentHashMap<String, Long>()
+    private val contextWindowUsageByChatKey = ConcurrentHashMap<String, ContextWindowUsage>()
     private val perRequestTokenCountByChatKey =
         ConcurrentHashMap<String, Pair<Int, Int>?>()
 
@@ -58,11 +63,13 @@ class TokenStatisticsDelegate(
         val input = cumulativeInputTokensByChatKey[key] ?: 0L
         val output = cumulativeOutputTokensByChatKey[key] ?: 0L
         val window = lastWindowSizeByChatKey[key] ?: 0L
+        val contextUsage = contextWindowUsageByChatKey[key] ?: ContextWindowUsage.Empty
         val perRequest = perRequestTokenCountByChatKey[key]
 
         _cumulativeInputTokens.value = input
         _cumulativeOutputTokens.value = output
         _currentWindowSize.value = window
+        _contextWindowUsage.value = contextUsage
         _perRequestTokenCount.value = perRequest
         lastCurrentWindowSize = window
     }
@@ -99,6 +106,20 @@ class TokenStatisticsDelegate(
         }
     }
 
+    private fun handleContextWindowUsage(
+        key: String,
+        usage: ContextWindowUsage,
+    ) {
+        if (usage.hasBreakdown) {
+            contextWindowUsageByChatKey[key] = usage
+        } else {
+            contextWindowUsageByChatKey.remove(key)
+        }
+        if (isActiveKey(key)) {
+            _contextWindowUsage.value = usage
+        }
+    }
+
     fun setupCollectors() {
         tokenCollectorJob?.cancel() // Cancel previous collector if any
         val service = getEnhancedAiService() ?: return // Service not ready
@@ -117,6 +138,11 @@ class TokenStatisticsDelegate(
                         key = chatKey(null),
                         windowSize = windowSize
                     )
+                }
+            }
+            launch {
+                service.contextWindowUsageFlow.collect { usage ->
+                    handleContextWindowUsage(chatKey(null), usage)
                 }
             }
         }
@@ -150,6 +176,11 @@ class TokenStatisticsDelegate(
                         )
                     }
                 }
+                launch {
+                    service.contextWindowUsageFlow.collect { usage ->
+                        handleContextWindowUsage(key, usage)
+                    }
+                }
             }
 
         if (isActiveKey(key)) {
@@ -162,12 +193,14 @@ class TokenStatisticsDelegate(
         _cumulativeInputTokens.value = 0L
         _cumulativeOutputTokens.value = 0L
         _currentWindowSize.value = 0L
+        _contextWindowUsage.value = ContextWindowUsage.Empty
         _perRequestTokenCount.value = null
         lastCurrentWindowSize = 0L
 
         cumulativeInputTokensByChatKey.clear()
         cumulativeOutputTokensByChatKey.clear()
         lastWindowSizeByChatKey.clear()
+        contextWindowUsageByChatKey.clear()
         perRequestTokenCountByChatKey.clear()
 
         // 同时重置服务中的token计数

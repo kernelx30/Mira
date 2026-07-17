@@ -105,8 +105,8 @@ class AIForegroundService : Service() {
         private const val TAG = "AIForegroundService"
         private const val NOTIFICATION_ID = 1
         private const val REPLY_NOTIFICATION_ID = 2001
-        private const val CHANNEL_ID = "AI_SERVICE_CHANNEL"
-        private const val REPLY_CHANNEL_ID_PREFIX = "AI_REPLY_COMPLETE_CHANNEL"
+        private const val CHANNEL_ID = "AI_SERVICE_CHANNEL_V2"
+        private const val REPLY_CHANNEL_ID_PREFIX = "AI_REPLY_COMPLETE_CHANNEL_V2"
         private val REPLY_VIBRATION_PATTERN = longArrayOf(0L, 250L, 150L, 250L)
 
         private const val ACTION_CANCEL_CURRENT_OPERATION = "com.ai.assistance.operit.action.CANCEL_CURRENT_OPERATION"
@@ -220,6 +220,7 @@ class AIForegroundService : Service() {
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
                     description = context.getString(R.string.service_notify_when_complete)
+                    setShowBadge(false)
                     setSound(
                         if (enableSound) Settings.System.DEFAULT_NOTIFICATION_URI else null,
                         if (enableSound) {
@@ -1315,6 +1316,7 @@ class AIForegroundService : Service() {
                     )
                     .apply {
                         description = getString(R.string.service_keep_background)
+                        setShowBadge(false)
                     }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)

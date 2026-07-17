@@ -72,6 +72,7 @@ import com.ai.assistance.operit.terminal.utils.SSHFileConnectionManager
 import com.ai.assistance.operit.core.tools.defaultTool.PathValidator
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.util.ripgrep.NativeRipgrep
+import com.ai.assistance.operit.util.ripgrep.KotlinRipgrepFallback
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -279,16 +280,30 @@ open class StandardFileSystemTools(protected val context: Context) {
         maxResults: Int
     ): Pair<List<RipgrepBlock>, Int> =
         withContext(Dispatchers.IO) {
+            val normalizedContextLines = contextLines.coerceAtLeast(0)
+            val normalizedMaxResults = maxResults.coerceAtLeast(0)
             val rawResult =
-                NativeRipgrep.searchJson(
-                    path = path,
-                    patterns = patterns.toTypedArray(),
-                    filePattern = filePattern,
-                    caseInsensitive = caseInsensitive,
-                    literal = false,
-                    contextLines = contextLines.coerceAtLeast(0),
-                    maxResults = maxResults.coerceAtLeast(0)
-                )
+                if (NativeRipgrep.isAvailable) {
+                    NativeRipgrep.searchJson(
+                        path = path,
+                        patterns = patterns.toTypedArray(),
+                        filePattern = filePattern,
+                        caseInsensitive = caseInsensitive,
+                        literal = false,
+                        contextLines = normalizedContextLines,
+                        maxResults = normalizedMaxResults,
+                    )
+                } else {
+                    KotlinRipgrepFallback.searchJson(
+                        path = path,
+                        patterns = patterns,
+                        filePattern = filePattern,
+                        caseInsensitive = caseInsensitive,
+                        literal = false,
+                        contextLines = normalizedContextLines,
+                        maxResults = normalizedMaxResults,
+                    )
+                }
             parseNativeRipgrepBlocks(rawResult)
         }
 

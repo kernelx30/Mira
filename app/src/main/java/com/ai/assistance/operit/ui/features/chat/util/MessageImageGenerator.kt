@@ -215,7 +215,7 @@ object MessageImageGenerator {
                                             Column(
                                                 modifier = Modifier.fillMaxWidth().wrapContentHeight()
                                             ) {
-                                                // 顶部品牌栏：Logo + "Operit AI"
+                                                // 顶部品牌栏：Logo + 产品名
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
@@ -226,14 +226,14 @@ object MessageImageGenerator {
                                                 ) {
                                                     // Logo
                                                     Image(
-                                                        painter = painterResource(id = com.ai.assistance.operit.R.drawable.ic_launcher_simple_foreground),
-                                                        contentDescription = "Operit Logo",
+                                                        painter = painterResource(id = com.ai.assistance.operit.R.drawable.ic_mira_logo),
+                                                        contentDescription = "Mira logo",
                                                         modifier = Modifier.size(48.dp)
                                                     )
                                                     Spacer(modifier = Modifier.width(2.dp))
                                                     // 品牌名称
                                                     Text(
-                                                        text = "Operit AI",
+                                                        text = context.getString(R.string.app_name),
                                                         fontSize = 16.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = colorScheme.onSurface

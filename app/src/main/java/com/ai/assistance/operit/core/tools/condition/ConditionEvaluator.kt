@@ -18,7 +18,9 @@ object ConditionEvaluator {
             val value = ast.eval(capabilities)
             value.isTruthy()
         } catch (e: Exception) {
-            AppLogger.w(TAG, "Condition evaluation failed: '$expression' (${e.message})")
+            runCatching {
+                AppLogger.w(TAG, "Condition evaluation failed: '$expression' (${e.message})")
+            }
             false
         }
     }

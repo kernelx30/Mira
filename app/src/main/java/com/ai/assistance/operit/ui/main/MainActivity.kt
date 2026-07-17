@@ -1,6 +1,5 @@
 package com.ai.assistance.operit.ui.main
 
-import android.Manifest
 import android.app.ActivityManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -13,13 +12,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -35,10 +28,13 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.AIForegroundService
+import com.ai.assistance.operit.core.companion.MiraCompanionContract
+import com.ai.assistance.operit.core.companion.MiraCompanionService
 import com.ai.assistance.operit.core.application.OperitApplication
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.preferences.AgreementPreferences
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
+import com.ai.assistance.operit.data.preferences.CompanionReminderPreferences
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.androidPermissionPreferences
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
@@ -62,7 +58,6 @@ import kotlinx.coroutines.launch
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.ui.res.stringResource
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.ui.features.github.GitHubOAuthCoordinator
 import com.ai.assistance.operit.widget.ToolPkgDesktopWidgetHost
@@ -71,13 +66,12 @@ import org.json.JSONObject
 class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_OPEN_SETTINGS_SHORTCUT = "com.ai.assistance.operit.action.OPEN_SETTINGS_SHORTCUT"
+        private const val STATE_CURRENT_MAIN_NAV_ROUTE = "current_main_nav_route"
     }
 
     private val TAG = "MainActivity"
 
     // ======== 屏幕方向变更状态 ========
-    private var showOrientationChangeDialog by mutableStateOf(false)
-
     private var lastOrientation: Int? = null
 
     // ======== 工具和管理器 ========
@@ -115,18 +109,6 @@ class MainActivity : ComponentActivity() {
     private var pendingRouteId: String? = null
     private var pendingRouteArgs: Map<String, Any?> = emptyMap()
     private var pendingRouteRequestId: Long = 0L
-
-    // 通知权限请求启动器
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            AppLogger.d(TAG, "通知权限已授予")
-        } else {
-            AppLogger.d(TAG, "通知权限被拒绝")
-            Toast.makeText(this, getString(R.string.notification_permission_denied), Toast.LENGTH_LONG).show()
-        }
-    }
 
     private fun processPendingSharedText() {
         if (pendingSharedFileUris != null) {
@@ -188,6 +170,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentMainNavItem =
+            NavItem.fromRoute(savedInstanceState?.getString(STATE_CURRENT_MAIN_NAV_ROUTE))
+                ?: currentMainNavItem
         lastOrientation = resources.configuration.orientation
         AppLogger.d(TAG, "onCreate: Android SDK version: ${Build.VERSION.SDK_INT}")
 
@@ -199,6 +184,7 @@ class MainActivity : ComponentActivity() {
         restoreRuntimeTaskViewVisibilityIfNeeded()
 
         (application as OperitApplication).initializeMainApplication()
+        restoreCompanionKeepAliveIfEnabled()
 
         // 语言设置已在Application中初始化，这里无需重复
 
@@ -234,6 +220,11 @@ class MainActivity : ComponentActivity() {
         setupBackPressHandler()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString(STATE_CURRENT_MAIN_NAV_ROUTE, currentMainNavItem.route)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         setIntent(intent) // 重要：更新当前Intent
@@ -258,6 +249,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?): Boolean {
+        if (intent?.action == MiraCompanionContract.ACTION_OPEN_REMINDER) {
+            intent.getStringExtra(MiraCompanionContract.EXTRA_CHAT_ID)
+                ?.takeIf { it.isNotBlank() }
+                ?.let(PendingChatOpenHandler::request)
+            pendingShortcutNavItem = NavItem.AiChat
+            pendingShortcutRequestId = System.currentTimeMillis()
+            currentMainNavItem = NavItem.AiChat
+            return true
+        }
+
         if (intent?.action == ACTION_OPEN_SETTINGS_SHORTCUT) {
             pendingShortcutNavItem = NavItem.Settings
             pendingShortcutRequestId = System.currentTimeMillis()
@@ -341,6 +342,18 @@ class MainActivity : ComponentActivity() {
         return false
     }
 
+    private fun restoreCompanionKeepAliveIfEnabled() {
+        lifecycleScope.launch {
+            val enabled =
+                CompanionReminderPreferences.getInstance(applicationContext)
+                    .keepAliveEnabledFlow
+                    .first()
+            if (enabled) {
+                MiraCompanionService.startKeepAlive(applicationContext)
+            }
+        }
+    }
+
     private fun processPendingGitHubAuth() {
         val authUri = pendingGitHubAuthUri ?: return
         pendingGitHubAuthUri = null
@@ -422,15 +435,12 @@ class MainActivity : ComponentActivity() {
     // ======== 执行初始化检查 ========
     private fun performInitialChecks() {
         lifecycleScope.launch {
-            // 1. 检查通知权限（Android 13+）
-            checkNotificationPermission()
-
-            // 2. 检查权限级别设置
+            // 1. 检查权限级别设置
             checkPermissionLevelSet()
 
             prepareStartupChatIfNeeded()
 
-            // 3. 在协议已接受且无需权限引导时，启动插件加载
+            // 2. 在协议已接受且无需权限引导时，启动插件加载
             if (!showPermissionGuide && agreementPreferences.isAgreementAccepted()) {
                 startPluginLoading()
             }
@@ -439,11 +449,9 @@ class MainActivity : ComponentActivity() {
 
     // ======== 启动插件加载 ========
     private fun startPluginLoading() {
-        // 显示插件加载界面
-        pluginLoadingState.show()
-
-        // 启动超时检测（30秒）
-        pluginLoadingState.startTimeoutCheck(30000L, lifecycleScope)
+        // Mira 在后台恢复扩展；安装与故障状态由“我的 -> 设置 -> 终端与 Node.js”承载，
+        // 不让插件初始化浮层覆盖主聊天体验。
+        pluginLoadingState.hide()
 
         // 初始化MCP服务器并启动插件
         // 轻微延迟让首帧 Compose 完成，避免启动阶段后台重任务立刻抢占导致掉帧
@@ -534,22 +542,15 @@ class MainActivity : ComponentActivity() {
         // 屏幕方向变化时，确保加载界面不可见
         pluginLoadingState.hide()
 
-        // 仅当方向确实发生变化时才处理
+        // Compose observes Configuration changes and recomposes the adaptive layout itself.
+        // Recreating the Activity here discards the in-memory route stack and returns to chat.
         if (newConfig.orientation != lastOrientation) {
-            // 记录变化前的方向
-            val orientationBeforeChange = lastOrientation
-            // 更新最后的方向记录
+            val previousOrientation = lastOrientation
             lastOrientation = newConfig.orientation
-
-            // 检查是否是“转回去”的操作
-            if (showOrientationChangeDialog && newConfig.orientation == orientationBeforeChange) {
-                // 如果是，隐藏弹窗并结束
-                showOrientationChangeDialog = false
-                return
-            }
-            
-            // 如果不是“转回去”，或者弹窗还未显示，则显示弹窗
-            showOrientationChangeDialog = true
+            AppLogger.d(
+                TAG,
+                "Orientation changed from $previousOrientation to ${newConfig.orientation}; preserving current route"
+            )
         }
     }
 
@@ -574,37 +575,6 @@ class MainActivity : ComponentActivity() {
         // 初始化协议偏好管理器
         agreementPreferences = AgreementPreferences(this)
 
-    }
-
-    // ======== 检查通知权限 ========
-    private fun checkNotificationPermission() {
-        // Android 13 (API 33) 及以上需要请求通知权限
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val permission = Manifest.permission.POST_NOTIFICATIONS
-            when {
-                ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                    AppLogger.d(TAG, "通知权限已授予")
-                }
-                shouldShowRequestPermissionRationale(permission) -> {
-                    // 用户之前拒绝过，显示说明并再次请求
-                    AppLogger.d(TAG, "需要显示通知权限说明")
-                    Toast.makeText(
-                        this,
-                        getString(R.string.notification_permission_rationale),
-                        Toast.LENGTH_LONG
-                    ).show()
-                    notificationPermissionLauncher.launch(permission)
-                }
-                else -> {
-                    // 直接请求权限
-                    AppLogger.d(TAG, "请求通知权限")
-                    notificationPermissionLauncher.launch(permission)
-                }
-            }
-        } else {
-            // Android 13 以下不需要运行时通知权限
-            AppLogger.d(TAG, "Android 版本 < 13，无需请求通知权限")
-        }
     }
 
     // ======== 检查权限级别设置 ========
@@ -764,19 +734,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // 方向改变时显示对话框
-                if (showOrientationChangeDialog) {
-                    OrientationChangeDialog(
-                        onConfirm = {
-                            showOrientationChangeDialog = false
-                            // 重新创建Activity以重新加载页面
-                            recreate()
-                        },
-                        onDismiss = {
-                            showOrientationChangeDialog = false
-                        }
-                    )
-                }
             }
         }
 
@@ -894,23 +851,4 @@ class MainActivity : ComponentActivity() {
         ).show()
     }
 
-}
-
-@Composable
-private fun OrientationChangeDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(id = R.string.dialog_title_orientation_change)) },
-        text = { Text(text = stringResource(id = R.string.dialog_message_orientation_change)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(id = R.string.dialog_button_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(id = R.string.dialog_button_dismiss))
-            }
-        }
-    )
 }

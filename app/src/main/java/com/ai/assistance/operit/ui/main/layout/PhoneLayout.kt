@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -83,20 +82,19 @@ fun PhoneLayout(
         // 使用 updateTransition 来创建更复杂的动画
         val transition = updateTransition(drawerState.targetValue, label = "drawer_transition")
         val drawerTopInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-
         val drawerProgress by
                 transition.animateFloat(
                         label = "drawerProgress",
                         transitionSpec = {
                                 if (targetState == DrawerValue.Open) {
                                         spring(
-                                                dampingRatio = Spring.DampingRatioLowBouncy,
-                                                stiffness = 1000f
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMedium
                                         )
                                 } else {
                                         spring(
                                                 dampingRatio = Spring.DampingRatioNoBouncy,
-                                                stiffness = 1000f
+                                                stiffness = Spring.StiffnessMedium
                                         )
                                 }
                         }
@@ -107,38 +105,17 @@ fun PhoneLayout(
                 drawerState.currentValue == DrawerValue.Open ||
                         drawerState.targetValue == DrawerValue.Open
 
-        val contentTranslationX =
-                if (enableNavigationAnimation) {
-                        drawerWidth * (0.82f * drawerProgress)
-                } else {
-                        drawerWidth * drawerProgress
-                }
-        val contentTranslationY =
-                if (enableNavigationAnimation) 12.dp * drawerProgress else 0.dp
-        val contentScale =
-                if (enableNavigationAnimation) 1f - (0.08f * drawerProgress) else 1f
-        val contentRotationY =
-                if (enableNavigationAnimation) -7f * drawerProgress else 0f
-        val contentCornerRadius =
-                if (enableNavigationAnimation) 24.dp * drawerProgress else 0.dp
-        val contentShadowElevation =
-                if (enableNavigationAnimation) 18.dp * drawerProgress else 0.dp
-
         val drawerOffset = -drawerWidth * (1f - drawerProgress)
         val sidebarElevation =
                 if (enableNavigationAnimation) 16.dp * drawerProgress
                 else 3.dp * drawerProgress
-        val drawerScale =
-                if (enableNavigationAnimation) 0.92f + (0.08f * drawerProgress)
-                else 1f
-        val drawerContentAlpha =
-                if (enableNavigationAnimation) 0.72f + (0.28f * drawerProgress)
-                else 0.8f + (0.2f * drawerProgress)
-        val scrimColor = Color.Transparent
+        val drawerScale = 1f
+        val drawerContentAlpha = 1f
+        val scrimColor = Color.Black.copy(alpha = 0.18f * drawerProgress)
 
         // 侧边栏相关拖拽状态
         var currentDrag by remember { mutableStateOf(0f) }
-        var verticalDrag by remember { mutableStateOf(0f) }
+        var drawerGestureTriggered by remember { mutableStateOf(false) }
         val dragThreshold = 40f
 
         val drawerAppearance = rememberNavigationDrawerAppearance()
@@ -156,22 +133,19 @@ fun PhoneLayout(
                 if (!GestureStateHolder.isChatScreenGestureConsumed) {
                         currentDrag += delta
 
-                        if (!isDrawerOpen &&
-                                        currentDrag > dragThreshold &&
-                                        Math.abs(currentDrag) > Math.abs(verticalDrag)
-                        ) {
+                        if (!drawerGestureTriggered && !isDrawerOpen && currentDrag > dragThreshold) {
+                                drawerGestureTriggered = true
+                                currentDrag = 0f
                                 scope.launch {
                                         drawerState.open()
-                                        currentDrag = 0f
-                                        verticalDrag = 0f
                                 }
                         }
 
-                        if (isDrawerOpen && currentDrag < -dragThreshold) {
+                        if (!drawerGestureTriggered && isDrawerOpen && currentDrag < -dragThreshold) {
+                                drawerGestureTriggered = true
+                                currentDrag = 0f
                                 scope.launch {
                                         drawerState.close()
-                                        currentDrag = 0f
-                                        verticalDrag = 0f
                                 }
                         }
                 }
@@ -184,42 +158,25 @@ fun PhoneLayout(
                                 .draggable(
                                         state = draggableState,
                                         orientation = Orientation.Horizontal,
+                                        enabled = currentScreen !is Screen.AiChat || isDrawerOpen,
                                         onDragStarted = {
                                                 currentDrag = 0f
-                                                verticalDrag = 0f
+                                                drawerGestureTriggered = false
                                         },
                                         onDragStopped = {
                                                 currentDrag = 0f
-                                                verticalDrag = 0f
+                                                drawerGestureTriggered = false
                                         }
-                                )
-                                .draggable(
-                                        state =
-                                                rememberDraggableState { delta ->
-                                                        verticalDrag += delta
-                                                },
-                                        orientation = Orientation.Vertical,
-                                        onDragStarted = { /* 不需要额外操作 */},
-                                        onDragStopped = { /* 不需要额外操作 */}
                                 )
         ) {
                 // 主内容区域 - 使用自定义布局修饰符优化性能
                 // 该修饰符只会影响布局，不会触发内容重组
                 Surface(
                     modifier =
-                            Modifier.fillMaxSize()
-                                    .graphicsLayer {
-                                            translationX = contentTranslationX.toPx()
-                                            translationY = contentTranslationY.toPx()
-                                            scaleX = contentScale
-                                            scaleY = contentScale
-                                            rotationY = contentRotationY
-                                            transformOrigin = TransformOrigin(0f, 0.5f)
-                                    }
-                                    .zIndex(1f),
-                    shape = RoundedCornerShape(contentCornerRadius),
+                            Modifier.fillMaxSize().zIndex(1f),
+                    shape = RoundedCornerShape(0.dp),
                     color = Color.Transparent,
-                    shadowElevation = contentShadowElevation
+                    shadowElevation = 0.dp
                 ) {
                     // 普通调用AppContent，但由于我们的优化，它不会在动画时重组
                     AppContent(
@@ -242,7 +199,9 @@ fun PhoneLayout(
                         onGoBack = onGoBack,
                         isNavigatingBack = isNavigatingBack,
                         actions = topBarActions,
-                        titleContent = topBarTitleContent
+                        titleContent = topBarTitleContent,
+                        bottomBar = {},
+                        contentAvoidsNavigationBar = currentScreen !is Screen.AiChat,
                     )
                 }
 

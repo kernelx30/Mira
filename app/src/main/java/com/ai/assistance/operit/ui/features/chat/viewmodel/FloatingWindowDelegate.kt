@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
+import androidx.core.content.ContextCompat
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.toSerializable
 import com.ai.assistance.operit.services.FloatingChatService
@@ -104,13 +105,14 @@ class FloatingWindowDelegate(
                 addAction(FloatingChatService.ACTION_FLOATING_CHAT_WINDOW_SHOWN)
                 addAction(FloatingChatService.ACTION_FLOATING_CHAT_WINDOW_SHOW_FAILED)
             }
-            if (Build.VERSION.SDK_INT >= 33) {
-                context.registerReceiver(serviceLifecycleReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("DEPRECATION")
-                context.registerReceiver(serviceLifecycleReceiver, filter)
-            }
-        } catch (_: Exception) {
+            ContextCompat.registerReceiver(
+                context,
+                serviceLifecycleReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+        } catch (error: Exception) {
+            AppLogger.e(TAG, "注册悬浮窗服务状态监听失败", error)
         }
 
         // If the service is already running (started by wake/workflow/widget), bind to it.

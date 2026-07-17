@@ -3,6 +3,7 @@ package com.ai.assistance.operit.ui.features.update.screens
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.data.api.GitHubApiService
 import com.ai.assistance.operit.data.api.GitHubRelease
 import com.ai.assistance.operit.R
@@ -24,11 +25,6 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
     
     private val apiService = GitHubApiService(context)
     
-    companion object {
-        private const val REPO_OWNER = "AAswordman"
-        private const val REPO_NAME = "Operit"
-    }
-    
     init {
         loadUpdates()
     }
@@ -39,8 +35,15 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
     fun loadUpdates() {
         viewModelScope.launch {
             _uiState.value = UpdateUiState.Loading
-            
-            apiService.getRepositoryReleases(REPO_OWNER, REPO_NAME, page = 1, perPage = 20)
+
+            val repoOwner = BuildConfig.UPDATE_REPO_OWNER.trim()
+            val repoName = BuildConfig.UPDATE_REPO_NAME.trim()
+            if (repoOwner.isBlank() || repoName.isBlank()) {
+                _uiState.value = UpdateUiState.Error(context.getString(R.string.update_source_not_configured))
+                return@launch
+            }
+
+            apiService.getRepositoryReleases(repoOwner, repoName, page = 1, perPage = 20)
                 .onSuccess { releases ->
                     val updates = releases
                         .filter { !it.draft && !it.prerelease } // 过滤掉草稿和预发布
@@ -100,4 +103,3 @@ sealed class UpdateUiState {
     data class Success(val updates: List<UpdateInfo>) : UpdateUiState()
     data class Error(val message: String) : UpdateUiState()
 }
-

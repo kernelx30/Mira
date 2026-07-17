@@ -504,7 +504,7 @@ fun FileBrowser(
                 // 显示/隐藏隐藏文件按钮
                 IconButton(
                         onClick = { showHiddenFiles = !showHiddenFiles },
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                             if (showHiddenFiles) Icons.Default.VisibilityOff else Icons.Default.Visibility,
@@ -518,7 +518,7 @@ fun FileBrowser(
                 Box {
                     IconButton(
                             onClick = { showSortMenu = true },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                                 Icons.AutoMirrored.Filled.Sort,
@@ -549,7 +549,7 @@ fun FileBrowser(
                 if (isManageMode) {
                     IconButton(
                             onClick = { showCreateFileDialog = true },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                                 Icons.Default.Add,
@@ -560,7 +560,7 @@ fun FileBrowser(
 
                     IconButton(
                             onClick = { loadDirectory(currentPath) },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                                 Icons.Default.Refresh,

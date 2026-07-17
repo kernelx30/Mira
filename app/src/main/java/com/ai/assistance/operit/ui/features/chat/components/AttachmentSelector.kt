@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,6 +30,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -37,6 +40,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Memory
@@ -47,14 +52,18 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,14 +79,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.packTool.PackageManager as ToolPackageManager
 import com.ai.assistance.operit.data.skill.SkillRepository
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -323,10 +333,11 @@ fun AttachmentSelectorPanel(
         }
     )
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AttachmentSelectorPopupPanel(
+fun MateAttachmentActionSheet(
         visible: Boolean,
-        containerColor: Color,
         onAttachImage: (String) -> Unit,
         onAttachFile: (String) -> Unit,
         onAttachScreenContent: () -> Unit,
@@ -334,6 +345,296 @@ fun AttachmentSelectorPopupPanel(
         onAttachLocation: () -> Unit = {},
         onAttachMemory: () -> Unit = {},
         onAttachPackage: (String) -> Unit = {},
+        onTakePhoto: (Uri) -> Unit,
+        onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val launchCameraCapture = rememberCameraCaptureLauncher(
+            onTakePhoto = onTakePhoto,
+            onDismiss = onDismiss,
+    )
+    var showAdvanced by remember { mutableStateOf(false) }
+    var showPackageDialog by remember { mutableStateOf(false) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            coroutineScope.launch {
+                uris.forEach { uri ->
+                    getAttachmentSource(uri)?.let(onAttachImage)
+                }
+                onDismiss()
+            }
+        }
+    }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            coroutineScope.launch {
+                uris.forEach { uri ->
+                    getAttachmentSource(uri)?.let(onAttachFile)
+                }
+                onDismiss()
+            }
+        }
+    }
+
+    LaunchedEffect(visible) {
+        if (!visible) showAdvanced = false
+    }
+
+    if (visible) {
+        ModalBottomSheet(
+                onDismissRequest = onDismiss,
+                sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        ) {
+            Column(
+                    modifier =
+                            Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Row(
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                            text = context.getString(R.string.add_attachment),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = context.getString(R.string.cancel),
+                        )
+                    }
+                }
+
+                val primaryItems =
+                    listOf(
+                        AttachmentPanelItem(
+                                icon = Icons.Default.PhotoCamera,
+                                label = context.getString(R.string.attachment_camera),
+                                onClick = {
+                                    onDismiss()
+                                    launchCameraCapture()
+                                },
+                        ),
+                        AttachmentPanelItem(
+                                icon = Icons.Default.Image,
+                                label = context.getString(R.string.attachment_photo),
+                                onClick = {
+                                    onDismiss()
+                                    imagePickerLauncher.launch("image/*")
+                                },
+                        ),
+                        AttachmentPanelItem(
+                                icon = Icons.Default.Description,
+                                label = context.getString(R.string.attachment_file),
+                                onClick = {
+                                    onDismiss()
+                                    filePickerLauncher.launch("*/*")
+                                },
+                        ),
+                    )
+
+                Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    primaryItems.forEach { item ->
+                        MateAttachmentPrimaryAction(
+                                item = item,
+                                modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                MateAttachmentActionRow(
+                        AttachmentPanelItem(
+                                icon = Icons.Default.Memory,
+                                label = context.getString(R.string.attachment_memory),
+                                onClick = {
+                                    onAttachMemory()
+                                    onDismiss()
+                                },
+                        )
+                )
+
+                TextButton(
+                        onClick = { showAdvanced = !showAdvanced },
+                        modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                            imageVector =
+                                    if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                            text =
+                                    context.getString(
+                                            if (showAdvanced) R.string.common_collapse
+                                            else R.string.common_expand_more
+                                    )
+                    )
+                }
+
+                AnimatedVisibility(visible = showAdvanced) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        HorizontalDivider(modifier = Modifier.padding(bottom = 4.dp))
+                        listOf(
+                                AttachmentPanelItem(
+                                        icon = Icons.Default.ScreenshotMonitor,
+                                        label = context.getString(R.string.attachment_screen_content),
+                                        onClick = {
+                                            onAttachScreenContent()
+                                            onDismiss()
+                                        },
+                                ),
+                                AttachmentPanelItem(
+                                        icon = Icons.Default.Notifications,
+                                        label = context.getString(R.string.attachment_notifications),
+                                        onClick = {
+                                            onAttachNotifications()
+                                            onDismiss()
+                                        },
+                                ),
+                                AttachmentPanelItem(
+                                        icon = Icons.Default.LocationOn,
+                                        label = context.getString(R.string.attachment_location),
+                                        onClick = {
+                                            onAttachLocation()
+                                            onDismiss()
+                                        },
+                                ),
+                                AttachmentPanelItem(
+                                        icon = Icons.Default.AutoAwesome,
+                                        label = context.getString(R.string.attachment_package),
+                                        onClick = {
+                                            showPackageDialog = true
+                                            onDismiss()
+                                        },
+                                ),
+                        ).forEach { item ->
+                            MateAttachmentActionRow(item)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    PackageSelectorDialog(
+            visible = showPackageDialog,
+            onDismiss = { showPackageDialog = false },
+            onPackageSelected = { packageName ->
+                onAttachPackage(packageName)
+                showPackageDialog = false
+                onDismiss()
+            }
+    )
+}
+
+@Composable
+private fun MateAttachmentPrimaryAction(
+        item: AttachmentPanelItem,
+        modifier: Modifier = Modifier,
+) {
+    Surface(
+            modifier =
+                    modifier
+                            .heightIn(min = 108.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = item.onClick),
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+    ) {
+        Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                    modifier =
+                            Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface),
+                    contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                        imageVector = item.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp),
+                )
+            }
+            Text(
+                    text = item.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MateAttachmentActionRow(item: AttachmentPanelItem) {
+    Row(
+            modifier =
+                    Modifier.fillMaxWidth()
+                            .heightIn(min = 52.dp)
+                            .clickable(onClick = item.onClick)
+                            .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Surface(
+                modifier = Modifier.size(36.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                        imageVector = item.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(19.dp),
+                )
+            }
+        }
+        Text(
+                text = item.label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+fun AttachmentSelectorPopupPanel(
+        visible: Boolean,
+        containerColor: Color,
+        onAttachImage: (String) -> Unit,
+        onAttachFile: (String) -> Unit,
+        onAttachMemory: () -> Unit = {},
         onTakePhoto: (Uri) -> Unit,
         onDismiss: () -> Unit
 ) {
@@ -345,8 +646,6 @@ fun AttachmentSelectorPopupPanel(
             onTakePhoto = onTakePhoto,
             onDismiss = onDismiss,
     )
-
-    var showPackageDialog by remember { mutableStateOf(false) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetMultipleContents()
@@ -381,14 +680,19 @@ fun AttachmentSelectorPopupPanel(
     val panelItems =
             listOf(
                     AttachmentPanelItem(
+                            icon = Icons.Default.PhotoCamera,
+                            label = context.getString(R.string.attachment_camera),
+                            onClick = launchCameraCapture
+                    ),
+                    AttachmentPanelItem(
                             icon = Icons.Default.Image,
                             label = context.getString(R.string.attachment_photo),
                             onClick = { imagePickerLauncher.launch("image/*") }
                     ),
                     AttachmentPanelItem(
-                            icon = Icons.Default.PhotoCamera,
-                            label = context.getString(R.string.attachment_camera),
-                            onClick = launchCameraCapture
+                            icon = Icons.Default.Description,
+                            label = context.getString(R.string.attachment_file),
+                            onClick = { filePickerLauncher.launch("*/*") }
                     ),
                     AttachmentPanelItem(
                             icon = Icons.Default.Memory,
@@ -397,121 +701,50 @@ fun AttachmentSelectorPopupPanel(
                                 onAttachMemory()
                                 onDismiss()
                             }
-                    ),
-                    AttachmentPanelItem(
-                            icon = Icons.Default.Description,
-                            label = context.getString(R.string.attachment_file),
-                            onClick = { filePickerLauncher.launch("*/*") }
-                    ),
-                    AttachmentPanelItem(
-                            icon = Icons.Default.ScreenshotMonitor,
-                            label = context.getString(R.string.attachment_screen_content),
-                            onClick = {
-                                onAttachScreenContent()
-                                onDismiss()
-                            }
-                    ),
-                    AttachmentPanelItem(
-                            icon = Icons.Default.Notifications,
-                            label = context.getString(R.string.attachment_notifications),
-                            onClick = {
-                                onAttachNotifications()
-                                onDismiss()
-                            }
-                    ),
-                    AttachmentPanelItem(
-                            icon = Icons.Default.LocationOn,
-                            label = context.getString(R.string.attachment_location),
-                            onClick = {
-                                onAttachLocation()
-                                onDismiss()
-                            }
-                    ),
-                    AttachmentPanelItem(
-                            icon = Icons.Default.AutoAwesome,
-                            label = context.getString(R.string.attachment_package),
-                            onClick = { showPackageDialog = true }
                     )
             )
 
-    Popup(
-            alignment = Alignment.TopStart,
-            onDismissRequest = onDismiss,
-            properties =
-                    PopupProperties(
-                            focusable = true,
-                            dismissOnBackPress = true,
-                            dismissOnClickOutside = false
-                    )
+    Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = containerColor,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 0.dp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)
     ) {
-        Box(
-                modifier =
-                        Modifier.fillMaxSize()
-                                .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = onDismiss
-                                ),
-                contentAlignment = Alignment.BottomEnd
+        Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = containerColor,
-                    shadowElevation = 4.dp,
-                    modifier =
-                            Modifier.padding(bottom = 44.dp, end = 12.dp)
-                                    .width(200.dp)
-                                    .heightIn(max = 420.dp)
-                                    .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            onClick = {}
-                                    )
-            ) {
+            panelItems.forEach { item ->
                 Column(
                         modifier =
-                                Modifier.fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .verticalScroll(rememberScrollState())
+                                Modifier.weight(1f)
+                                        .heightIn(min = 64.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable(onClick = item.onClick),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    panelItems.forEach { item ->
-                        Row(
-                                modifier =
-                                        Modifier.fillMaxWidth()
-                                                .height(36.dp)
-                                                .clickable(onClick = item.onClick)
-                                                .padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = item.label,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                    text = item.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
+                    Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.label,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                    )
                 }
             }
         }
     }
-
-    // 包选择对话框
-    PackageSelectorDialog(
-        visible = showPackageDialog,
-        onDismiss = { showPackageDialog = false },
-        onPackageSelected = { packageName ->
-            onAttachPackage(packageName)
-            showPackageDialog = false
-            onDismiss()
-        }
-    )
 }
 
 private data class AttachmentPanelItem(
@@ -550,6 +783,8 @@ private fun rememberCameraCaptureLauncher(
                 if (success && capturedUri != null) {
                     latestOnTakePhoto(capturedUri)
                     latestOnDismiss()
+                } else if (capturedUri != null) {
+                    deleteTempCameraUri(context, capturedUri)
                 }
             }
 
@@ -564,6 +799,7 @@ private fun rememberCameraCaptureLauncher(
                 if (isGranted) {
                     launchCameraCapture()
                 } else {
+                    latestOnDismiss()
                     Toast.makeText(
                                     context,
                                     context.getString(R.string.camera_permission_denied_toast),
@@ -588,11 +824,12 @@ private fun rememberCameraCaptureLauncher(
 private fun createTempCameraUri(context: Context): Uri {
     val authority = "${context.applicationContext.packageName}.fileprovider"
     val tmpFile =
-            File.createTempFile("temp_image_", ".jpg", context.cacheDir).apply {
-                createNewFile()
-                deleteOnExit()
-            }
+            File.createTempFile("temp_image_", ".jpg", context.cacheDir)
     return FileProvider.getUriForFile(context, authority, tmpFile)
+}
+
+private fun deleteTempCameraUri(context: Context, uri: Uri) {
+    runCatching { context.contentResolver.delete(uri, null, null) }
 }
 
 private fun getAttachmentSource(uri: Uri): String? {
@@ -667,6 +904,7 @@ fun PackageSelectorDialog(
     }
     val skillRepository = remember { SkillRepository.getInstance(context.applicationContext) }
     var packageOptions by remember { mutableStateOf<List<AttachmentPackageOption>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val filteredPackageOptions =
             remember(packageOptions, searchQuery) {
@@ -685,12 +923,19 @@ fun PackageSelectorDialog(
     LaunchedEffect(visible) {
         if (visible) {
             searchQuery = ""
-            packageOptions =
-                buildAttachmentPackageOptions(
-                    context = context.applicationContext,
-                    packageManager = packageManager,
-                    skillRepository = skillRepository
-                )
+            isLoading = true
+            packageOptions = emptyList()
+            try {
+                packageOptions = withContext(Dispatchers.IO) {
+                    buildAttachmentPackageOptions(
+                            context = context.applicationContext,
+                            packageManager = packageManager,
+                            skillRepository = skillRepository
+                    )
+                }
+            } finally {
+                isLoading = false
+            }
         }
     }
 
@@ -703,7 +948,14 @@ fun PackageSelectorDialog(
                 )
             },
             text = {
-                if (packageOptions.isEmpty()) {
+                if (isLoading) {
+                    Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    }
+                } else if (packageOptions.isEmpty()) {
                     Box(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                             contentAlignment = Alignment.Center
@@ -715,9 +967,7 @@ fun PackageSelectorDialog(
                         )
                     }
                 } else {
-                    Column(
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState())
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
                         OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
@@ -756,37 +1006,44 @@ fun PackageSelectorDialog(
                                 )
                             }
                         } else {
-                            filteredPackageOptions.forEach { option ->
-                                Surface(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color.Transparent,
-                                        onClick = { onPackageSelected(option.packageName) }
-                                ) {
-                                    Row(
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                            LazyColumn(
+                                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
+                            ) {
+                                items(
+                                        items = filteredPackageOptions,
+                                        key = { it.packageName }
+                                ) { option ->
+                                    Surface(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color.Transparent,
+                                            onClick = { onPackageSelected(option.packageName) }
                                     ) {
-                                        Icon(
-                                                imageVector = Icons.Default.AutoAwesome,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                    text = option.title,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurface
+                                        Row(
+                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                    imageVector = Icons.Default.AutoAwesome,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(20.dp)
                                             )
-                                            Text(
-                                                    text = buildAttachmentPackageSubtitle(option),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
-                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                        text = option.title,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                        text = buildAttachmentPackageSubtitle(option),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                     }
                                 }

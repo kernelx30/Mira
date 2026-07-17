@@ -77,6 +77,11 @@ tools/native_ripgrep/target/
 # windows拉的屎
 desktop.ini
 
+# Local verification output and device exports
+/artifacts/
+/hs_err_pid*.log
+/replay_pid*.log
+
 
 
 # 系统级临时目录/文件

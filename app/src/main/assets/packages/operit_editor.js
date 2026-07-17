@@ -107,7 +107,7 @@
 
 【Sandbox Package：安装与排查】
 1) 沙盒包目录（外部）：
-- Android/data/com.ai.assistance.operit/files/packages
+- Android/data/com.ai.assistance.operit.mate/files/packages
 2) 内置包：
 - 内置包来自应用内置资源，不在上述外部目录；删除内置包文件不是常规操作，通常只做开关管理。
 3) 导入与删除：
@@ -355,7 +355,7 @@
 
 [Sandbox Package: install and troubleshooting]
 1) External sandbox packages directory:
-- Android/data/com.ai.assistance.operit/files/packages
+- Android/data/com.ai.assistance.operit.mate/files/packages
 2) Built-in packages:
 - Built-in packages come from app bundled assets, not from the external directory above; usually manage via enable/disable instead of file deletion.
 3) Import and delete:
@@ -2114,14 +2114,14 @@ description: one-line summary of what this skill does
             });
         }
     }
-    const SANDBOX_EXTERNAL_PACKAGES_DIR = "/sdcard/Android/data/com.ai.assistance.operit/files/packages";
+    const SANDBOX_EXTERNAL_PACKAGES_DIR = "/sdcard/Android/data/com.ai.assistance.operit.mate/files/packages";
     const TOOLPKG_DEBUG_INSTALL_ACTION = "com.ai.assistance.operit.DEBUG_INSTALL_TOOLPKG";
-    const TOOLPKG_DEBUG_INSTALL_COMPONENT = "com.ai.assistance.operit/.core.tools.packTool.ToolPkgDebugInstallReceiver";
+    const TOOLPKG_DEBUG_INSTALL_COMPONENT = "com.ai.assistance.operit.mate/com.ai.assistance.operit.core.tools.packTool.ToolPkgDebugInstallReceiver";
     const SANDBOX_SCRIPT_EXECUTION_ACTION = "com.ai.assistance.operit.EXECUTE_JS";
-    const SANDBOX_SCRIPT_EXECUTION_COMPONENT = "com.ai.assistance.operit/com.ai.assistance.operit.core.tools.javascript.ScriptExecutionReceiver";
+    const SANDBOX_SCRIPT_EXECUTION_COMPONENT = "com.ai.assistance.operit.mate/com.ai.assistance.operit.core.tools.javascript.ScriptExecutionReceiver";
     const SANDBOX_SCRIPT_EXECUTION_MODE_SCRIPT = "script";
     const SANDBOX_SCRIPT_EXECUTION_MODE_CODE = "code";
-    const SANDBOX_JS_TEMP_DIR = "/sdcard/Android/data/com.ai.assistance.operit/js_temp";
+    const SANDBOX_JS_TEMP_DIR = "/sdcard/Android/data/com.ai.assistance.operit.mate/js_temp";
     const DEFAULT_SANDBOX_REFRESH_TIMEOUT_MS = 1500;
     const DEFAULT_TOOLPKG_INSTALL_WAIT_MS = 1500;
     const DEFAULT_SANDBOX_SCRIPT_WAIT_MS = 15000;

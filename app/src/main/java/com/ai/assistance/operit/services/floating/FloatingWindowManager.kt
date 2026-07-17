@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.view.WindowInsets
 import android.view.animation.DecelerateInterpolator
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.animation.core.LinearEasing
@@ -82,6 +83,15 @@ enum class StatusIndicatorStyle {
 interface FloatingWindowCallback {
     fun onClose()
     fun onSendMessage(message: String, promptType: PromptFunctionType = PromptFunctionType.CHAT)
+    fun onSendMessageWithResult(
+        message: String,
+        promptType: PromptFunctionType = PromptFunctionType.CHAT,
+        onResolved: (Boolean) -> Unit,
+    ): Boolean {
+        onSendMessage(message, promptType)
+        onResolved(true)
+        return true
+    }
     fun onCancelMessage()
     fun onAttachmentRequest(request: String)
     fun onRemoveAttachment(filePath: String)
@@ -119,7 +129,10 @@ class FloatingWindowManager(
     private var indicatorPersistentEnabled: Boolean = false
 
     private fun cancelFocusBeforeExit() {
-        val view = composeView ?: return
+        val view = composeView ?: run {
+            state.isTransitioning = false
+            return
+        }
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         try {
             view.clearFocus()
@@ -150,6 +163,122 @@ class FloatingWindowManager(
         private const val IME_FOCUS_DELAY_MS = 200L
         private const val IME_FOCUS_RETRY_DELAY_MS = 50L
         private const val MAX_IME_FOCUS_RETRIES = 4
+        private const val BALL_SAFE_MARGIN_DP = 8
+        private const val QUICK_REPLY_SAFE_MARGIN_DP = 12
+        private const val QUICK_REPLY_GAP_DP = 8
+    }
+
+    private data class SafeInsets(
+        val left: Int,
+        val top: Int,
+        val right: Int,
+        val bottom: Int,
+    )
+
+    private fun systemSafeInsets(): SafeInsets {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val insets =
+                windowManager.currentWindowMetrics.windowInsets.getInsetsIgnoringVisibility(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                )
+            return SafeInsets(insets.left, insets.top, insets.right, insets.bottom)
+        }
+        val statusBarId = context.resources.getIdentifier("status_bar_height", "dimen", "android")
+        val navigationBarId = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        return SafeInsets(
+            left = 0,
+            top = if (statusBarId > 0) context.resources.getDimensionPixelSize(statusBarId) else 0,
+            right = 0,
+            bottom = if (navigationBarId > 0) context.resources.getDimensionPixelSize(navigationBarId) else 0,
+        )
+    }
+
+    private fun quickReplyCardSizePx(): Pair<Int, Int> {
+        val metrics = context.resources.displayMetrics
+        val screenWidthDp = (metrics.widthPixels / metrics.density).toInt()
+        return Pair(
+            (MiraFloatingLayoutPolicy.cardWidthDp(screenWidthDp) * metrics.density).toInt(),
+            (MiraFloatingLayoutPolicy.CARD_MAX_HEIGHT_DP * metrics.density).toInt(),
+        )
+    }
+
+    private fun anchoredQuickReplyPosition(
+        ballX: Int,
+        ballY: Int,
+        ballSize: Int,
+        cardWidth: Int,
+        cardHeight: Int,
+    ): FloatingCardPosition {
+        val metrics = context.resources.displayMetrics
+        val density = metrics.density
+        val systemInsets = systemSafeInsets()
+        val margin = (QUICK_REPLY_SAFE_MARGIN_DP * density).toInt()
+        return MiraFloatingLayoutPolicy.anchoredCardPosition(
+            screenWidth = metrics.widthPixels,
+            screenHeight = metrics.heightPixels,
+            ballX = ballX,
+            ballY = ballY,
+            ballSize = ballSize,
+            cardWidth = cardWidth,
+            cardHeight = cardHeight,
+            safeLeft = systemInsets.left + margin,
+            safeTop = systemInsets.top + margin,
+            safeRight = systemInsets.right + margin,
+            safeBottom = systemInsets.bottom + margin,
+            gap = (QUICK_REPLY_GAP_DP * density).toInt(),
+        )
+    }
+
+    private fun clampBallPosition(x: Int, y: Int, ballSize: Int): FloatingBallPosition {
+        val metrics = context.resources.displayMetrics
+        val insets = systemSafeInsets()
+        return MiraFloatingLayoutPolicy.clampBallPosition(
+            screenWidth = metrics.widthPixels,
+            screenHeight = metrics.heightPixels,
+            x = x,
+            y = y,
+            ballSize = ballSize,
+            safeLeft = insets.left,
+            safeTop = insets.top,
+            safeRight = insets.right,
+            safeBottom = insets.bottom,
+            margin = (BALL_SAFE_MARGIN_DP * metrics.density).toInt(),
+        )
+    }
+
+    private fun snapBallToEdge(enabled: Boolean) {
+        if (!enabled) return
+        if (
+            state.currentMode.value != FloatingMode.BALL &&
+                state.currentMode.value != FloatingMode.VOICE_BALL
+        ) return
+
+        updateViewLayout { params ->
+            val metrics = context.resources.displayMetrics
+            val insets = systemSafeInsets()
+            val ballSize = (state.ballSize.value.value * metrics.density).toInt()
+            val target = MiraFloatingLayoutPolicy.nearestHorizontalEdgePosition(
+                screenWidth = metrics.widthPixels,
+                screenHeight = metrics.heightPixels,
+                x = params.x,
+                y = params.y,
+                ballSize = ballSize,
+                safeLeft = insets.left,
+                safeTop = insets.top,
+                safeRight = insets.right,
+                safeBottom = insets.bottom,
+                margin = (BALL_SAFE_MARGIN_DP * metrics.density).toInt(),
+            )
+            params.x = target.x
+            params.y = target.y
+            state.x = target.x
+            state.y = target.y
+            state.lastBallPositionX = target.x
+            state.lastBallPositionY = target.y
+            state.hasSavedBallPosition = true
+            state.isAtEdge.value = true
+        }
+        callback.saveState()
     }
 
     private fun resolveSoftInputModeForMode(mode: FloatingMode): Int {
@@ -181,6 +310,17 @@ class FloatingWindowManager(
                                     typography = callback.getTypography()
                             ) { FloatingChatUi() }
                         }
+                        setOnTouchListener { _, event ->
+                            if (
+                                event.action == MotionEvent.ACTION_OUTSIDE &&
+                                    state.currentMode.value == FloatingMode.WINDOW
+                            ) {
+                                switchMode(FloatingMode.BALL)
+                                true
+                            } else {
+                                false
+                            }
+                        }
                     }
 
             val params = createLayoutParams()
@@ -195,6 +335,12 @@ class FloatingWindowManager(
     }
 
     fun destroy() {
+        sizeAnimator?.cancel()
+        sizeAnimator = null
+        mainHandler.removeCallbacksAndMessages(null)
+        pendingImeFocusRunnable = null
+        state.isTransitioning = false
+        state.ballExploding.value = false
         hideStatusIndicator()
         if (isViewAdded) {
             composeView?.let {
@@ -233,6 +379,9 @@ class FloatingWindowManager(
                         "Focus dismiss overlay tapped: x=${event.rawX}, y=${event.rawY}, mode=${state.currentMode.value}"
                     )
                     this@FloatingWindowManager.setFocusable(false)
+                    if (state.currentMode.value == FloatingMode.WINDOW) {
+                        switchMode(FloatingMode.BALL)
+                    }
                 }
                 true
             }
@@ -293,10 +442,15 @@ class FloatingWindowManager(
                 ballSize = state.ballSize.value,
                 onModeChange = { newMode -> switchMode(newMode) },
                 onMove = { dx, dy, scale -> onMove(dx, dy, scale) },
+                snapToEdge = { enabled -> snapBallToEdge(enabled) },
+                isAtEdge = state.isAtEdge.value,
                 saveWindowState = { callback.saveState() },
-                onSendMessage = { message, promptType ->
-                    callback.onSendMessage(message, promptType)
-                },
+                 onSendMessage = { message, promptType ->
+                     callback.onSendMessage(message, promptType)
+                 },
+                 onSendMessageWithResult = { message, promptType, onResolved ->
+                     callback.onSendMessageWithResult(message, promptType, onResolved)
+                 },
                 onCancelMessage = { callback.onCancelMessage() },
                 onInputFocusRequest = { setFocusable(it) },
                 attachments = callback.getAttachments(),
@@ -304,7 +458,15 @@ class FloatingWindowManager(
                 onRemoveAttachment = { callback.onRemoveAttachment(it) },
                 chatService = context as? FloatingChatService,
                 windowState = state,
-                inputProcessingState = callback.getInputProcessingState()
+                inputProcessingState = callback.getInputProcessingState(),
+                screenWidth =
+                    (context.resources.displayMetrics.widthPixels /
+                        context.resources.displayMetrics.density).dp,
+                screenHeight =
+                    (context.resources.displayMetrics.heightPixels /
+                        context.resources.displayMetrics.density).dp,
+                currentX = state.x.toFloat(),
+                currentY = state.y.toFloat(),
         )
     }
 
@@ -524,37 +686,34 @@ class FloatingWindowManager(
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 
-                val safeMargin = (16 * density).toInt()
-                val minVisible = ballSizeInPx / 2
-                state.x =
-                        state.x.coerceIn(
-                                -ballSizeInPx + minVisible + safeMargin,
-                                screenWidth - minVisible - safeMargin
-                        )
-                state.y = state.y.coerceIn(safeMargin, screenHeight - minVisible - safeMargin)
+                val restored = clampBallPosition(
+                    x = if (state.hasSavedBallPosition) state.lastBallPositionX else state.x,
+                    y = if (state.hasSavedBallPosition) state.lastBallPositionY else state.y,
+                    ballSize = ballSizeInPx,
+                )
+                state.x = restored.x
+                state.y = restored.y
+                state.lastBallPositionX = restored.x
+                state.lastBallPositionY = restored.y
+                state.hasSavedBallPosition = true
             }
             FloatingMode.WINDOW -> {
-                val scale = state.windowScale.value
-                val windowWidthDp = state.windowWidth.value
-                val windowHeightDp = state.windowHeight.value
-                params.width = (windowWidthDp.value * density * scale).toInt()
-                params.height = (windowHeightDp.value * density * scale).toInt()
+                val (cardWidth, cardHeight) = quickReplyCardSizePx()
+                params.width = WindowManager.LayoutParams.WRAP_CONTENT
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT
                 params.flags =
-                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-
-                val minVisibleWidth = (params.width * 2 / 3)
-                val safeMargin = (20 * density).toInt()
-                state.x =
-                        state.x.coerceIn(
-                                -(params.width - minVisibleWidth) + safeMargin,
-                                screenWidth - minVisibleWidth - safeMargin
-                        )
-                state.y =
-                        state.y.coerceIn(
-                                safeMargin,
-                                screenHeight - (params.height / 2) - safeMargin
-                        )
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+                val position = anchoredQuickReplyPosition(
+                    ballX = if (state.hasSavedBallPosition) state.lastBallPositionX else state.x,
+                    ballY = if (state.hasSavedBallPosition) state.lastBallPositionY else state.y,
+                    ballSize = (state.ballSize.value.value * density).toInt(),
+                    cardWidth = cardWidth,
+                    cardHeight = cardHeight,
+                )
+                state.x = position.x
+                state.y = position.y
             }
             FloatingMode.RESULT_DISPLAY -> {
                 params.width = WindowManager.LayoutParams.WRAP_CONTENT
@@ -582,7 +741,7 @@ class FloatingWindowManager(
 
         applyFullscreenBlur(params, state.currentMode.value == FloatingMode.FULLSCREEN)
 
-        state.isAtEdge.value = isAtEdge(params.x, params.width)
+        state.isAtEdge.value = params.width > 0 && isAtEdge(params.x, params.width)
 
         return params
     }
@@ -643,6 +802,11 @@ class FloatingWindowManager(
 
     private fun updateWindowSizeInLayoutParams() {
         updateViewLayout { params ->
+            if (state.currentMode.value == FloatingMode.WINDOW) {
+                params.width = WindowManager.LayoutParams.WRAP_CONTENT
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT
+                return@updateViewLayout
+            }
             val density = context.resources.displayMetrics.density
             val scale = state.windowScale.value
             val widthDp = state.windowWidth.value
@@ -715,6 +879,7 @@ class FloatingWindowManager(
             FloatingMode.BALL, FloatingMode.VOICE_BALL -> {
                 state.lastBallPositionX = currentParams.x
                 state.lastBallPositionY = currentParams.y
+                state.hasSavedBallPosition = true
             }
             FloatingMode.WINDOW -> {
                 state.lastWindowPositionX = currentParams.x
@@ -768,26 +933,18 @@ class FloatingWindowManager(
                                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                     val ballSizeInPx = (state.ballSize.value.value * density).toInt()
                 
-                // 如果从全屏模式切换，球应该出现在屏幕右侧中间位置
-                val (newX, newY) = if (state.previousMode == FloatingMode.FULLSCREEN) {
-                    // 球出现在屏幕右侧，垂直居中
-                    val rightX = screenWidth - ballSizeInPx
-                    val centerY = (screenHeight - ballSizeInPx) / 2
-                    Pair(rightX, centerY)
-                } else if (state.previousMode == FloatingMode.RESULT_DISPLAY) {
-                    // 从结果展示模式切回时，直接恢复到原来的位置
+                val (newX, newY) = if (state.hasSavedBallPosition) {
                     Pair(state.lastBallPositionX, state.lastBallPositionY)
                 } else {
-                    // 处理 MATCH_PARENT (-1) 的情况，使用实际屏幕尺寸
-                    val actualStartWidth = if (startWidth == WindowManager.LayoutParams.MATCH_PARENT) {
-                        screenWidth
-                    } else {
-                        startWidth
+                    val actualStartWidth = when {
+                        startWidth == WindowManager.LayoutParams.MATCH_PARENT -> screenWidth
+                        startWidth <= 0 -> view.width.coerceAtLeast(ballSizeInPx)
+                        else -> startWidth
                     }
-                    val actualStartHeight = if (startHeight == WindowManager.LayoutParams.MATCH_PARENT) {
-                        screenHeight
-                    } else {
-                        startHeight
+                    val actualStartHeight = when {
+                        startHeight == WindowManager.LayoutParams.MATCH_PARENT -> screenHeight
+                        startHeight <= 0 -> view.height.coerceAtLeast(ballSizeInPx)
+                        else -> startHeight
                     }
                     
                     calculateCenteredPosition(
@@ -795,56 +952,59 @@ class FloatingWindowManager(
                         ballSizeInPx, ballSizeInPx
                     )
                 }
-                
-                com.ai.assistance.operit.util.AppLogger.d("FloatingWindowManager", 
-                    "Ball target before coerce: newPos=($newX,$newY), ballSize=$ballSizeInPx")
-                    val minVisible = ballSizeInPx / 2
-                val finalX = newX.coerceIn(-ballSizeInPx + minVisible, screenWidth - minVisible)
-                val finalY = newY.coerceIn(0, screenHeight - minVisible)
-                com.ai.assistance.operit.util.AppLogger.d("FloatingWindowManager", 
-                    "Ball target after coerce: finalPos=($finalX,$finalY)")
-                TargetParams(ballSizeInPx, ballSizeInPx, finalX, finalY, flags)
+
+                val finalPosition = clampBallPosition(newX, newY, ballSizeInPx)
+                state.lastBallPositionX = finalPosition.x
+                state.lastBallPositionY = finalPosition.y
+                state.hasSavedBallPosition = true
+                AppLogger.d(
+                    TAG,
+                    "Ball target restored: (${finalPosition.x},${finalPosition.y}), size=$ballSizeInPx"
+                )
+                TargetParams(
+                    ballSizeInPx,
+                    ballSizeInPx,
+                    finalPosition.x,
+                    finalPosition.y,
+                    flags,
+                )
                 }
                 FloatingMode.WINDOW -> {
-                val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                val width = (state.windowWidth.value.value * density * state.lastWindowScale).toInt()
-                val height = (state.windowHeight.value.value * density * state.lastWindowScale).toInt()
+                val flags =
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+                val (width, height) = quickReplyCardSizePx()
                 
                 val isFromBall = state.previousMode == FloatingMode.BALL || 
                                 state.previousMode == FloatingMode.VOICE_BALL
 
-                val (tempX, tempY) = if (isFromBall) {
-                                calculateCenteredPosition(
-                        startX, startY, startWidth, startHeight,
-                        width, height
-                    )
+                val position =
+                    if (isFromBall) {
+                        anchoredQuickReplyPosition(
+                            ballX = startX,
+                            ballY = startY,
+                            ballSize = (state.ballSize.value.value * density).toInt(),
+                            cardWidth = width,
+                            cardHeight = height,
+                        )
                     } else {
-                    Pair(state.lastWindowPositionX, state.lastWindowPositionY)
+                        anchoredQuickReplyPosition(
+                            ballX = state.lastBallPositionX,
+                            ballY = state.lastBallPositionY,
+                            ballSize = (state.ballSize.value.value * density).toInt(),
+                            cardWidth = width,
+                            cardHeight = height,
+                        )
                     }
-                    state.windowScale.value = state.lastWindowScale
-
-                    // Coerce position to be within screen bounds for window mode
-                val finalX: Int
-                val finalY: Int
-                
-                if (isFromBall) {
-                    // Limit strictly within screen when expanding from ball
-                    val maxX = (screenWidth - width).coerceAtLeast(0)
-                    val maxY = (screenHeight - height).coerceAtLeast(0)
-                    finalX = tempX.coerceIn(0, maxX)
-                    finalY = tempY.coerceIn(0, maxY)
-                } else {
-                    val minVisibleWidth = (width * 2 / 3)
-                    val minVisibleHeight = (height * 2 / 3)
-                    finalX = tempX.coerceIn(
-                        -(width - minVisibleWidth),
-                        screenWidth - minVisibleWidth / 2
-                    )
-                    finalY = tempY.coerceIn(0, screenHeight - minVisibleHeight)
-                }
-                
-                TargetParams(width, height, finalX, finalY, flags)
+                state.windowScale.value = 1f
+                TargetParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    position.x,
+                    position.y,
+                    flags,
+                )
             }
             FloatingMode.FULLSCREEN, FloatingMode.SCREEN_OCR -> {
                 val flags =
@@ -891,6 +1051,10 @@ class FloatingWindowManager(
             }
         }
 
+        if (newMode == FloatingMode.BALL || newMode == FloatingMode.VOICE_BALL) {
+            callback.saveState()
+        }
+
         // 判断是否在球模式和其他模式之间切换
         val isBallTransition = (state.previousMode == FloatingMode.BALL || 
                                 state.previousMode == FloatingMode.VOICE_BALL) ||
@@ -905,7 +1069,7 @@ class FloatingWindowManager(
                 // 其他模式 -> 球模式
                 // AnimatedContent: 旧内容在 150ms 内 fadeOut + scaleOut，新内容延迟 150ms 后用 350ms fadeIn + scaleIn
                 // 策略：延迟 150ms 后再改变窗口物理尺寸，这样旧内容先消失，然后窗口变小，球再出现
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                mainHandler.postDelayed({
                     updateViewLayout { params ->
                         params.width = target.width
                         params.height = target.height
@@ -929,7 +1093,7 @@ class FloatingWindowManager(
                 state.ballExploding.value = true
                 
                 // 2. 延迟 100ms 后改变窗口尺寸（此时球已经淡出消失）
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                mainHandler.postDelayed({
                     updateViewLayout { params ->
                         params.width = target.width
                         params.height = target.height
@@ -969,7 +1133,7 @@ class FloatingWindowManager(
             }
             
             // 延迟标记过渡完成，与 AnimatedContent 动画时长匹配
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            mainHandler.postDelayed({
                 state.isTransitioning = false
             }, 500) // 匹配 AnimatedContent 的最长动画时长
         } else {
@@ -1019,9 +1183,24 @@ class FloatingWindowManager(
                             state.currentMode.value == FloatingMode.VOICE_BALL
             ) {
                 val ballSize = (state.ballSize.value.value * density).toInt()
-                val minVisible = ballSize / 2
-                params.x = params.x.coerceIn(-ballSize + minVisible, screenWidth - minVisible)
-                params.y = params.y.coerceIn(0, screenHeight - minVisible)
+                val position = clampBallPosition(params.x, params.y, ballSize)
+                params.x = position.x
+                params.y = position.y
+                state.lastBallPositionX = position.x
+                state.lastBallPositionY = position.y
+                state.hasSavedBallPosition = true
+                state.isAtEdge.value = false
+            } else if (state.currentMode.value == FloatingMode.WINDOW) {
+                val cardWidth = composeView?.width?.takeIf { it > 0 } ?: quickReplyCardSizePx().first
+                val cardHeight = composeView?.height?.takeIf { it > 0 } ?: quickReplyCardSizePx().second
+                val insets = systemSafeInsets()
+                val margin = (QUICK_REPLY_SAFE_MARGIN_DP * density).toInt()
+                val minX = insets.left + margin
+                val maxX = (screenWidth - insets.right - margin - cardWidth).coerceAtLeast(minX)
+                val minY = insets.top + margin
+                val maxY = (screenHeight - insets.bottom - margin - cardHeight).coerceAtLeast(minY)
+                params.x = params.x.coerceIn(minX, maxX)
+                params.y = params.y.coerceIn(minY, maxY)
             } else {
                 val windowWidth = (state.windowWidth.value.value * density * scale).toInt()
                 val windowHeight = (state.windowHeight.value.value * density * scale).toInt()
@@ -1092,12 +1271,19 @@ class FloatingWindowManager(
                     params.flags =
                             params.flags or
                                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                    params.flags =
+                    if (state.currentMode.value == FloatingMode.WINDOW) {
+                        params.flags =
+                            params.flags or
+                                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+                    } else {
+                        params.flags =
                             params.flags and
-                                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL.inv()
-                    params.flags =
+                                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL.inv()
+                        params.flags =
                             params.flags and
-                                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH.inv()
+                                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH.inv()
+                    }
                 }
                 params.softInputMode = resolveSoftInputModeForMode(state.currentMode.value)
             }

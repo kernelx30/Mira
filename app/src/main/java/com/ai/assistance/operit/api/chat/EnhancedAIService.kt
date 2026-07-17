@@ -14,6 +14,11 @@ import com.ai.assistance.operit.api.chat.enhance.ToolExecutionManager
 import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.core.chat.logMessageTiming
 import com.ai.assistance.operit.core.chat.messageTimingNow
+import com.ai.assistance.operit.core.chat.CompanionReminderIntentDetector
+import com.ai.assistance.operit.core.chat.CompanionMemoryRuleExtractor
+import com.ai.assistance.operit.core.chat.CompanionMemoryReceiptBus
+import com.ai.assistance.operit.core.chat.CompanionMemoryImportanceDetector
+import com.ai.assistance.operit.core.chat.CompanionMemoryTargetResolver
 import com.ai.assistance.operit.core.chat.hooks.PromptHookContext
 import com.ai.assistance.operit.core.chat.hooks.PromptHookRegistry
 import com.ai.assistance.operit.core.chat.hooks.PromptTurn
@@ -31,6 +36,7 @@ import com.ai.assistance.operit.core.tools.climode.CliToolModeSupport
 import com.ai.assistance.operit.core.tools.climode.ToolExposureMode
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.model.FunctionType
+import com.ai.assistance.operit.data.model.ContextWindowUsage
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolInvocation
@@ -79,11 +85,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import com.ai.assistance.operit.data.repository.CustomEmojiRepository
-import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.CharacterCardToolAccessResolver
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.MemoryAutoSaveCandidateRepository
+import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
+import com.ai.assistance.operit.data.model.MemoryAutoSaveCandidate
+import com.ai.assistance.operit.data.skill.SkillRepository
+import com.ai.assistance.operit.data.db.AppDatabase
+import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveScheduler
+import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveWorkScheduler
 import com.ai.assistance.operit.core.config.SystemToolPrompts
 import com.ai.assistance.operit.data.model.ToolPrompt
 import com.ai.assistance.operit.data.model.ToolParameterSchema
@@ -351,7 +362,8 @@ class EnhancedAIService private constructor(private val context: Context) {
         var chatModelIndexOverride: Int? = null,
         var preferenceProfileIdOverride: String? = null,
         var stream: Boolean = true,
-        var disableWarning: Boolean = false
+        var disableWarning: Boolean = false,
+        var toolsEnabledOverride: Boolean? = null,
     )
 
     // MultiServiceManager 管理不同功能的 AIService 实例
@@ -402,6 +414,9 @@ class EnhancedAIService private constructor(private val context: Context) {
     private val _requestWindowEstimate = MutableStateFlow<Int?>(null)
     val requestWindowEstimateFlow: StateFlow<Int?> = _requestWindowEstimate.asStateFlow()
 
+    private val _contextWindowUsage = MutableStateFlow(ContextWindowUsage.Empty)
+    val contextWindowUsageFlow: StateFlow<ContextWindowUsage> = _contextWindowUsage.asStateFlow()
+
     // Conversation management
     // private val streamBuffer = StringBuilder() // Moved to MessageExecutionContext
     // private val roundManager = ConversationRoundManager() // Moved to MessageExecutionContext
@@ -430,6 +445,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         val isConversationActive: AtomicBoolean = AtomicBoolean(true),
         val conversationHistory: MutableList<PromptTurn>,
         val eventChannel: MutableSharedStream<TextStreamEvent>,
+        val allowToolExecution: Boolean = true,
         var modelExecutionSnapshot: ModelExecutionSnapshot? = null
     )
 
@@ -673,6 +689,86 @@ class EnhancedAIService private constructor(private val context: Context) {
         _requestWindowEstimate.value = windowSize
     }
 
+    private fun estimatePromptContentTokens(turns: List<PromptTurn>): Long {
+        return turns.sumOf { turn ->
+            ChatUtils.estimateTokenCount(turn.content).toLong().coerceAtLeast(0L)
+        }
+    }
+
+    private fun extractVisibleSkillPromptText(systemTurns: List<PromptTurn>): String {
+        val visibleSkillNames =
+            runCatching {
+                SkillRepository.getInstance(context).getAiVisibleSkillPackages().keys
+            }.getOrDefault(emptySet())
+        if (visibleSkillNames.isEmpty()) return ""
+
+        return systemTurns
+            .asSequence()
+            .flatMap { it.content.lineSequence() }
+            .filter { line ->
+                val trimmed = line.trim()
+                visibleSkillNames.any { skillName ->
+                    trimmed == "- $skillName" || trimmed.startsWith("- $skillName :")
+                }
+            }
+            .joinToString("\n")
+    }
+
+    private suspend fun buildContextWindowUsage(
+        serviceForFunction: AIService,
+        preparedHistory: List<PromptTurn>,
+        availableTools: List<ToolPrompt>?,
+        totalTokens: Int,
+    ): ContextWindowUsage {
+        val safeTotal = totalTokens.toLong().coerceAtLeast(0L)
+        val withoutToolDefinitions =
+            if (availableTools.isNullOrEmpty()) {
+                safeTotal
+            } else {
+                runCatching {
+                    serviceForFunction.calculateInputTokens(
+                        chatHistory = preparedHistory,
+                        availableTools = null,
+                    ).toLong()
+                }.getOrDefault(safeTotal)
+            }.coerceIn(0L, safeTotal)
+        val toolDefinitionTokens = (safeTotal - withoutToolDefinitions).coerceAtLeast(0L)
+
+        val systemTurns = preparedHistory.filter { it.kind == PromptTurnKind.SYSTEM }
+        val messageTurns =
+            preparedHistory.filter {
+                it.kind == PromptTurnKind.USER ||
+                    it.kind == PromptTurnKind.ASSISTANT ||
+                    it.kind == PromptTurnKind.SUMMARY
+            }
+        val toolHistoryTurns =
+            preparedHistory.filter {
+                it.kind == PromptTurnKind.TOOL_CALL || it.kind == PromptTurnKind.TOOL_RESULT
+            }
+
+        val systemContentTokens = estimatePromptContentTokens(systemTurns)
+        val skillTokens =
+            ChatUtils.estimateTokenCount(extractVisibleSkillPromptText(systemTurns))
+                .toLong()
+                .coerceIn(0L, systemContentTokens)
+        val systemPromptTokens = (systemContentTokens - skillTokens).coerceAtLeast(0L)
+        val messageTokens = estimatePromptContentTokens(messageTurns)
+        val toolHistoryTokens = estimatePromptContentTokens(toolHistoryTurns)
+        val knownWithoutDefinitions =
+            messageTokens + toolHistoryTokens + skillTokens + systemPromptTokens
+        val requestFramingTokens = (withoutToolDefinitions - knownWithoutDefinitions).coerceAtLeast(0L)
+
+        return ContextWindowUsage.fromRawEstimates(
+            totalTokens = safeTotal,
+            messageTokens = messageTokens,
+            systemToolTokens = toolHistoryTokens + toolDefinitionTokens,
+            skillTokens = skillTokens,
+            systemPromptTokens = systemPromptTokens,
+            otherTokens = requestFramingTokens,
+            updatedAtMillis = System.currentTimeMillis(),
+        )
+    }
+
     private suspend fun estimatePreparedRequestWindow(
         serviceForFunction: AIService,
         preparedHistory: List<PromptTurn>,
@@ -686,6 +782,13 @@ class EnhancedAIService private constructor(private val context: Context) {
             )
         if (publishEstimate) {
             publishRequestWindowEstimate(windowSize)
+            _contextWindowUsage.value =
+                buildContextWindowUsage(
+                    serviceForFunction = serviceForFunction,
+                    preparedHistory = preparedHistory,
+                    availableTools = availableTools,
+                    totalTokens = windowSize,
+                )
         }
         return windowSize
     }
@@ -909,6 +1012,9 @@ class EnhancedAIService private constructor(private val context: Context) {
         val preferenceProfileIdOverride = options.preferenceProfileIdOverride
         val stream = options.stream
         val disableWarning = options.disableWarning
+        val toolsEnabledOverride = options.toolsEnabledOverride
+        val effectiveToolsEnabled =
+            toolsEnabledOverride ?: apiPreferences.enableToolsFlow.first()
         val onNonFatalError: suspend (error: String) -> Unit = { error ->
             options.onNonFatalError(error)
             callbacks?.onNonFatalError(error)
@@ -946,7 +1052,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                 MessageExecutionContext(
                     executionId = nextExecutionContextId.incrementAndGet(),
                     conversationHistory = chatHistory.toMutableList(),
-                    eventChannel = eventChannel
+                    eventChannel = eventChannel,
+                    allowToolExecution = effectiveToolsEnabled,
                 )
             registerExecutionContext(execContext)
             var hadFatalError = false
@@ -991,7 +1098,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     isSubTask,
                                     functionType,
                                     modelSnapshot.config,
-                                    preferenceProfileIdOverride
+                                    preferenceProfileIdOverride,
+                                    effectiveToolsEnabled
                             )
                     val tAfterPrepareHistory = messageTimingNow()
                     AppLogger.d(TAG, "sendMessage本地耗时: prepareConversationHistory=${tAfterPrepareHistory - startTime}ms")
@@ -1024,13 +1132,18 @@ class EnhancedAIService private constructor(private val context: Context) {
                     currentRequestCachedInputTokenCount = 0
 
                     // 获取工具列表（如果启用Tool Call）
-                    val availableTools = getAvailableToolsForFunction(
-                        functionType = functionType,
-                        chatId = chatId,
-                        promptFunctionType = promptFunctionType,
-                        roleCardId = roleCardId,
-                        modelConfig = modelSnapshot.config
-                    )
+                    val availableTools =
+                        if (execContext.allowToolExecution) {
+                            getAvailableToolsForFunction(
+                                functionType = functionType,
+                                chatId = chatId,
+                                promptFunctionType = promptFunctionType,
+                                roleCardId = roleCardId,
+                                modelConfig = modelSnapshot.config,
+                            )
+                        } else {
+                            null
+                        }
                     val tAfterGetTools = messageTimingNow()
                     AppLogger.d(TAG, "sendMessage本地耗时: getAvailableToolsForFunction=${tAfterGetTools - tAfterGetService}ms")
 
@@ -2024,11 +2137,71 @@ class EnhancedAIService private constructor(private val context: Context) {
                 if (currentChatId.isNullOrBlank()) {
                     AppLogger.w(TAG, "自动保存长期记忆入队跳过：chatId为空")
                 } else {
+                    val database = AppDatabase.getDatabase(this@EnhancedAIService.context)
+                    val recentMessages =
+                        database.messageDao().getMessagesForChatDesc(currentChatId, 12)
+                    val latestUserMessage = recentMessages.firstOrNull { it.sender == "user" }
+                    val latestAssistantMessage = recentMessages.firstOrNull { it.sender == "ai" }
+                    val latestUserContent = latestUserMessage?.content.orEmpty()
+                    val isHighValueMemory =
+                        CompanionMemoryImportanceDetector.isHighValue(latestUserContent)
                     MemoryAutoSaveCandidateRepository(this@EnhancedAIService.context, profileId)
                         .enqueue(
                             chatId = currentChatId,
-                            triggerMessageTimestamp = System.currentTimeMillis()
+                            triggerMessageTimestamp =
+                                if (isHighValueMemory) {
+                                    latestUserMessage?.timestamp ?: System.currentTimeMillis()
+                                } else {
+                                    latestAssistantMessage?.timestamp
+                                        ?: latestUserMessage?.timestamp
+                                        ?: System.currentTimeMillis()
+                                },
+                            sourceType =
+                                if (isHighValueMemory) {
+                                    MemoryAutoSaveCandidate.SOURCE_TYPE_HIGH_VALUE_AUTO
+                                } else {
+                                    MemoryAutoSaveCandidate.SOURCE_TYPE_REPLY_FINALIZED_AUTO
+                                },
                         )
+                    val companionId =
+                        CompanionMemoryTargetResolver.resolve(
+                            context = this@EnhancedAIService.context,
+                            chatId = currentChatId,
+                        )
+                    latestUserMessage?.let { message ->
+                        val companionMemoryRepository =
+                            CompanionMemoryRepository(this@EnhancedAIService.context)
+                        CompanionMemoryRuleExtractor.extract(
+                            content = message.content,
+                            conversationId = currentChatId,
+                            messageTimestamp = message.timestamp,
+                            messageId = message.messageId,
+                        ).forEach { proposal ->
+                            val recordId = companionMemoryRepository.applyProposal(
+                                profileId = profileId,
+                                companionId = companionId,
+                                proposal = proposal,
+                            )
+                            if (recordId != null) {
+                                CompanionMemoryReceiptBus.publishConfirmedHighValue(recordId, proposal)
+                            }
+                        }
+                    }
+                    if (
+                        isHighValueMemory ||
+                            CompanionReminderIntentDetector.isTimeSensitive(latestUserContent)
+                    ) {
+                        val scheduler = MemoryAutoSaveScheduler.getInstance()
+                        if (scheduler != null) {
+                            scheduler.requestImmediateProcessing(profileId, currentChatId)
+                        } else {
+                            MemoryAutoSaveWorkScheduler.requestImmediate(
+                                context = this@EnhancedAIService.context,
+                                profileId = profileId,
+                                chatId = currentChatId,
+                            )
+                        }
+                    }
                 }
             }.onFailure { e ->
                 AppLogger.e(TAG, "自动保存长期记忆候选入队失败", e)
@@ -2076,14 +2249,22 @@ class EnhancedAIService private constructor(private val context: Context) {
         disableWarning: Boolean = false
     ) {
         val startTime = messageTimingNow()
+        val effectiveToolInvocations =
+            if (context.allowToolExecution) toolInvocations else emptyList()
+        val effectiveOverrideMessage =
+            if (!context.allowToolExecution && toolInvocations.isNotEmpty()) {
+                "Tools are unavailable for this turn. Reply directly to the user without calling tools."
+            } else {
+                toolResultOverrideMessage
+            }
 
-        toolInvocations.forEach { invocation ->
+        effectiveToolInvocations.forEach { invocation ->
             onToolInvocation?.invoke(invocation.tool.name)
         }
 
-        if (!isSubTask && toolInvocations.isNotEmpty()) {
+        if (!isSubTask && effectiveToolInvocations.isNotEmpty()) {
             withContext(Dispatchers.Main) {
-                val toolNames = toolInvocations.joinToString(", ") { resolveToolDisplayName(it.tool) }
+                val toolNames = effectiveToolInvocations.joinToString(", ") { resolveToolDisplayName(it.tool) }
                 _inputProcessingState.value = InputProcessingState.ExecutingTool(toolNames)
             }
         }
@@ -2097,7 +2278,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             )
             val config = modelSnapshot.config
             val allToolResults = ToolExecutionManager.executeInvocations(
-                invocations = toolInvocations,
+                invocations = effectiveToolInvocations,
                 context = this@EnhancedAIService.context,
                 toolHandler = toolHandler,
                 packageManager = packageManager,
@@ -2117,7 +2298,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     chatModelConfigIdOverride, chatModelIndexOverride, preferenceProfileIdOverride, stream, enableGroupOrchestrationHint,
                     disableWarning = disableWarning
                 )
-            } else if (!toolResultOverrideMessage.isNullOrEmpty()) {
+            } else if (!effectiveOverrideMessage.isNullOrEmpty()) {
                 AppLogger.d(TAG, "0工具路由命中，使用覆盖消息继续请求AI。")
                 processToolResults(
                     results = emptyList(),
@@ -2143,7 +2324,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     preferenceProfileIdOverride = preferenceProfileIdOverride,
                     stream = stream,
                     enableGroupOrchestrationHint = enableGroupOrchestrationHint,
-                    toolResultMessageOverride = toolResultOverrideMessage,
+                    toolResultMessageOverride = effectiveOverrideMessage,
                     disableWarning = disableWarning
                 )
             }
@@ -2151,7 +2332,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             logMessageTiming(
                 stage = "enhanced.handleToolInvocation.complete",
                 startTimeMs = startTime,
-                details = "toolCount=${toolInvocations.size}"
+                details = "toolCount=${effectiveToolInvocations.size}"
             )
         }
 
@@ -2197,7 +2378,11 @@ class EnhancedAIService private constructor(private val context: Context) {
         val startTime = messageTimingNow()
         val toolNames = results.joinToString(", ") { it.toolName }
         val rawToolResultMessage =
-            toolResultMessageOverride ?: ConversationMarkupManager.buildBoundedToolResultMessage(results)
+            toolResultMessageOverride
+                ?: ConversationMarkupManager.buildBoundedToolResultMessage(
+                    results = results,
+                    context = this@EnhancedAIService.context
+                )
         val toolResultMessage =
             if (rawToolResultMessage.length <= ToolExecutionLimits.MAX_FINAL_TOOL_RESULT_MESSAGE_CHARS) {
                 rawToolResultMessage
@@ -2280,13 +2465,18 @@ class EnhancedAIService private constructor(private val context: Context) {
         val serviceForFunction = modelSnapshot.service
         
         // 获取工具列表（如果启用Tool Call）- 提前获取，以便在token计算中使用
-        val availableTools = getAvailableToolsForFunction(
-            functionType = functionType,
-            chatId = chatId,
-            promptFunctionType = promptFunctionType,
-            roleCardId = roleCardId,
-            modelConfig = modelSnapshot.config
-        )
+        val availableTools =
+            if (context.allowToolExecution) {
+                getAvailableToolsForFunction(
+                    functionType = functionType,
+                    chatId = chatId,
+                    promptFunctionType = promptFunctionType,
+                    roleCardId = roleCardId,
+                    modelConfig = modelSnapshot.config,
+                )
+            } else {
+                null
+            }
  
         val currentTokens = estimatePreparedRequestWindow(
             serviceForFunction = serviceForFunction,
@@ -2603,6 +2793,15 @@ class EnhancedAIService private constructor(private val context: Context) {
         )
     }
 
+    suspend fun generateNextUserMessage(
+        recentMessages: List<Pair<String, String>>,
+    ): String {
+        return conversationService.generateNextUserMessage(
+            recentMessages = recentMessages,
+            multiServiceManager = multiServiceManager,
+        )
+    }
+
     /**
      * 获取指定功能类型的当前输入token计数
      * @param functionType 功能类型
@@ -2650,6 +2849,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             functionType: FunctionType = FunctionType.CHAT,
             modelConfig: ModelConfigData,
             preferenceProfileIdOverride: String? = null,
+            toolsEnabledOverride: Boolean? = null,
             dispatchHistoryHooks: (PromptHookContext) -> PromptHookContext =
                 PromptHookRegistry::dispatchPromptHistoryHooks,
             dispatchSystemPromptComposeHooks: (PromptHookContext) -> PromptHookContext =
@@ -2693,6 +2893,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 chatModelHasDirectImage,
                 toolExposureMode,
                 preferenceProfileIdOverride,
+                toolsEnabledOverride,
                 dispatchHistoryHooks,
                 dispatchSystemPromptComposeHooks,
                 dispatchToolPromptComposeHooks
@@ -2868,8 +3069,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                 TAG,
                 "准备构建Tool Call工具列表: functionType=${functionType.name}, promptFunctionType=${promptFunctionType?.name}, chatId=${chatId ?: "null"}"
             )
-            // 先读取全局工具开关
-            val enableTools = apiPreferences.enableToolsFlow.first()
+            // This method is only reached for turns that allow tool execution.
+            val enableTools = true
             val toolPromptVisibility = runCatching {
                 apiPreferences.toolPromptVisibilityFlow.first()
             }.getOrElse { emptyMap() }
@@ -2878,11 +3079,6 @@ class EnhancedAIService private constructor(private val context: Context) {
                 packageManager = packageManager,
                 globalToolVisibility = toolPromptVisibility
             )
-
-            if (!enableTools) {
-                AppLogger.d(TAG, "全局设置已禁用工具，本次调用不提供任何Tool Call工具")
-                return null
-            }
 
             // 获取对应功能类型的模型配置
             val config = modelConfig
@@ -3146,6 +3342,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         conversationHistory: List<Pair<String, String>>,
         lastContent: String,
         preferenceProfileIdOverride: String? = null,
+        chatId: String? = null,
         onSuccess: (suspend () -> Unit)? = null,
         onError: (suspend (Exception) -> Unit)? = null
     ) {
@@ -3160,6 +3357,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     content = lastContent,
                     aiService = memoryService,
                     profileIdOverride = preferenceProfileIdOverride,
+                    chatIdOverride = chatId,
                     onSuccess = {
                         AppLogger.d(TAG, "手动记忆更新成功")
                         onSuccess?.invoke()

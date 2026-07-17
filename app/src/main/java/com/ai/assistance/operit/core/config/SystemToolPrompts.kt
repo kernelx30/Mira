@@ -83,6 +83,80 @@ object SystemToolPrompts {
             )
         )
     )
+
+    private val miraDeviceTools =
+        SystemToolPromptCategory(
+            categoryName = "Device app tools",
+            tools =
+                listOf(
+                    ToolPrompt(
+                        name = "start_app",
+                        description =
+                            "Launch an installed Android app immediately. Pass either its visible app name (for example Douyin or 汽水音乐) or its package name. Use this directly whenever the user asks to open or launch an app; do not activate a package first.",
+                        parametersStructured =
+                            listOf(
+                                ToolParameterSchema(
+                                    name = "package_name",
+                                    type = "string",
+                                    description = "Visible app name or Android package name",
+                                    required = true,
+                                ),
+                            ),
+                    ),
+                    ToolPrompt(
+                        name = "list_installed_apps",
+                        description =
+                            "List installed Android apps and package names. Use only when start_app reports that the requested app name is ambiguous or not found.",
+                        parametersStructured =
+                            listOf(
+                                ToolParameterSchema(
+                                    name = "include_system_apps",
+                                    type = "boolean",
+                                    description = "Whether to include system apps",
+                                    required = false,
+                                    default = "false",
+                                ),
+                            ),
+                    ),
+                ),
+        )
+
+    private val miraDeviceToolsCn =
+        SystemToolPromptCategory(
+            categoryName = "设备应用工具",
+            tools =
+                listOf(
+                    ToolPrompt(
+                        name = "start_app",
+                        description =
+                            "立即启动本机已安装应用。package_name 可直接填写用户看到的应用名称（例如“抖音”“汽水音乐”），也可填写安卓包名。用户要求打开或启动应用时直接调用本工具，不要先激活工具包。",
+                        parametersStructured =
+                            listOf(
+                                ToolParameterSchema(
+                                    name = "package_name",
+                                    type = "string",
+                                    description = "应用显示名称或安卓包名",
+                                    required = true,
+                                ),
+                            ),
+                    ),
+                    ToolPrompt(
+                        name = "list_installed_apps",
+                        description =
+                            "列出本机已安装应用及包名。仅在 start_app 返回名称有歧义或找不到应用时使用。",
+                        parametersStructured =
+                            listOf(
+                                ToolParameterSchema(
+                                    name = "include_system_apps",
+                                    type = "boolean",
+                                    description = "是否包含系统应用",
+                                    required = false,
+                                    default = "false",
+                                ),
+                            ),
+                    ),
+                ),
+        )
     
     // ==================== 文件系统工具 ====================
     val fileSystemTools = SystemToolPromptCategory(
@@ -538,6 +612,7 @@ object SystemToolPrompts {
 
         return listOf(
             basicTools,
+            miraDeviceTools,
             adjustedFileSystemTools,
             httpTools,
             memoryTools
@@ -613,6 +688,7 @@ object SystemToolPrompts {
 
         return listOf(
             basicToolsCn,
+            miraDeviceToolsCn,
             adjustedFileSystemTools,
             httpToolsCn,
             memoryToolsCn

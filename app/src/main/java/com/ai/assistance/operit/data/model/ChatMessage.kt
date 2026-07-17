@@ -25,6 +25,7 @@ data class ChatMessage(
         val completedAt: Long = 0L, // 本轮消息完成时间（时间戳）
         val displayMode: ChatMessageDisplayMode = ChatMessageDisplayMode.NORMAL,
         val isFavorite: Boolean = false,
+        val speechDirectionJson: String? = null,
         @Transient
         val isVariantPreview: Boolean = false,
         @Transient
@@ -55,6 +56,7 @@ data class ChatMessage(
         displayMode = readDisplayModeFromParcel(parcel),
         isFavorite = readBooleanFromParcel(parcel),
         completedAt = if (parcel.dataAvail() > 0) parcel.readLong() else 0L,
+        speechDirectionJson = if (parcel.dataAvail() > 0) parcel.readString() else null,
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
@@ -75,6 +77,7 @@ data class ChatMessage(
         parcel.writeString(displayMode.name)
         parcel.writeInt(if (isFavorite) 1 else 0)
         parcel.writeLong(completedAt)
+        parcel.writeString(speechDirectionJson)
         // 不需要序列化contentStream，因为它是暂时性的
     }
 

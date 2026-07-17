@@ -10,6 +10,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        exclusiveContent {
+            forRepository {
+                maven { url = uri("https://maven.aliyun.com/repository/central") }
+            }
+            filter { includeGroup("com.arthenica") }
+        }
         maven { url = uri("https://jitpack.io") }
         maven { url = uri("https://dl.bintray.com/rikkaw/Shizuku") }
         maven { url = uri("https://api.xposed.info/") }
@@ -17,7 +23,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Operit"
+rootProject.name = "Mira"
 include(":app")
 include(":dragonbones")
 include(":terminal")

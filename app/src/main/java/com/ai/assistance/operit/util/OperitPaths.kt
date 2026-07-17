@@ -7,6 +7,7 @@ import java.io.File
 object OperitPaths {
 
     private const val OPERIT_DIR_NAME = "Operit"
+    private const val MIRA_DIR_NAME = "Mira"
     private const val CLEAN_ON_EXIT_DIR_NAME = "cleanOnExit"
     private const val PLUGINS_DIR_NAME = "plugins"
     private const val MCP_PLUGINS_DIR_NAME = "mcp_plugins"
@@ -30,6 +31,15 @@ object OperitPaths {
 
     fun operitRootDir(): File {
         return ensureDir(File(downloadsDir(), OPERIT_DIR_NAME))
+    }
+
+    /** User-owned Mira exports and backups. Operit paths remain for plugin compatibility. */
+    fun miraRootDir(): File {
+        return ensureDir(File(downloadsDir(), MIRA_DIR_NAME))
+    }
+
+    fun miraExportsDir(): File {
+        return ensureDir(File(miraRootDir(), EXPORTS_DIR_NAME))
     }
 
     fun cleanOnExitDir(): File {

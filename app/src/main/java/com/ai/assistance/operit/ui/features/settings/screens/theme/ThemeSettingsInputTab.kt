@@ -34,10 +34,10 @@ internal fun ThemeSettingsInputTab(
 ) {
     val preferencesManager = shared.preferencesManager
     val inputStyle by preferencesManager.inputStyle.collectAsState(
-        initial = UserPreferencesManager.INPUT_STYLE_AGENT,
+        initial = UserPreferencesManager.DEFAULT_INPUT_STYLE,
     )
     val chatInputTransparent by preferencesManager.chatInputTransparent.collectAsState(initial = false)
-    val chatInputFloating by preferencesManager.chatInputFloating.collectAsState(initial = false)
+    val chatInputFloating by preferencesManager.chatInputFloating.collectAsState(initial = true)
     val chatInputLiquidGlass by preferencesManager.chatInputLiquidGlass.collectAsState(initial = false)
     val chatInputWaterGlass by preferencesManager.chatInputWaterGlass.collectAsState(initial = false)
     var inputStyleInput by remember { mutableStateOf(inputStyle) }
@@ -209,4 +209,3 @@ private fun ThemeSettingsInputSwitch(
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
-

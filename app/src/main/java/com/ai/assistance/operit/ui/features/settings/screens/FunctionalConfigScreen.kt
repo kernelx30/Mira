@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import com.ai.assistance.operit.util.AssetCopyUtils
+import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.api.chat.llmprovider.AIServiceFactory
 import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkBuilder
 import com.ai.assistance.operit.api.chat.EnhancedAIService
@@ -42,6 +43,7 @@ import com.ai.assistance.operit.core.config.FunctionalPrompts
 import com.ai.assistance.operit.util.ImagePoolManager
 import com.ai.assistance.operit.util.MediaPoolManager
 import com.ai.assistance.operit.util.LocaleUtils
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 
@@ -461,6 +463,7 @@ fun FunctionConfigCard(
                                         isTestingConnection = true
                                         testResult = null
                                         val cleanupTasks = mutableListOf<() -> Unit>()
+                                        var testService: AIService? = null
                                         try {
                                             val configId =
                                                     currentConfig?.id
@@ -478,28 +481,121 @@ fun FunctionConfigCard(
                                                             config = configWithSelectedModel,
                                                             modelConfigManager = modelConfigManager,
                                                             context = context
-                                                    )
+                                                    ).also { testService = it }
 
                                             val useEnglish = LocaleUtils.getCurrentLanguage(context).lowercase().startsWith("en")
+                                            val parameters =
+                                                modelConfigManager.getModelParametersForConfig(
+                                                    configWithSelectedModel.id
+                                                )
                                             val result = when (functionType) {
                                                 FunctionType.SUMMARY -> {
-                                                    val enhancedService = EnhancedAIService.getInstance(context)
-                                                    val sampleMessages =
+                                                    val buffer = StringBuilder()
+                                                    service.sendMessage(
+                                                        context,
                                                         listOf(
-                                                            "user" to "Connection test: summarize this short dialog.",
-                                                            "assistant" to "Sure, I can help with summaries."
-                                                        )
-                                                    enhancedService.generateSummary(sampleMessages)
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.SYSTEM,
+                                                                content = FunctionalPrompts.summaryPrompt(useEnglish),
+                                                            ),
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.USER,
+                                                                content = "Connection test: summarize this short dialog.",
+                                                            ),
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.ASSISTANT,
+                                                                content = "Sure, I can help with summaries.",
+                                                            ),
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.USER,
+                                                                content = FunctionalPrompts.summaryUserMessage(useEnglish),
+                                                            ),
+                                                        ),
+                                                        parameters,
+                                                        stream = false,
+                                                        enableRetry = false,
+                                                    ).collect { chunk -> buffer.append(chunk) }
+                                                    buffer.toString()
                                                 }
                                                 FunctionType.TITLE_GENERATION -> {
-                                                    val enhancedService = EnhancedAIService.getInstance(context)
-                                                    enhancedService.generateConversationTitle(
-                                                        userText = context.getString(R.string.functional_config_test_title_generation_user_text)
-                                                    )
+                                                    val buffer = StringBuilder()
+                                                    service.sendMessage(
+                                                        context,
+                                                        listOf(
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.SYSTEM,
+                                                                content = FunctionalPrompts.conversationTitleSystemPrompt(useEnglish),
+                                                            ),
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.USER,
+                                                                content =
+                                                                    FunctionalPrompts.conversationTitleUserPrompt(
+                                                                        userText = context.getString(R.string.functional_config_test_title_generation_user_text),
+                                                                        attachmentFileNames = emptyList(),
+                                                                        useEnglish = useEnglish,
+                                                                    ),
+                                                            ),
+                                                        ),
+                                                        parameters,
+                                                        stream = false,
+                                                        enableRetry = false,
+                                                    ).collect { chunk -> buffer.append(chunk) }
+                                                    buffer.toString()
+                                                }
+                                                FunctionType.NEXT_USER_MESSAGE -> {
+                                                    val buffer = StringBuilder()
+                                                    service.sendMessage(
+                                                        context,
+                                                        listOf(
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.SYSTEM,
+                                                                content =
+                                                                    FunctionalPrompts.nextUserMessageSystemPrompt(
+                                                                        useEnglish
+                                                                    ),
+                                                            ),
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.USER,
+                                                                content =
+                                                                    FunctionalPrompts.nextUserMessageUserPrompt(
+                                                                        recentMessages =
+                                                                            listOf(
+                                                                                "user" to "I had a long day at work.",
+                                                                                "ai" to "That sounds exhausting. Want to tell me what happened?",
+                                                                            ),
+                                                                        useEnglish = useEnglish,
+                                                                    ),
+                                                            ),
+                                                        ),
+                                                        parameters,
+                                                        stream = false,
+                                                        enableRetry = false,
+                                                    ).collect { chunk -> buffer.append(chunk) }
+                                                    buffer.toString()
                                                 }
                                                 FunctionType.TRANSLATION -> {
-                                                    val enhancedService = EnhancedAIService.getInstance(context)
-                                                    enhancedService.translateText("Connection test: translate me.")
+                                                    val buffer = StringBuilder()
+                                                    service.sendMessage(
+                                                        context,
+                                                        listOf(
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.SYSTEM,
+                                                                content = FunctionalPrompts.translationSystemPrompt(),
+                                                            ),
+                                                            PromptTurn(
+                                                                kind = PromptTurnKind.USER,
+                                                                content =
+                                                                    FunctionalPrompts.translationUserPrompt(
+                                                                        targetLanguage = if (useEnglish) "Chinese" else "英文",
+                                                                        text = "Connection test: translate me.",
+                                                                    ),
+                                                            ),
+                                                        ),
+                                                        parameters,
+                                                        stream = false,
+                                                        enableRetry = false,
+                                                    ).collect { chunk -> buffer.append(chunk) }
+                                                    buffer.toString()
                                                 }
                                                 FunctionType.IMAGE_RECOGNITION -> {
                                                     val imageFile = AssetCopyUtils.copyAssetToCache(context, "test/1.jpg")
@@ -640,6 +736,10 @@ fun FunctionConfigCard(
                                                             existingMemoriesPrompt = existingMemoriesPrompt,
                                                             existingFoldersPrompt = existingFoldersPrompt,
                                                             currentPreferences = "",
+                                                            currentDateTime =
+                                                                java.time.ZonedDateTime.now().format(
+                                                                    java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME
+                                                                ),
                                                             useEnglish = useEnglish
                                                         )
                                                     val userPrompt =
@@ -690,11 +790,19 @@ fun FunctionConfigCard(
                                                     buffer.toString()
                                                 }
                                             }
+                                            if (result.isBlank()) {
+                                                throw IllegalStateException(
+                                                    context.getString(R.string.functional_config_test_empty_response)
+                                                )
+                                            }
                                             testResult = Result.success(result)
+                                        } catch (e: CancellationException) {
+                                            throw e
                                         } catch (e: Exception) {
                                             testResult = Result.failure(e)
                                         } finally {
                                             cleanupTasks.forEach { task -> runCatching { task() } }
+                                            runCatching { testService?.release() }
                                         }
                                         isTestingConnection = false
                                     }
@@ -924,6 +1032,7 @@ fun getFunctionDisplayName(functionType: FunctionType): String {
         FunctionType.CHAT -> stringResource(id = R.string.function_type_chat)
         FunctionType.SUMMARY -> stringResource(id = R.string.function_type_summary)
         FunctionType.TITLE_GENERATION -> stringResource(id = R.string.function_type_title_generation)
+        FunctionType.NEXT_USER_MESSAGE -> stringResource(id = R.string.function_type_next_user_message)
         FunctionType.MEMORY -> stringResource(id = R.string.function_type_memory)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_type_ui_controller)
         FunctionType.TRANSLATION -> stringResource(id = R.string.function_type_translation)
@@ -942,6 +1051,7 @@ fun getFunctionDescription(functionType: FunctionType): String {
         FunctionType.CHAT -> stringResource(id = R.string.function_desc_chat)
         FunctionType.SUMMARY -> stringResource(id = R.string.function_desc_summary)
         FunctionType.TITLE_GENERATION -> stringResource(id = R.string.function_desc_title_generation)
+        FunctionType.NEXT_USER_MESSAGE -> stringResource(id = R.string.function_desc_next_user_message)
         FunctionType.MEMORY -> stringResource(id = R.string.function_desc_memory)
         FunctionType.UI_CONTROLLER -> stringResource(id = R.string.function_desc_ui_controller)
         FunctionType.TRANSLATION -> stringResource(id = R.string.function_desc_translation)

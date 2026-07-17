@@ -40,6 +40,7 @@ fun rememberFloatContext(
         currentY: Float = 0f,
         saveWindowState: (() -> Unit)? = null,
         onSendMessage: ((String, PromptFunctionType) -> Unit)? = null,
+        onSendMessageWithResult: ((String, PromptFunctionType, (Boolean) -> Unit) -> Boolean)? = null,
         onCancelMessage: (() -> Unit)? = null,
         onAttachmentRequest: ((String) -> Unit)? = null,
         attachments: List<AttachmentInfo> = emptyList(),
@@ -91,6 +92,7 @@ fun rememberFloatContext(
     val currentSnapToEdge by rememberUpdatedState(snapToEdge)
     val currentSaveWindowState by rememberUpdatedState(saveWindowState)
     val currentOnSendMessage by rememberUpdatedState(onSendMessage)
+    val currentOnSendMessageWithResult by rememberUpdatedState(onSendMessageWithResult)
     val currentOnCancelMessage by rememberUpdatedState(onCancelMessage)
     val currentOnAttachmentRequest by rememberUpdatedState(onAttachmentRequest)
     val currentOnRemoveAttachment by rememberUpdatedState(onRemoveAttachment)
@@ -107,6 +109,7 @@ fun rememberFloatContext(
         floatContext.snapToEdge = currentSnapToEdge
         floatContext.saveWindowState = currentSaveWindowState
         floatContext.onSendMessage = currentOnSendMessage
+        floatContext.onSendMessageWithResult = currentOnSendMessageWithResult
         floatContext.onCancelMessage = currentOnCancelMessage
         floatContext.onAttachmentRequest = currentOnAttachmentRequest
         floatContext.onRemoveAttachment = currentOnRemoveAttachment
@@ -158,6 +161,8 @@ class FloatContext(
     var snapToEdge: (Boolean) -> Unit = {}
     var saveWindowState: (() -> Unit)? = null
     var onSendMessage by mutableStateOf<((String, PromptFunctionType) -> Unit)?>(null)
+    var onSendMessageWithResult by
+        mutableStateOf<((String, PromptFunctionType, (Boolean) -> Unit) -> Boolean)?>(null)
     var onCancelMessage: (() -> Unit)? = null
     var onAttachmentRequest: ((String) -> Unit)? = null
     var onRemoveAttachment: ((String) -> Unit)? = null

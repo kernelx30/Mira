@@ -101,8 +101,8 @@ class ScreenCaptureService : Service() {
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Screen Capture Active")
-            .setContentText("Operit is capturing screen content")
-            .setSmallIcon(R.drawable.ic_launcher_simple_foreground)
+            .setContentText("Mira is capturing screen content")
+            .setSmallIcon(R.drawable.ic_launcher_mira_monochrome)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }

@@ -5,6 +5,7 @@ enum class FunctionType {
     CHAT, // 常规对话
     SUMMARY, // 对话总结
     TITLE_GENERATION, // AI总结标题
+    NEXT_USER_MESSAGE, // 根据最近对话生成下一条用户草稿
     MEMORY, // 记忆库处理
     UI_CONTROLLER, // UI自动化控制
     TRANSLATION, // 翻译功能

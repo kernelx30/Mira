@@ -56,6 +56,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 class FloatingChatService : Service(), FloatingWindowCallback {
     private val TAG = "FloatingChatService"
@@ -224,9 +225,30 @@ class FloatingChatService : Service(), FloatingWindowCallback {
         try {
             acquireWakeLock()
 
-            chatCore = ChatRuntimeHolder.getInstance(applicationContext).getCore(ChatRuntimeSlot.FLOATING)
+            val runtimeHolder = ChatRuntimeHolder.getInstance(applicationContext)
+            val mainChatCore = runtimeHolder.getCore(ChatRuntimeSlot.MAIN)
+            chatCore = runtimeHolder.getCore(ChatRuntimeSlot.FLOATING)
             chatCore.setUiBridge(EmptyChatServiceUiBridge)
             AppLogger.d(TAG, "ChatServiceCore 已初始化")
+
+            serviceScope.launch {
+                val mainChatId =
+                    withTimeoutOrNull(1_200L) {
+                        mainChatCore.currentChatId.first { !it.isNullOrBlank() }
+                    } ?: mainChatCore.currentChatId.value
+                if (!mainChatId.isNullOrBlank()) {
+                    runtimeHolder.syncMainChatSelectionToFloating(mainChatId)
+                    withTimeoutOrNull(1_500L) {
+                        chatCore.currentChatId.first { it == mainChatId }
+                    }
+                    if (
+                        chatCore.currentChatId.value == mainChatId &&
+                            chatCore.chatHistory.value.isEmpty()
+                    ) {
+                        chatCore.reloadChatMessagesSmart(mainChatId)
+                    }
+                }
+            }
 
             // 订阅聊天历史更新
             serviceScope.launch {
@@ -685,21 +707,39 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     }
 
     override fun onSendMessage(message: String, promptType: PromptFunctionType) {
+        onSendMessageWithResult(message, promptType) {}
+    }
+
+    override fun onSendMessageWithResult(
+        message: String,
+        promptType: PromptFunctionType,
+        onResolved: (Boolean) -> Unit,
+    ): Boolean {
         AppLogger.d(TAG, "onSendMessage: $message, promptType: $promptType")
-        
-        // 直接使用 chatCore 发送消息，不再通过 SharedFlow
-        serviceScope.launch {
-            try {
-                // 发送消息（包含总结逻辑）
+        val resolvedOnce = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun resolve(accepted: Boolean) {
+            if (resolvedOnce.compareAndSet(false, true)) {
+                if (accepted) {
+                    AppLogger.d(TAG, "Floating message accepted by chatCore")
+                } else {
+                    AppLogger.w(TAG, "Floating message was not accepted by the response pipeline")
+                }
+                onResolved(accepted)
+            }
+        }
+        return try {
+            val reserved =
                 chatCore.sendUserMessage(
                     promptFunctionType = promptType,
-                    messageTextOverride = message
+                    messageTextOverride = message,
+                    onDispatchResolved = ::resolve,
                 )
-                
-                AppLogger.d(TAG, "消息已通过 chatCore 发送")
-            } catch (e: Exception) {
-                AppLogger.e(TAG, "发送消息时出错", e)
-            }
+            if (!reserved) resolve(false)
+            reserved
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "发送消息时出错", e)
+            resolve(false)
+            false
         }
     }
 

@@ -35,45 +35,92 @@ import java.util.Locale
 @Composable
 fun MemoryInfoDialog(
         memory: Memory,
+        showAdvancedFields: Boolean = true,
         onDismiss: () -> Unit,
         onEdit: () -> Unit,
         onDelete: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+    val dateFormat =
+        remember(showAdvancedFields) {
+            SimpleDateFormat(
+                if (showAdvancedFields) "yyyy-MM-dd HH:mm:ss" else "yyyy/MM/dd HH:mm",
+                Locale.getDefault(),
+            )
+        }
 
     AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(text = stringResource(R.string.memory_details_title)) },
+            title = {
+                Text(
+                    text =
+                        if (showAdvancedFields) {
+                            stringResource(R.string.memory_details_title)
+                        } else {
+                            memory.title
+                        },
+                )
+            },
             text = {
                 Column(
                         modifier = Modifier.verticalScroll(scrollState),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("${stringResource(R.string.memory_title)}: ${memory.title}", style = MaterialTheme.typography.titleMedium)
-                    HorizontalDivider()
-                    Text(stringResource(R.string.memory_content) + ":", style = MaterialTheme.typography.titleSmall)
-                    Text(memory.content)
-                    HorizontalDivider()
-                    Text("${stringResource(R.string.memory_folder)}: ${memory.folderPath?.ifEmpty { stringResource(R.string.memory_uncategorized) }}", style = MaterialTheme.typography.bodySmall)
-                    Text("${stringResource(R.string.memory_uuid)}: ${memory.uuid}", style = MaterialTheme.typography.bodySmall)
-                    Text("${stringResource(R.string.memory_source)}: ${memory.source}", style = MaterialTheme.typography.bodySmall)
-                    Text(
-                            "${stringResource(R.string.memory_importance)}: ${String.format("%.2f", memory.importance)}",
-                            style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                            "${stringResource(R.string.memory_credibility)}: ${String.format("%.2f", memory.credibility)}",
-                            style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                            "${stringResource(R.string.memory_created_at)}: ${dateFormat.format(memory.createdAt)}",
-                            style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                            "${stringResource(R.string.memory_updated_at)}: ${dateFormat.format(memory.updatedAt)}",
-                            style = MaterialTheme.typography.bodySmall
-                    )
+                    if (showAdvancedFields) {
+                        Text("${stringResource(R.string.memory_title)}: ${memory.title}", style = MaterialTheme.typography.titleMedium)
+                        HorizontalDivider()
+                        Text(stringResource(R.string.memory_content) + ":", style = MaterialTheme.typography.titleSmall)
+                        Text(memory.content)
+                        HorizontalDivider()
+                        Text("${stringResource(R.string.memory_folder)}: ${memory.folderPath?.ifEmpty { stringResource(R.string.memory_uncategorized) }}", style = MaterialTheme.typography.bodySmall)
+                        Text("${stringResource(R.string.memory_uuid)}: ${memory.uuid}", style = MaterialTheme.typography.bodySmall)
+                        Text("${stringResource(R.string.memory_source)}: ${memory.source}", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                                "${stringResource(R.string.memory_importance)}: ${String.format("%.2f", memory.importance)}",
+                                style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                                "${stringResource(R.string.memory_credibility)}: ${String.format("%.2f", memory.credibility)}",
+                                style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                                "${stringResource(R.string.memory_created_at)}: ${dateFormat.format(memory.createdAt)}",
+                                style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                                "${stringResource(R.string.memory_updated_at)}: ${dateFormat.format(memory.updatedAt)}",
+                                style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        Text(
+                            text = memory.content.ifBlank { stringResource(R.string.mate_memory_content_empty) },
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        HorizontalDivider()
+                        Text(
+                            text = stringResource(friendlyMemorySourceRes(memory)),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = stringResource(R.string.mate_memory_updated_value, dateFormat.format(memory.updatedAt)),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.mate_memory_confidence_value,
+                                    (memory.credibility * 100).toInt(),
+                                ) + " · " +
+                                    stringResource(
+                                        R.string.mate_memory_importance_value,
+                                        (memory.importance * 100).toInt(),
+                                    ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -94,6 +141,17 @@ fun MemoryInfoDialog(
                 }
             }
     )
+}
+
+private fun friendlyMemorySourceRes(memory: Memory): Int {
+    if (memory.isDocumentNode) return R.string.mate_memory_source_document
+    val source = memory.source.lowercase(Locale.ROOT)
+    return when {
+        "chat" in source || "conversation" in source || "summary" in source -> R.string.mate_memory_source_chat
+        "user" in source || "manual" in source -> R.string.mate_memory_source_manual
+        "import" in source || "file" in source || "web" in source -> R.string.mate_memory_source_import
+        else -> R.string.mate_memory_source_organized
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -248,4 +306,4 @@ fun BatchDeleteConfirmDialog(
             }
         }
     )
-} 
+}

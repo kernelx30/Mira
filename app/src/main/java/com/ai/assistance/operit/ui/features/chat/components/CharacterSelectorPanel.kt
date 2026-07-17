@@ -15,8 +15,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Groups
@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +83,7 @@ fun CharacterSelectorPanel(
     onOpenCharacterSettings: () -> Unit
 ) {
     val context = LocalContext.current
+    val showCharacterCount = LocalDensity.current.fontScale < 1.3f
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val characterGroupCardManager = remember { CharacterGroupCardManager.getInstance(context) }
     val activePromptManager = remember { ActivePromptManager.getInstance(context) }
@@ -162,22 +164,27 @@ fun CharacterSelectorPanel(
                                 text = context.getString(R.string.select_character),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                text = context.getString(R.string.character_count, allCards.size + allGroups.size),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            if (showCharacterCount) {
+                                Text(
+                                    text = context.getString(R.string.character_count, allCards.size + allGroups.size),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
                             Box {
                                 IconButton(
                                     onClick = { sortMenuExpanded = true },
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Sort,
+                                        imageVector = Icons.AutoMirrored.Filled.Sort,
                                         contentDescription = context.getString(R.string.character_card_sort),
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -189,13 +196,13 @@ fun CharacterSelectorPanel(
                                     modifier = Modifier
                                         .shadow(elevation = 12.dp, shape = RoundedCornerShape(12.dp))
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(Color.White)
+                                        .background(MaterialTheme.colorScheme.surfaceContainer)
                                 ) {
                                     DropdownMenuItem(
                                         text = {
                                             Text(
                                                 text = context.getString(R.string.character_card_sort_default),
-                                                color = Color(0xFF1F1F1F)
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                         },
                                         onClick = {
@@ -207,7 +214,7 @@ fun CharacterSelectorPanel(
                                         text = {
                                             Text(
                                                 text = context.getString(R.string.character_card_sort_by_name),
-                                                color = Color(0xFF1F1F1F)
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                         },
                                         onClick = {
@@ -219,7 +226,7 @@ fun CharacterSelectorPanel(
                                         text = {
                                             Text(
                                                 text = context.getString(R.string.character_card_sort_by_created),
-                                                color = Color(0xFF1F1F1F)
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                         },
                                         onClick = {
@@ -235,7 +242,7 @@ fun CharacterSelectorPanel(
                                     onOpenCharacterSettings()
                                     onDismiss()
                                 },
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Edit,
@@ -289,6 +296,22 @@ fun CharacterSelectorPanel(
                                     }
                                 )
                             }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = {
+                                onOpenCharacterSettings()
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Groups,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.manage_character_group_chat))
                         }
                     }
                 }

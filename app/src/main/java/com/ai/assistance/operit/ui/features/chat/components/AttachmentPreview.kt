@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
@@ -82,6 +85,8 @@ private fun AttachmentItem(attachment: AttachmentInfo, onRemove: () -> Unit, onI
     Box(
             modifier =
                     Modifier.clip(RoundedCornerShape(8.dp))
+                            .widthIn(min = 200.dp, max = 280.dp)
+                            .heightIn(min = 48.dp)
                             .border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
@@ -102,7 +107,7 @@ private fun AttachmentItem(attachment: AttachmentInfo, onRemove: () -> Unit, onI
             Spacer(modifier = Modifier.width(8.dp))
 
             // File info
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                         text = AttachmentUtils.getDisplayName(attachment),
                         style = MaterialTheme.typography.bodySmall,
@@ -122,10 +127,10 @@ private fun AttachmentItem(attachment: AttachmentInfo, onRemove: () -> Unit, onI
             Spacer(modifier = Modifier.width(8.dp))
 
             // Remove button
-            IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
+            IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
                 Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Remove attachment",
+                        contentDescription = stringResource(R.string.remove_attachment),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp)
                 )

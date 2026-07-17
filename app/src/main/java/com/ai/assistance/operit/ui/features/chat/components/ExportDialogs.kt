@@ -36,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ai.assistance.operit.core.subpack.ApkEditor
@@ -44,13 +43,15 @@ import com.ai.assistance.operit.core.subpack.ExeEditor
 import com.ai.assistance.operit.core.subpack.KeyStoreHelper
 import com.ai.assistance.operit.ui.common.rememberLocal
 import com.ai.assistance.operit.util.UriSerializer
+import com.ai.assistance.operit.util.OperitPaths
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 
 /** 导出选择对话框，用于选择导出平台 */
 @Composable
@@ -594,10 +595,10 @@ private fun createExportIconCropOptions(context: Context, sourceUri: Uri): CropI
 
         onPrimaryColor = if (isNightMode) android.graphics.Color.WHITE else android.graphics.Color.BLACK
     } catch (_: Exception) {
-        primaryColor = if (isNightMode) 0xFF9C27B0.toInt() else 0xFF6200EE.toInt()
-        statusBarColor = if (isNightMode) 0xFF7B1FA2.toInt() else 0xFF3700B3.toInt()
-        surfaceColor = if (isNightMode) android.graphics.Color.BLACK else android.graphics.Color.WHITE
-        onPrimaryColor = if (isNightMode) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+        primaryColor = if (isNightMode) 0xFF7ED5CE.toInt() else 0xFF167A75.toInt()
+        statusBarColor = if (isNightMode) 0xFF00504C.toInt() else 0xFF0E5D59.toInt()
+        surfaceColor = if (isNightMode) 0xFF111816.toInt() else 0xFFFFF8EE.toInt()
+        onPrimaryColor = if (isNightMode) 0xFF003735.toInt() else android.graphics.Color.WHITE
     }
 
     return CropImageContractOptions(
@@ -775,7 +776,7 @@ suspend fun exportAndroidApp(
         onComplete: (success: Boolean, filePath: String?, errorMessage: String?) -> Unit
 ) {
     try {
-        withContext(Dispatchers.IO) {
+        runInterruptible(Dispatchers.IO) {
             onProgress(0.1f, context.getString(R.string.export_prepare_base_apk))
 
             // 1. 初始化APK编辑器
@@ -807,17 +808,7 @@ suspend fun exportAndroidApp(
 
             // 7. 设置签名信息并执行签名
             onProgress(0.8f, context.getString(R.string.export_signing_apk))
-            // 使用下载目录下的Operit/exports子目录
-            val outputDir =
-                    File(
-                            android.os.Environment.getExternalStoragePublicDirectory(
-                                    android.os.Environment.DIRECTORY_DOWNLOADS
-                            ),
-                            "Operit/exports"
-                    )
-            if (!outputDir.exists()) {
-                outputDir.mkdirs()
-            }
+            val outputDir = OperitPaths.miraExportsDir()
 
             val outputName = "WebApp_${Date().time}.apk"
             val outputFile = File(outputDir, outputName)
@@ -843,12 +834,14 @@ suspend fun exportAndroidApp(
                 onProgress(1.0f, context.getString(R.string.export_completed))
                 onComplete(true, signedApk.absolutePath, null)
             } catch (e: Exception) {
+                runCatching { apkEditor.cleanup() }
+                if (e is CancellationException) throw e
                 AppLogger.e("ExportDialogs", "签名APK失败", e)
                 onComplete(false, null, context.getString(R.string.export_sign_apk_failed, e.message ?: ""))
-                apkEditor.cleanup() // 确保失败时也清理资源
             }
         }
     } catch (e: Exception) {
+        if (e is CancellationException) throw e
         AppLogger.e("ExportDialogs", "导出失败", e)
         onComplete(false, null, context.getString(R.string.export_failed_with_reason, e.message ?: ""))
     }
@@ -864,20 +857,10 @@ suspend fun exportWindowsApp(
         onComplete: (success: Boolean, filePath: String?, errorMessage: String?) -> Unit
 ) {
     try {
-        withContext(Dispatchers.IO) {
+        runInterruptible(Dispatchers.IO) {
             onProgress(0.1f, context.getString(R.string.export_prepare_windows_template))
 
-            // 创建输出目录 - 使用下载目录下的Operit/exports子目录
-            val outputDir =
-                    File(
-                            android.os.Environment.getExternalStoragePublicDirectory(
-                                    android.os.Environment.DIRECTORY_DOWNLOADS
-                            ),
-                            "Operit/exports"
-                    )
-            if (!outputDir.exists()) {
-                outputDir.mkdirs()
-            }
+            val outputDir = OperitPaths.miraExportsDir()
 
             // 创建临时工作目录
             val tempDir = File(context.cacheDir, "windows_export_temp")
@@ -929,6 +912,7 @@ suspend fun exportWindowsApp(
                             }
                             AppLogger.d("ExportDialogs", "已更换Windows应用图标")
                         } catch (e: Exception) {
+                            if (e is CancellationException) throw e
                             AppLogger.e("ExportDialogs", "更换Windows应用图标失败", e)
                             // 继续执行，不因图标失败而中断整个导出流程
                         }
@@ -975,6 +959,7 @@ suspend fun exportWindowsApp(
                 onProgress(1.0f, context.getString(R.string.export_completed))
                 onComplete(true, outputZip.absolutePath, null)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 AppLogger.e("ExportDialogs", "Windows应用导出过程失败", e)
                 onComplete(false, null, context.getString(R.string.export_process_failed, e.message ?: ""))
             } finally {
@@ -988,6 +973,7 @@ suspend fun exportWindowsApp(
             }
         }
     } catch (e: Exception) {
+        if (e is CancellationException) throw e
         AppLogger.e("ExportDialogs", "Windows应用导出失败", e)
         onComplete(false, null, context.getString(R.string.export_failed_with_reason, e.message ?: ""))
     }

@@ -45,6 +45,8 @@ class DisplayPreferencesManager private constructor(private val context: Context
         private val KEY_ENABLE_REPLY_NOTIFICATION_VIBRATION =
             booleanPreferencesKey("enable_reply_notification_vibration")
         private val KEY_ENABLE_ENTER_TO_SEND = booleanPreferencesKey("enable_enter_to_send")
+        private val KEY_ENABLE_AI_INPUT_SUGGESTION =
+            booleanPreferencesKey("enable_ai_input_suggestion")
         private val KEY_ENABLE_NAVIGATION_ANIMATION =
             booleanPreferencesKey("enable_navigation_animation")
         private val KEY_START_WITH_NEW_CHAT =
@@ -85,11 +87,11 @@ class DisplayPreferencesManager private constructor(private val context: Context
 
     /**
      * 是否启用回复通知
-     * 默认值：true
+     * 默认值：false，用户开启时再申请通知权限
      */
     val enableReplyNotification: Flow<Boolean> =
         context.displayPreferencesDataStore.data.map { preferences ->
-            preferences[KEY_ENABLE_REPLY_NOTIFICATION] ?: true
+            preferences[KEY_ENABLE_REPLY_NOTIFICATION] ?: false
         }
 
     /**
@@ -119,13 +121,18 @@ class DisplayPreferencesManager private constructor(private val context: Context
             preferences[KEY_ENABLE_ENTER_TO_SEND] ?: false
         }
 
+    val enableAiInputSuggestion: Flow<Boolean> =
+        context.displayPreferencesDataStore.data.map { preferences ->
+            preferences[KEY_ENABLE_AI_INPUT_SUGGESTION] ?: true
+        }
+
     /**
      * 是否启用新版导航动画
-     * 默认值：true
+     * 默认值：false
      */
     val enableNavigationAnimation: Flow<Boolean> =
         context.displayPreferencesDataStore.data.map { preferences ->
-            preferences[KEY_ENABLE_NAVIGATION_ANIMATION] ?: true
+            preferences[KEY_ENABLE_NAVIGATION_ANIMATION] ?: false
         }
 
     /**
@@ -207,6 +214,7 @@ class DisplayPreferencesManager private constructor(private val context: Context
         enableReplyNotificationSound: Boolean? = null,
         enableReplyNotificationVibration: Boolean? = null,
         enableEnterToSend: Boolean? = null,
+        enableAiInputSuggestion: Boolean? = null,
         enableNavigationAnimation: Boolean? = null,
         startWithNewChat: Boolean? = null,
         globalUserAvatarUri: String? = null,
@@ -231,6 +239,9 @@ class DisplayPreferencesManager private constructor(private val context: Context
                 preferences[KEY_ENABLE_REPLY_NOTIFICATION_VIBRATION] = it
             }
             enableEnterToSend?.let { preferences[KEY_ENABLE_ENTER_TO_SEND] = it }
+            enableAiInputSuggestion?.let {
+                preferences[KEY_ENABLE_AI_INPUT_SUGGESTION] = it
+            }
             enableNavigationAnimation?.let {
                 preferences[KEY_ENABLE_NAVIGATION_ANIMATION] = it
             }
@@ -299,10 +310,11 @@ class DisplayPreferencesManager private constructor(private val context: Context
     suspend fun resetDisplaySettings() {
         context.displayPreferencesDataStore.edit { preferences ->
             preferences[KEY_SHOW_FPS_COUNTER] = false
-            preferences[KEY_ENABLE_REPLY_NOTIFICATION] = true
+            preferences[KEY_ENABLE_REPLY_NOTIFICATION] = false
             preferences[KEY_ENABLE_REPLY_NOTIFICATION_SOUND] = false
             preferences[KEY_ENABLE_REPLY_NOTIFICATION_VIBRATION] = false
             preferences[KEY_ENABLE_ENTER_TO_SEND] = false
+            preferences[KEY_ENABLE_AI_INPUT_SUGGESTION] = true
             preferences.remove(KEY_ENABLE_NAVIGATION_ANIMATION)
             preferences[KEY_START_WITH_NEW_CHAT] = false
             preferences.remove(KEY_GLOBAL_USER_AVATAR_URI)

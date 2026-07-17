@@ -1,9 +1,14 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
 import android.app.DatePickerDialog as AndroidDatePickerDialog
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +23,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.ai.assistance.operit.ui.components.CustomScaffold
@@ -25,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,7 +39,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupProperties
 import com.ai.assistance.operit.data.model.PreferenceProfile
+import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
+import com.ai.assistance.operit.util.FileUtils
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
+import coil.compose.rememberAsyncImagePainter
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -50,11 +64,16 @@ fun UserPreferencesSettingsScreen(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val displayPreferencesManager = remember { DisplayPreferencesManager.getInstance(context) }
 
     // 获取所有配置文件
     val profileList by preferencesManager.profileListFlow.collectAsState(initial = emptyList())
     val activeProfileId by
             preferencesManager.activeProfileIdFlow.collectAsState(initial = "default")
+    val legacyGlobalUserAvatarUri by
+        displayPreferencesManager.globalUserAvatarUri.collectAsState(initial = null)
+    val legacyGlobalUserName by
+        displayPreferencesManager.globalUserName.collectAsState(initial = null)
 
     // 下拉菜单状态
     var isDropdownExpanded by remember { mutableStateOf(false) }
@@ -88,26 +107,99 @@ fun UserPreferencesSettingsScreen(
             preferencesManager.categoryLockStatusFlow.collectAsState(initial = emptyMap())
 
     // 对话框状态
-    var showAddProfileDialog by remember { mutableStateOf(false) }
-    var newProfileName by remember { mutableStateOf("") }
+    var showAddProfileDialog by rememberSaveable { mutableStateOf(false) }
+    var newProfileName by rememberSaveable { mutableStateOf("") }
     // 新增：删除确认弹窗状态
-    var showDeleteProfileDialog by remember { mutableStateOf(false) }
+    var showDeleteProfileDialog by rememberSaveable { mutableStateOf(false) }
     // 新增：重命名弹窗状态
-    var showRenameProfileDialog by remember { mutableStateOf(false) }
-    var editingProfileName by remember { mutableStateOf("") }
+    var showRenameProfileDialog by rememberSaveable { mutableStateOf(false) }
+    var editingProfileName by rememberSaveable { mutableStateOf("") }
 
     // 选中的配置文件
-    var selectedProfileId by remember { mutableStateOf(activeProfileId) }
+    var selectedProfileId by rememberSaveable { mutableStateOf(activeProfileId) }
     var selectedProfile by remember { mutableStateOf<PreferenceProfile?>(null) }
+    var hasSelectedProfileManually by rememberSaveable { mutableStateOf(false) }
 
     // 编辑状态
-    var editMode by remember { mutableStateOf(false) }
-    var editBirthDate by remember { mutableStateOf(0L) }
-    var editGender by remember { mutableStateOf("") }
-    var editPersonality by remember { mutableStateOf("") }
-    var editIdentity by remember { mutableStateOf("") }
-    var editOccupation by remember { mutableStateOf("") }
-    var editAiStyle by remember { mutableStateOf("") }
+    var editMode by rememberSaveable { mutableStateOf(false) }
+    var editDisplayName by rememberSaveable { mutableStateOf("") }
+    var editPreferredAddress by rememberSaveable { mutableStateOf("") }
+    var editPronouns by rememberSaveable { mutableStateOf("") }
+    var editBirthDate by rememberSaveable { mutableStateOf(0L) }
+    var editGender by rememberSaveable { mutableStateOf("") }
+    var editPersonality by rememberSaveable { mutableStateOf("") }
+    var editIdentity by rememberSaveable { mutableStateOf("") }
+    var editOccupation by rememberSaveable { mutableStateOf("") }
+    var editAiStyle by rememberSaveable { mutableStateOf("") }
+    var loadedEditProfileId by rememberSaveable { mutableStateOf<String?>(null) }
+    var avatarTargetProfileId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val cropUserAvatarLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        val targetProfileId = avatarTargetProfileId
+        val croppedUri = result.uriContent
+        if (result.isSuccessful && croppedUri != null && targetProfileId != null) {
+            scope.launch {
+                val profile = preferencesManager.getUserPreferencesFlow(targetProfileId).first()
+                val internalUri =
+                    FileUtils.copyFileToInternalStorage(
+                        context = context,
+                        uri = croppedUri,
+                        uniqueName = "user_avatar_${profile.id}",
+                    )
+                if (internalUri != null) {
+                    preferencesManager.updateProfile(profile.copy(avatarUri = internalUri.toString()))
+                    if (targetProfileId == activeProfileId) {
+                        displayPreferencesManager.saveDisplaySettings(
+                            globalUserAvatarUri = internalUri.toString(),
+                        )
+                    }
+                    Toast.makeText(context, context.getString(R.string.avatar_updated), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, context.getString(R.string.theme_copy_failed), Toast.LENGTH_LONG).show()
+                }
+                avatarTargetProfileId = null
+            }
+        } else if (result.error != null) {
+            avatarTargetProfileId = null
+            Toast.makeText(
+                context,
+                context.getString(R.string.avatar_crop_failed, result.error?.message.orEmpty()),
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    fun launchUserAvatarCrop(uri: Uri) {
+        cropUserAvatarLauncher.launch(
+            CropImageContractOptions(
+                uri,
+                CropImageOptions().apply {
+                    guidelines = CropImageView.Guidelines.ON
+                    outputCompressFormat = android.graphics.Bitmap.CompressFormat.PNG
+                    outputCompressQuality = 90
+                    fixAspectRatio = true
+                    aspectRatioX = 1
+                    aspectRatioY = 1
+                    cropMenuCropButtonTitle = context.getString(R.string.theme_crop_done)
+                    activityTitle = context.getString(R.string.crop_avatar)
+                },
+            )
+        )
+    }
+
+    val userAvatarPickerLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                launchUserAvatarCrop(uri)
+            } else {
+                avatarTargetProfileId = null
+            }
+        }
+
+    fun pickUserAvatar(profileId: String) {
+        avatarTargetProfileId = profileId
+        userAvatarPickerLauncher.launch("image/*")
+    }
 
     // 日期选择器状态
     val dateFormatter = SimpleDateFormat(stringResource(R.string.date_format_chinese), Locale.getDefault())
@@ -115,17 +207,32 @@ fun UserPreferencesSettingsScreen(
     // 动画状态
     val listState = rememberLazyListState()
 
+    LaunchedEffect(activeProfileId, profileList) {
+        if (!hasSelectedProfileManually && activeProfileId in profileList) {
+            selectedProfileId = activeProfileId
+        }
+    }
+
     // 加载选中的配置文件
     LaunchedEffect(selectedProfileId) {
         preferencesManager.getUserPreferencesFlow(selectedProfileId).collect { profile ->
             selectedProfile = profile
-            // 初始化编辑字段
-            editBirthDate = profile.birthDate
-            editGender = profile.gender
-            editPersonality = profile.personality
-            editIdentity = profile.identity
-            editOccupation = profile.occupation
-            editAiStyle = profile.aiStyle
+            // Avatar updates also emit this flow. Preserve unsaved text while the profile is edited.
+            if (!editMode || loadedEditProfileId != profile.id) {
+                editDisplayName =
+                    profile.displayName.ifBlank {
+                        if (profile.id == activeProfileId) legacyGlobalUserName.orEmpty() else ""
+                    }
+                editPreferredAddress = profile.preferredAddress
+                editPronouns = profile.pronouns
+                editBirthDate = profile.birthDate
+                editGender = profile.gender
+                editPersonality = profile.personality
+                editIdentity = profile.identity
+                editOccupation = profile.occupation
+                editAiStyle = profile.aiStyle
+                loadedEditProfileId = profile.id
+            }
         }
     }
 
@@ -135,14 +242,27 @@ fun UserPreferencesSettingsScreen(
             selectedProfile?.let { profile ->
                 preferencesManager.updateProfileCategory(
                     profileId = profile.id,
+                    displayName = editDisplayName.trim(),
+                    preferredAddress = editPreferredAddress.trim(),
+                    pronouns = editPronouns.trim(),
                     birthDate = editBirthDate,
-                    gender = editGender.takeIf { it.isNotBlank() },
-                    personality = editPersonality.takeIf { it.isNotBlank() },
-                    identity = editIdentity.takeIf { it.isNotBlank() },
-                    occupation = editOccupation.takeIf { it.isNotBlank() },
-                    aiStyle = editAiStyle.takeIf { it.isNotBlank() }
+                    gender = editGender.trim(),
+                    personality = editPersonality.trim(),
+                    identity = editIdentity.trim(),
+                    occupation = editOccupation.trim(),
+                    aiStyle = editAiStyle.trim(),
                 )
+                if (profile.id == activeProfileId) {
+                    displayPreferencesManager.saveDisplaySettings(
+                        globalUserName = editDisplayName.trim(),
+                    )
+                }
                 editMode = false
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.settings_saved),
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
         }
     }
@@ -251,7 +371,7 @@ fun UserPreferencesSettingsScreen(
                                             BorderStroke(0.8.dp, MaterialTheme.colorScheme.primary),
                                     contentPadding =
                                             PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(28.dp),
+                                    modifier = Modifier.heightIn(min = 48.dp),
                                     colors =
                                             ButtonDefaults.outlinedButtonColors(
                                                     contentColor = MaterialTheme.colorScheme.primary
@@ -336,9 +456,9 @@ fun UserPreferencesSettingsScreen(
                         }
 
                         // 操作按钮
-                        Row(
-                                modifier = Modifier.padding(top = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        Column(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
                             // 激活按钮
                             if (!isActive) {
@@ -351,7 +471,7 @@ fun UserPreferencesSettingsScreen(
                                             }
                                         },
                                         contentPadding = PaddingValues(horizontal = 12.dp),
-                                        modifier = Modifier.height(36.dp)
+                                        modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
                                     Icon(
                                             Icons.Default.Check,
@@ -371,7 +491,7 @@ fun UserPreferencesSettingsScreen(
                                             showRenameProfileDialog = true
                                         },
                                         contentPadding = PaddingValues(horizontal = 12.dp),
-                                        modifier = Modifier.height(36.dp)
+                                        modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
                                     Icon(
                                             Icons.Default.Edit,
@@ -395,7 +515,7 @@ fun UserPreferencesSettingsScreen(
                                                         contentColor =
                                                                 MaterialTheme.colorScheme.error
                                                 ),
-                                        modifier = Modifier.height(36.dp)
+                                        modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
                                     Icon(
                                             Icons.Default.Delete,
@@ -472,6 +592,7 @@ fun UserPreferencesSettingsScreen(
                                                     }
                                                 } else null,
                                         onClick = {
+                                            hasSelectedProfileManually = true
                                             selectedProfileId = profileId
                                             isDropdownExpanded = false
                                             editMode = false
@@ -519,11 +640,9 @@ fun UserPreferencesSettingsScreen(
                                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
                             Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-                                // 标题和引导按钮
-                                Row(
+                                // Keep the configuration label and guide readable on narrow screens.
+                                Column(
                                         modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
@@ -534,9 +653,16 @@ fun UserPreferencesSettingsScreen(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                                text = "${profile.name}",
+                                                text =
+                                                    stringResource(
+                                                        R.string.mira_profile_config_name,
+                                                        profile.name,
+                                                    ),
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f),
                                         )
                                     }
 
@@ -557,7 +683,10 @@ fun UserPreferencesSettingsScreen(
                                                                 horizontal = 10.dp,
                                                                 vertical = 6.dp
                                                         ),
-                                                modifier = Modifier.height(32.dp)
+                                                modifier =
+                                                    Modifier
+                                                        .align(Alignment.End)
+                                                        .heightIn(min = 48.dp)
                                         ) {
                                             Icon(
                                                     Icons.Default.Assistant,
@@ -575,6 +704,221 @@ fun UserPreferencesSettingsScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
+                                    item(key = "mira_user_profile") {
+                                        val effectiveAvatarUri =
+                                            profile.avatarUri.ifBlank {
+                                                if (profile.id == activeProfileId) {
+                                                    legacyGlobalUserAvatarUri.orEmpty()
+                                                } else {
+                                                    ""
+                                                }
+                                            }
+                                        val effectiveDisplayName =
+                                            profile.displayName.ifBlank {
+                                                if (profile.id == activeProfileId) {
+                                                    legacyGlobalUserName.orEmpty()
+                                                } else {
+                                                    ""
+                                                }
+                                            }
+                                        Column(
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = 8.dp, bottom = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.mira_my_profile),
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.weight(1f),
+                                                )
+                                                TextButton(
+                                                    onClick = {
+                                                        if (editMode) {
+                                                            saveUserPreferences()
+                                                        } else {
+                                                            editMode = true
+                                                        }
+                                                    },
+                                                    modifier = Modifier.heightIn(min = 48.dp),
+                                                ) {
+                                                    Icon(
+                                                        imageVector =
+                                                            if (editMode) Icons.Default.Save
+                                                            else Icons.Default.Edit,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(20.dp),
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        if (editMode) stringResource(R.string.save_action)
+                                                        else stringResource(R.string.edit_profile)
+                                                    )
+                                                }
+                                            }
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            ) {
+                                                Box(
+                                                    modifier =
+                                                        Modifier
+                                                            .size(72.dp)
+                                                            .clip(CircleShape)
+                                                            .clickable {
+                                                                pickUserAvatar(profile.id)
+                                                            },
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    if (effectiveAvatarUri.isNotBlank()) {
+                                                        Image(
+                                                            painter =
+                                                                rememberAsyncImagePainter(
+                                                                    model = Uri.parse(effectiveAvatarUri)
+                                                                ),
+                                                            contentDescription = stringResource(R.string.mira_user_avatar),
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            contentScale = ContentScale.Crop,
+                                                        )
+                                                    } else {
+                                                        Surface(
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                                        ) {
+                                                            Box(contentAlignment = Alignment.Center) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Person,
+                                                                    contentDescription = null,
+                                                                    modifier = Modifier.size(32.dp),
+                                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                    Surface(
+                                                        modifier =
+                                                            Modifier
+                                                                .align(Alignment.BottomEnd)
+                                                                .size(26.dp),
+                                                        shape = CircleShape,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.PhotoCamera,
+                                                                contentDescription = stringResource(R.string.mira_change_avatar),
+                                                                modifier = Modifier.size(15.dp),
+                                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                Column(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                                ) {
+                                                    Text(
+                                                        text =
+                                                            effectiveDisplayName.ifBlank {
+                                                                stringResource(R.string.mira_name_not_set)
+                                                            },
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                    Text(
+                                                        text =
+                                                            profile.preferredAddress.ifBlank {
+                                                                stringResource(R.string.mira_address_not_set)
+                                                            },
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        TextButton(
+                                                            onClick = {
+                                                                pickUserAvatar(profile.id)
+                                                            },
+                                                            contentPadding = PaddingValues(horizontal = 0.dp),
+                                                            modifier = Modifier.heightIn(min = 48.dp),
+                                                        ) {
+                                                            Text(stringResource(R.string.mira_change_avatar))
+                                                        }
+                                                        if (effectiveAvatarUri.isNotBlank()) {
+                                                            IconButton(
+                                                                onClick = {
+                                                                    scope.launch {
+                                                                        preferencesManager.updateProfile(
+                                                                            profile.copy(avatarUri = "")
+                                                                        )
+                                                                        if (profile.id == activeProfileId) {
+                                                                            displayPreferencesManager.saveDisplaySettings(
+                                                                                globalUserAvatarUri = ""
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                },
+                                                                modifier = Modifier.size(48.dp),
+                                                            ) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.Delete,
+                                                                    contentDescription = stringResource(R.string.mira_remove_avatar),
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            if (editMode) {
+                                                OutlinedTextField(
+                                                    value = editDisplayName,
+                                                    onValueChange = { editDisplayName = it },
+                                                    label = { Text(stringResource(R.string.mira_my_name)) },
+                                                    placeholder = { Text(stringResource(R.string.mira_my_name_hint)) },
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                )
+                                                OutlinedTextField(
+                                                    value = editPreferredAddress,
+                                                    onValueChange = { editPreferredAddress = it },
+                                                    label = { Text(stringResource(R.string.mira_preferred_address)) },
+                                                    placeholder = {
+                                                        Text(stringResource(R.string.mira_preferred_address_hint))
+                                                    },
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                )
+                                                OutlinedTextField(
+                                                    value = editPronouns,
+                                                    onValueChange = { editPronouns = it },
+                                                    label = { Text(stringResource(R.string.mira_pronouns)) },
+                                                    placeholder = { Text(stringResource(R.string.mira_pronouns_hint)) },
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                )
+                                            } else if (profile.pronouns.isNotBlank()) {
+                                                Text(
+                                                    text = stringResource(R.string.mira_pronouns_value, profile.pronouns),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                            HorizontalDivider()
+                                        }
+                                    }
+
                                     // 出生日期
                                     item {
                                         ModernPreferenceCategoryItem(
@@ -655,7 +999,7 @@ fun UserPreferencesSettingsScreen(
                                     // 身份认同
                                     item {
                                         ModernPreferenceCategoryItem(
-                                                title = stringResource(R.string.identity),
+                                                title = stringResource(R.string.mira_user_identity),
                                                 value = profile.identity.ifEmpty { stringResource(R.string.not_set) },
                                                 editValue = editIdentity,
                                                 onValueChange = { editIdentity = it },
@@ -1008,14 +1352,14 @@ fun ProfileItem(
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                            modifier = Modifier.height(28.dp)
+                            modifier = Modifier.heightIn(min = 48.dp)
                     ) { Text(stringResource(R.string.activate_action), style = MaterialTheme.typography.labelMedium, fontSize = 13.sp) }
                 }
 
                 if (onDelete != null) {
                     IconButton(
                             onClick = onDelete,
-                            modifier = Modifier.size(28.dp).clip(CircleShape)
+                            modifier = Modifier.size(48.dp).clip(CircleShape)
                     ) {
                         Icon(
                                 Icons.Default.Delete,

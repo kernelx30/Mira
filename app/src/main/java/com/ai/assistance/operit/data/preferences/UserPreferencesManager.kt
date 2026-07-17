@@ -260,6 +260,8 @@ class UserPreferencesManager private constructor(private val context: Context) {
 
         const val INPUT_STYLE_CLASSIC = "classic"
         const val INPUT_STYLE_AGENT = "agent"
+        const val DEFAULT_CHAT_STYLE = CHAT_STYLE_BUBBLE
+        const val DEFAULT_INPUT_STYLE = INPUT_STYLE_CLASSIC
         const val BUBBLE_IMAGE_RENDER_MODE_TILED_NINE_SLICE = "tiled_nine_slice"
         const val BUBBLE_IMAGE_RENDER_MODE_NINE_PATCH = "nine_patch"
 
@@ -529,7 +531,7 @@ class UserPreferencesManager private constructor(private val context: Context) {
 
     val chatInputFloating: Flow<Boolean> =
             context.userPreferencesDataStore.data.map { preferences ->
-                preferences[CHAT_INPUT_FLOATING] ?: false
+                preferences[CHAT_INPUT_FLOATING] ?: true
             }
 
     val chatInputLiquidGlass: Flow<Boolean> =
@@ -580,12 +582,12 @@ class UserPreferencesManager private constructor(private val context: Context) {
     // Chat style preference
     val chatStyle: Flow<String> =
             context.userPreferencesDataStore.data.map { preferences ->
-                preferences[CHAT_STYLE] ?: CHAT_STYLE_CURSOR
+                preferences[CHAT_STYLE] ?: DEFAULT_CHAT_STYLE
             }
 
     val inputStyle: Flow<String> =
             context.userPreferencesDataStore.data.map { preferences ->
-                preferences[INPUT_STYLE] ?: INPUT_STYLE_AGENT
+                preferences[INPUT_STYLE] ?: DEFAULT_INPUT_STYLE
             }
 
     val bubbleShowAvatar: Flow<Boolean> =
@@ -889,7 +891,7 @@ class UserPreferencesManager private constructor(private val context: Context) {
 
     val showMessageTimestamp: Flow<Boolean> =
         context.userPreferencesDataStore.data.map { preferences ->
-            preferences[KEY_SHOW_MESSAGE_TIMESTAMP] ?: false
+            preferences[KEY_SHOW_MESSAGE_TIMESTAMP] ?: true
         }
 
     val customUserAvatarUri: Flow<String?> =
@@ -1652,6 +1654,10 @@ class UserPreferencesManager private constructor(private val context: Context) {
                 PreferenceProfile(
                         id = profileId,
                         name = name,
+                        displayName = "",
+                        preferredAddress = "",
+                        pronouns = "",
+                        avatarUri = "",
                         birthDate = 0L,
                         gender = "",
                         occupation = "",
@@ -1706,6 +1712,10 @@ class UserPreferencesManager private constructor(private val context: Context) {
     // 更新配置文件中的特定分类
     suspend fun updateProfileCategory(
             profileId: String = "",
+            displayName: String? = null,
+            preferredAddress: String? = null,
+            pronouns: String? = null,
+            avatarUri: String? = null,
             birthDate: Long? = null,
             gender: String? = null,
             personality: String? = null,
@@ -1726,6 +1736,10 @@ class UserPreferencesManager private constructor(private val context: Context) {
         // 检查每个分类的锁定状态，如果锁定则不更新
         val updatedProfile =
                 currentProfile.copy(
+                        displayName = displayName ?: currentProfile.displayName,
+                        preferredAddress = preferredAddress ?: currentProfile.preferredAddress,
+                        pronouns = pronouns ?: currentProfile.pronouns,
+                        avatarUri = avatarUri ?: currentProfile.avatarUri,
                         birthDate =
                                 if (birthDate != null && !isCategoryLocked("birthDate")) birthDate
                                 else currentProfile.birthDate,
@@ -2117,11 +2131,11 @@ class UserPreferencesManager private constructor(private val context: Context) {
             chatHeaderTransparent = booleanValue(CHAT_HEADER_TRANSPARENT, false),
             chatHeaderOverlayMode = booleanValue(CHAT_HEADER_OVERLAY_MODE, false),
             chatInputTransparent = booleanValue(CHAT_INPUT_TRANSPARENT, false),
-            chatInputFloating = booleanValue(CHAT_INPUT_FLOATING, false),
+            chatInputFloating = booleanValue(CHAT_INPUT_FLOATING, true),
             chatInputLiquidGlass = booleanValue(CHAT_INPUT_LIQUID_GLASS, false),
             chatInputWaterGlass = booleanValue(CHAT_INPUT_WATER_GLASS, false),
-            chatStyle = stringValue(CHAT_STYLE, CHAT_STYLE_CURSOR) ?: CHAT_STYLE_CURSOR,
-            inputStyle = stringValue(INPUT_STYLE, INPUT_STYLE_AGENT) ?: INPUT_STYLE_AGENT,
+            chatStyle = stringValue(CHAT_STYLE, DEFAULT_CHAT_STYLE) ?: DEFAULT_CHAT_STYLE,
+            inputStyle = stringValue(INPUT_STYLE, DEFAULT_INPUT_STYLE) ?: DEFAULT_INPUT_STYLE,
             bubbleShowAvatar = booleanValue(BUBBLE_SHOW_AVATAR, true),
             bubbleWideLayoutEnabled = booleanValue(BUBBLE_WIDE_LAYOUT_ENABLED, false),
             cursorUserBubbleFollowTheme = booleanValue(CURSOR_USER_BUBBLE_FOLLOW_THEME, true),
@@ -2163,7 +2177,7 @@ class UserPreferencesManager private constructor(private val context: Context) {
             showUserName = booleanValue(KEY_SHOW_USER_NAME, true),
             showMessageTokenStats = booleanValue(KEY_SHOW_MESSAGE_TOKEN_STATS, false),
             showMessageTimingStats = booleanValue(KEY_SHOW_MESSAGE_TIMING_STATS, false),
-            showMessageTimestamp = booleanValue(KEY_SHOW_MESSAGE_TIMESTAMP, false),
+            showMessageTimestamp = booleanValue(KEY_SHOW_MESSAGE_TIMESTAMP, true),
             showInputProcessingStatus = booleanValue(KEY_SHOW_INPUT_PROCESSING_STATUS, true)
         )
     }

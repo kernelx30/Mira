@@ -419,8 +419,14 @@ class ChatHistoryManager private constructor(private val context: Context) {
             parentChatId = this.parentChatId, // 映射parentChatId字段
             characterCardName = this.characterCardName, // 映射characterCardName字段
             characterGroupId = this.characterGroupId, // 映射characterGroupId字段
+            chatModelConfigId = this.chatModelConfigId,
+            chatModelIndex = this.chatModelIndex,
+            memoryAutoUpdateOverride = this.memoryAutoUpdateOverride,
+            autoReadOverride = this.autoReadOverride,
+            isTemporary = this.isTemporary,
             locked = this.locked,
-            pinned = this.pinned
+            pinned = this.pinned,
+            archived = this.archived,
         )
     }
 
@@ -635,6 +641,17 @@ class ChatHistoryManager private constructor(private val context: Context) {
                 chatDao.updateChatPinned(chatId, pinned)
             } catch (e: Exception) {
                 AppLogger.e(TAG, "Failed to update chat pinned state for chat $chatId", e)
+                throw e
+            }
+        }
+    }
+
+    suspend fun updateChatArchived(chatId: String, archived: Boolean) {
+        chatMutex(chatId).withLock {
+            try {
+                chatDao.updateChatArchived(chatId, archived)
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Failed to update chat archived state for chat $chatId", e)
                 throw e
             }
         }
@@ -1428,6 +1445,11 @@ class ChatHistoryManager private constructor(private val context: Context) {
         inheritGroupFromChatId: String? = null,
         characterCardName: String? = null,
         characterGroupId: String? = null,
+        chatModelConfigId: String? = null,
+        chatModelIndex: Int = 0,
+        memoryAutoUpdateOverride: Boolean? = null,
+        autoReadOverride: Boolean? = null,
+        isTemporary: Boolean = false,
         setAsCurrentChat: Boolean = true
     ): ChatHistory {
         val dateTime = LocalDateTime.now()
@@ -1452,13 +1474,18 @@ class ChatHistoryManager private constructor(private val context: Context) {
 
         val newHistory =
             ChatHistory(
-                title = "${localizedContext.getString(R.string.new_conversation)} $formattedTime",
+                title = "${localizedContext.getString(if (isTemporary) R.string.temporary_conversation else R.string.new_conversation)} $formattedTime",
                 messages = listOf<ChatMessage>(),
                 inputTokens = 0,
                 outputTokens = 0,
                 group = finalGroup,
                 characterCardName = characterCardName, // 使用传入的角色卡名称，如果为null则不绑定
-                characterGroupId = characterGroupId // 绑定群组角色卡ID（可选）
+                characterGroupId = characterGroupId, // 绑定群组角色卡ID（可选）
+                chatModelConfigId = chatModelConfigId,
+                chatModelIndex = chatModelIndex.coerceAtLeast(0),
+                memoryAutoUpdateOverride = memoryAutoUpdateOverride,
+                autoReadOverride = autoReadOverride,
+                isTemporary = isTemporary,
             )
 
         // 保存新聊天
@@ -1770,8 +1797,14 @@ class ChatHistoryManager private constructor(private val context: Context) {
                         parentChatId = entity.parentChatId,
                         characterCardName = entity.characterCardName,
                         characterGroupId = entity.characterGroupId,
+                        chatModelConfigId = entity.chatModelConfigId,
+                        chatModelIndex = entity.chatModelIndex,
+                        memoryAutoUpdateOverride = entity.memoryAutoUpdateOverride,
+                        autoReadOverride = entity.autoReadOverride,
+                        isTemporary = entity.isTemporary,
                         locked = entity.locked,
-                        pinned = entity.pinned
+                        pinned = entity.pinned,
+                        archived = entity.archived,
                     )
                 }
             } catch (e: Exception) {
@@ -1811,8 +1844,14 @@ class ChatHistoryManager private constructor(private val context: Context) {
                     parentChatId = entity.parentChatId,
                     characterCardName = entity.characterCardName,
                     characterGroupId = entity.characterGroupId,
+                    chatModelConfigId = entity.chatModelConfigId,
+                    chatModelIndex = entity.chatModelIndex,
+                    memoryAutoUpdateOverride = entity.memoryAutoUpdateOverride,
+                    autoReadOverride = entity.autoReadOverride,
+                    isTemporary = entity.isTemporary,
                     locked = entity.locked,
-                    pinned = entity.pinned
+                    pinned = entity.pinned,
+                    archived = entity.archived,
                 )
             }
         }
@@ -1824,6 +1863,28 @@ class ChatHistoryManager private constructor(private val context: Context) {
      */
     suspend fun exportChatHistoriesToDownloads(): String? =
         exportChatHistoriesToDownloads(ExportFormat.JSON)
+
+    suspend fun exportChatToDownloads(chatId: String): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val basicHistory = chatHistoriesFlow.first().firstOrNull { it.id == chatId } ?: return@withContext null
+                val history = loadDisplayHistory(basicHistory)
+                val exportDir = OperitBackupDirs.chatDir()
+                val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
+                val safeTitle =
+                    history.title
+                        .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                        .trim()
+                        .take(50)
+                        .ifBlank { "Mira_chat" }
+                val file = File(exportDir, "${safeTitle}_$timestamp.md")
+                file.writeText(MarkdownExporter.exportSingle(context, history))
+                file.absolutePath
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Failed to export chat $chatId", e)
+                null
+            }
+        }
 
     /**
      * 导出所有聊天记录到「下载/Operit」目录（支持多种格式）
@@ -2452,6 +2513,26 @@ class ChatHistoryManager private constructor(private val context: Context) {
                 AppLogger.e(TAG, "Failed to update chat character binding for chat $chatId", e)
                 throw e
             }
+        }
+    }
+
+    suspend fun updateChatSessionControls(
+        chatId: String,
+        modelConfigId: String?,
+        modelIndex: Int,
+        memoryAutoUpdateOverride: Boolean?,
+        autoReadOverride: Boolean?,
+        isTemporary: Boolean,
+    ) {
+        chatMutex(chatId).withLock {
+            chatDao.updateChatSessionControls(
+                chatId = chatId,
+                modelConfigId = modelConfigId?.trim()?.takeIf { it.isNotEmpty() },
+                modelIndex = modelIndex.coerceAtLeast(0),
+                memoryAutoUpdateOverride = memoryAutoUpdateOverride,
+                autoReadOverride = autoReadOverride,
+                isTemporary = isTemporary,
+            )
         }
     }
 

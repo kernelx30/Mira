@@ -7,6 +7,7 @@ import com.ai.assistance.operit.data.preferences.SpeechServicesPreferences
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.HttpLogSanitizer
 import java.io.File
+import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.URLEncoder
@@ -49,9 +50,25 @@ open class HttpVoiceProvider(
 
     private var httpConfig: SpeechServicesPreferences.TtsHttpConfig = SpeechServicesPreferences.DEFAULT_HTTP_TTS_PRESET
 
+    override val capabilities: VoiceCapabilities
+        get() {
+            val template = httpConfig.urlTemplate + "\n" + httpConfig.requestBody
+            fun containsPlaceholder(name: String): Boolean =
+                template.contains("{$name}", ignoreCase = true)
+            return VoiceCapabilities(
+                supportsEmotion = containsPlaceholder("emotion") || containsPlaceholder("intensity"),
+                supportsStyleInstruction =
+                    containsPlaceholder("style") || containsPlaceholder("instruction"),
+                supportsRate = containsPlaceholder("rate") || containsPlaceholder("speed"),
+                supportsPitch = containsPlaceholder("pitch"),
+                supportsSsml =
+                    containsPlaceholder("pause_style") || containsPlaceholder("delivery"),
+            )
+        }
+
     companion object {
         private const val TAG = "HttpVoiceProvider"
-        private const val DEFAULT_TIMEOUT = 10 // 10秒超时
+        private const val DEFAULT_TIMEOUT = 60
         private const val SPEECH_PREVIEW_MAX = 48
     }
 
@@ -221,13 +238,18 @@ open class HttpVoiceProvider(
         val prefs = SpeechServicesPreferences(context.applicationContext)
         val effectiveRate = request.rate ?: prefs.ttsSpeechRateFlow.first()
         val effectivePitch = request.pitch ?: prefs.ttsPitchFlow.first()
+        val usesLocalPlaybackParams =
+            request.extraParams[QueuedTtsPlayback.EXTRA_APPLY_LOCAL_PLAYBACK_PARAMS]
+                ?.equals("true", ignoreCase = true) == true
+        val synthesisRate = if (usesLocalPlaybackParams) 1f else effectiveRate
+        val synthesisPitch = if (usesLocalPlaybackParams) 1f else effectivePitch
 
         try {
             // 生成缓存键
             val cacheKey = generateCacheKey(
                 request.text,
-                effectiveRate,
-                effectivePitch,
+                synthesisRate,
+                synthesisPitch,
                 currentVoiceId,
                 request.extraParams
             )
@@ -237,8 +259,8 @@ open class HttpVoiceProvider(
             if (audioFile == null || !audioFile.exists()) {
                 audioFile = fetchAudioFromServer(
                     request.text,
-                    effectiveRate,
-                    effectivePitch,
+                    synthesisRate,
+                    synthesisPitch,
                     currentVoiceId,
                     request.extraParams
                 )
@@ -634,6 +656,10 @@ open class HttpVoiceProvider(
                         PipelineValue.Binary(decodeBase64Value(current, index))
                     }
 
+                    HttpTtsResponsePipelineStep.TYPE_JSON_LINES_BASE64_CONCAT -> {
+                        PipelineValue.Binary(concatJsonLineAudio(current, index))
+                    }
+
                     else -> {
                         throw TtsException(
                             context.getString(
@@ -650,6 +676,39 @@ open class HttpVoiceProvider(
             is PipelineValue.Binary -> current.payload
             else -> throw TtsException(context.getString(R.string.http_tts_response_pipeline_final_not_audio))
         }
+    }
+
+    private fun concatJsonLineAudio(current: PipelineValue, stepIndex: Int): BinaryPayload {
+        val payload = (current as? PipelineValue.Binary)?.payload
+            ?: throw TtsException(
+                context.getString(
+                    R.string.http_tts_response_pipeline_step_type_mismatch,
+                    stepIndex + 1,
+                    HttpTtsResponsePipelineStep.TYPE_JSON_LINES_BASE64_CONCAT,
+                    "binary",
+                )
+            )
+        val output = ByteArrayOutputStream()
+
+        payload.bytes.toString(payload.charset).lineSequence().forEach { rawLine ->
+            val line = rawLine.trim().removePrefix("data:").trim()
+            if (line.isEmpty()) return@forEach
+            val item = runCatching { jsonParser.parseToJsonElement(line) as JsonObject }
+                .getOrElse { error ->
+                    throw TtsException("Streaming TTS returned invalid JSON", cause = error)
+                }
+            val code = item["code"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+            if (code != null && code != 0 && code != 20_000_000) {
+                val message = item["message"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                throw TtsException("Streaming TTS failed with code $code: $message")
+            }
+            item["data"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { output.write(Base64.decode(it, Base64.DEFAULT)) }
+        }
+
+        if (output.size() == 0) throw TtsException("Streaming TTS returned no audio data")
+        return BinaryPayload(output.toByteArray(), "audio/mpeg", Charsets.UTF_8)
     }
 
     private fun parseJsonPayload(current: PipelineValue, stepIndex: Int): JsonElement {

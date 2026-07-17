@@ -29,6 +29,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+internal fun remainingAttachmentsAfterConsume(
+    current: List<AttachmentInfo>,
+    consumed: List<AttachmentInfo>,
+): List<AttachmentInfo> {
+    if (current.isEmpty() || consumed.isEmpty()) return current
+    val consumedSet = consumed.toHashSet()
+    return current.filterNot(consumedSet::contains)
+}
+
 /**
  * Manages attachment operations for the chat feature Handles adding, removing, and referencing
  * attachments
@@ -562,6 +571,13 @@ class AttachmentDelegate(private val context: Context, private val toolHandler: 
     fun clearAttachments() {
         synchronized(attachmentListLock) {
             _attachments.value = emptyList()
+        }
+    }
+
+    /** Removes only the exact attachments captured by a completed send. */
+    fun consumeAttachments(expected: List<AttachmentInfo>) {
+        synchronized(attachmentListLock) {
+            _attachments.value = remainingAttachmentsAfterConsume(_attachments.value, expected)
         }
     }
 
