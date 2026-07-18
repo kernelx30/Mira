@@ -1039,7 +1039,9 @@ fun AboutScreen(
 
             item {
                 Text(
-                    text = stringResource(id = R.string.about_copyright),
+                    text =
+                        "Copyright (C) 2026 kernelx30 \u00B7 " +
+                            stringResource(id = R.string.about_copyright),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
