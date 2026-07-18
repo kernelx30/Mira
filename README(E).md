@@ -27,7 +27,7 @@
 > Mira is currently in the `0.1.x` release-candidate phase. Only APKs published in this repository's Releases with the project's retained signing key are official builds.
 
 > [!TIP]
-> Mira QQ community group: `1070153809`. In the app, open `Settings → Community and Project → Join Mira Home`.
+> [Join the Mira QQ community group](https://qun.qq.com/universal-share/share?ac=1&authKey=T1QUgCwcBvZgzJ8p%2B1cG723go8dbe8EtOC35wtUQiFkjoyg88AfApHet%2F6VerSL2&busi_data=eyJncm91cENvZGUiOiIxMDcwMTUzODA5IiwidG9rZW4iOiJ3WlBoa3BRNVFxQ3dEVC9ld0JDNTNoY3d1QlNyMnRlR3gvdlhZNEtZbUFrc2UxQ1JUeFZhb1Q2dGFmRUpDY0xYIiwidWluIjoiNDgyNzM0MTE5In0%3D&data=QaDcQk3MDx_wS59qrWDZXsmhCGW7cSQq_JR31WvZfb5cGWQtn1PnwSW3Asblpq4zaqyuUmAh0WiFSHjUVphX2A&svctype=4&tempid=h5_group_info), group number: `1070153809`. In the app, open `Settings → Community and Project → Join Mira Home`.
 
 ## What Mira Is
 

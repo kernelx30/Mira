@@ -29,7 +29,7 @@
 > Mira 当前处于 `0.1.x` 发布候选阶段。仓库 Release 中由固定签名发布的 APK 才是公开版本；聊天群、网盘和第三方站点里的改包不属于项目发布物。
 
 > [!TIP]
-> Mira QQ 交流群：`1070153809`。软件内入口：`设置 → 社区与项目 → 加入 Mira 小窝`。
+> [加入 Mira QQ 交流群](https://qun.qq.com/universal-share/share?ac=1&authKey=T1QUgCwcBvZgzJ8p%2B1cG723go8dbe8EtOC35wtUQiFkjoyg88AfApHet%2F6VerSL2&busi_data=eyJncm91cENvZGUiOiIxMDcwMTUzODA5IiwidG9rZW4iOiJ3WlBoa3BRNVFxQ3dEVC9ld0JDNTNoY3d1QlNyMnRlR3gvdlhZNEtZbUFrc2UxQ1JUeFZhb1Q2dGFmRUpDY0xYIiwidWluIjoiNDgyNzM0MTE5In0%3D&data=QaDcQk3MDx_wS59qrWDZXsmhCGW7cSQq_JR31WvZfb5cGWQtn1PnwSW3Asblpq4zaqyuUmAh0WiFSHjUVphX2A&svctype=4&tempid=h5_group_info)，群号：`1070153809`。软件内入口：`设置 → 社区与项目 → 加入 Mira 小窝`。
 
 ## Mira 是什么
 
