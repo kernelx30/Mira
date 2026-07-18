@@ -11,6 +11,8 @@ on:
       - "docs/assets/README_examples/mira/**"
       - "market/**"
       - ".github/workflows/pages.yml"
+  schedule:
+    - cron: "23 2 * * *"
   workflow_dispatch:
 
 permissions:
