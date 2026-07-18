@@ -26,6 +26,9 @@
 > [!IMPORTANT]
 > Mira is currently in the `0.1.x` release-candidate phase. Only APKs published in this repository's Releases with the project's retained signing key are official builds.
 
+> [!TIP]
+> Mira QQ community group: `1070153809`. In the app, open `Settings → Community and Project → Join Mira Home`.
+
 ## What Mira Is
 
 Mira is an Android AI companion created through a substantial redesign of [Operit](https://github.com/AAswordman/Operit). It inherits Operit's model integrations, tool calling, local runtime, and extension ecosystem, but reorganizes the product around one path:

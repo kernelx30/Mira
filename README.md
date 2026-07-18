@@ -28,6 +28,9 @@
 > [!IMPORTANT]
 > Mira 当前处于 `0.1.x` 发布候选阶段。仓库 Release 中由固定签名发布的 APK 才是公开版本；聊天群、网盘和第三方站点里的改包不属于项目发布物。
 
+> [!TIP]
+> Mira QQ 交流群：`1070153809`。软件内入口：`设置 → 社区与项目 → 加入 Mira 小窝`。
+
 ## Mira 是什么
 
 Mira 是基于 [Operit](https://github.com/AAswordman/Operit) 深度改造的 Android AI 伴侣。它继承 Operit 的模型接入、工具调用、本地运行环境与扩展生态，但重新组织了产品主线：
