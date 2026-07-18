@@ -67,7 +67,7 @@ Mira continues to track reusable upstream fixes and preserves compatible protoco
 ## Screenshots
 
 <div align="center">
-  <img src="docs/assets/README_examples/mira/chat-home.png" width="42%" alt="Mira chat screen">
+  <img src="docs/assets/guide/beginner/18-first-deepseek-reply.png" width="42%" alt="Mira chat screen">
   <img src="docs/assets/README_examples/mira/settings.png" width="42%" alt="Mira settings screen">
 </div>
 
