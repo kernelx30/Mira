@@ -287,6 +287,12 @@ upstream  https://github.com/AAswordman/Operit.git
 
 Mira 基于 Operit 开发，并保留 LGPLv3 许可证与原始版权信息。感谢 Operit 项目及其贡献者提供的 Agent、工具、插件和本地运行基础。
 
+由 `kernelx30` 创作的 Mira 原创改动与组件，其版权归 `kernelx30` 所有；其他贡献者对各自贡献保留相应权利。派生版本可以依照 LGPLv3 修改、重新命名和分发，但必须保留合理版权署名、标记修改来源，不得冒充官方版本或把 Mira 原创材料冒充为他人原创。
+
 - Mira：[kernelx30/Mira](https://github.com/kernelx30/Mira)
 - 上游：[AAswordman/Operit](https://github.com/AAswordman/Operit)
-- 许可证：[LICENSE](LICENSE)
+- 作者与贡献者：[AUTHORS.md](AUTHORS.md)
+- 版权声明：[NOTICE](NOTICE)
+- LGPLv3：[LICENSE](LICENSE)；完整 GPLv3：[COPYING](COPYING)
+- 合理署名与来源标记：[ADDITIONAL_TERMS.md](ADDITIONAL_TERMS.md)
+- Mira 名称与图标：[TRADEMARKS.md](TRADEMARKS.md)

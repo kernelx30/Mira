@@ -1,0 +1,22 @@
+Mira Copyright and Attribution Notice
+=====================================
+
+Mira-specific modifications and original components:
+
+    Copyright (C) 2026 kernelx30
+    Official repository: https://github.com/kernelx30/Mira
+
+Mira is based on the Operit project. The upstream work and retained portions
+remain attributed to their original authors, including:
+
+    Copyright (C) 2023-2024 Operit AI Project Team
+    Upstream repository: https://github.com/AAswordman/Operit
+
+Mira is distributed under the GNU Lesser General Public License version 3.0.
+See LICENSE for the LGPLv3 text and COPYING for the incorporated GPLv3 text.
+Mira-specific material first authored by kernelx30 is also subject to the
+permitted attribution and origin-marking terms in ADDITIONAL_TERMS.md.
+
+Third-party components retain their own copyright and license notices. This
+notice does not replace those notices and must be preserved with source
+distributions that contain Mira-specific material.

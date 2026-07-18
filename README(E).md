@@ -263,6 +263,12 @@ Use `origin` for Mira development and releases. Use `upstream` to track reusable
 
 Mira is based on Operit and retains its LGPLv3 license and original copyright notices. Thanks to the Operit project and its contributors for the Agent, tool, plugin, and local-runtime foundations.
 
+Mira-specific modifications and original components authored by `kernelx30` are copyrighted by `kernelx30`; other contributors retain the applicable rights in their own contributions. Derivative versions may be modified, renamed, and distributed under LGPLv3, but they must preserve reasonable attribution, identify modifications, and must not impersonate an official release or misrepresent Mira-specific material as another party's original work.
+
 - Mira: [kernelx30/Mira](https://github.com/kernelx30/Mira)
 - Upstream: [AAswordman/Operit](https://github.com/AAswordman/Operit)
-- License: [LICENSE](LICENSE)
+- Authors and contributors: [AUTHORS.md](AUTHORS.md)
+- Copyright notices: [NOTICE](NOTICE)
+- LGPLv3: [LICENSE](LICENSE); complete GPLv3: [COPYING](COPYING)
+- Attribution and origin marking: [ADDITIONAL_TERMS.md](ADDITIONAL_TERMS.md)
+- Mira name and logo: [TRADEMARKS.md](TRADEMARKS.md)
