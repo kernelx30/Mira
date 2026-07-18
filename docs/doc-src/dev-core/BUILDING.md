@@ -1,10 +1,10 @@
-# **Android 项目 Operit 编译指南（Linux/Ubuntu）**
+# **Android 项目 Mira 编译指南（Linux/Ubuntu）**
 
-本指南详细介绍了在 Linux 环境下（推荐 Ubuntu/Debian）编译 Android 项目 **Operit** 所需的全部环境配置和步骤。
+本指南介绍在 Linux 环境下（推荐 Ubuntu/Debian）编译 Android 项目 **Mira** 所需的环境配置和步骤。
 
-## **关于 Operit**
+## **关于 Mira**
 
-**Operit AI** 是移动端首个功能完备的 AI 智能助手应用，它**完全独立运行**于您的 Android 设备上，拥有强大的**工具调用能力**。本项目旨在为开发者提供一个可深度定制和扩展的 AI 助手框架。
+**Mira** 是面向 Android 的本地优先 AI 伴侣，在角色聊天、长期记忆和语音陪伴之外保留完整工具调用能力。项目基于 Operit，并维护独立应用 ID、仓库、发布通道和产品设计。
 
 在开始编译之前，请确保您已了解本项目的功能和目标。更多信息请参考项目主页的 [README.md](../../../README.md)。
 
@@ -174,21 +174,22 @@ org.gradle.parallel=true
 请根据需要选择以下两种克隆方式（项目包含 Git 子模块）：
 
 **推荐：先 Fork 后克隆你的仓库**  
-在 GitHub 打开上游仓库并点击 Fork： [AAswordman/Operit](https://github.com/AAswordman/Operit)  
+在 GitHub 打开 Mira 仓库并点击 Fork：[kernelx30/Mira](https://github.com/kernelx30/Mira)
 克隆你的 Fork（注意使用 --recurse-submodules）：
 ```bash
-git clone --recurse-submodules https://github.com/<你的 GitHub 用户名>/Operit.git
-cd Operit
+git clone --recurse-submodules https://github.com/<你的 GitHub 用户名>/Mira.git
+cd Mira
 ```  
 （可选）添加上游仓库以便同步更新：  
 ```bash
-git remote add upstream https://github.com/AAswordman/Operit.git
+git remote add upstream https://github.com/kernelx30/Mira.git
+git remote add operit-upstream https://github.com/AAswordman/Operit.git
 ```  
 
-**备选：不 Fork，直接克隆上游仓库（只读）**  
+**备选：不 Fork，直接克隆 Mira（只读）**
 ```bash
-git clone --recurse-submodules https://github.com/AAswordman/Operit.git
-cd Operit
+git clone --recurse-submodules https://github.com/kernelx30/Mira.git
+cd Mira
 ```  
 
 如果你已克隆但忘记带 --recurse-submodules，可在仓库目录中执行：  

@@ -503,7 +503,7 @@ fun getSampleAdbCommands(context: Context) =
 // Predefined OperitTerminal commands (previously Termux)
 fun getOperitTerminalSampleCommands(context: Context) =
         listOf(
-                "echo 'Hello OperitTerminal'" to context.getString(R.string.demo_cmd_echo_hello),
+                "echo 'Hello Mira Terminal'" to context.getString(R.string.demo_cmd_echo_hello),
                 "ls -la" to context.getString(R.string.demo_cmd_list_files),
                 "whoami" to context.getString(R.string.demo_cmd_show_user),
                 "apt update" to context.getString(R.string.demo_cmd_update_package_manager),

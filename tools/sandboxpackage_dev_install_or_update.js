@@ -12,7 +12,7 @@ const SandboxPackageDevInstaller = (function () {
   const EXAMPLES_DIR = `${SKILL_ROOT}/examples`;
   const EXAMPLE_PACKAGES_DIR = `${EXAMPLES_DIR}/packages`;
   const BUILTIN_PACKAGES_ASSET_DIR = "packages";
-  const CDN_BASE = "https://cdn.jsdelivr.net/gh/AAswordman/Operit@main";
+  const CDN_BASE = "https://cdn.jsdelivr.net/gh/kernelx30/Mira@main";
   const MAX_DOWNLOAD_CONCURRENCY = 8;
   const TYPE_FILES = [
     "android.d.ts",

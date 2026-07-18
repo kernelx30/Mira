@@ -497,10 +497,10 @@
     <string name="about_title">Tentang Mira</string>
     <string name="about_version">Versi: %1$s</string>
     <string name="about_description">Mira adalah aplikasi asisten cerdas yang membantu pengguna menggunakan perangkat dengan lebih efisien, menyediakan analisis antarmuka, percakapan obrolan, dan fungsi lainnya.</string>
-    <string name="about_developer">Pengembang: &lt;a href="https://github.com/AAswordman"&gt;AAswordman&lt;/a&gt;</string>
-    <string name="about_contact">Hubungi kami: aaswordsman@foxmail.com</string>
+    <string name="about_developer">Pengelola Mira: &lt;a href="https://github.com/kernelx30"&gt;kernelx30&lt;/a&gt;</string>
+    <string name="about_contact">GitHub Issues: https://github.com/kernelx30/Mira/issues</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
-    <string name="about_copyright">Mira · Based on Operit · LGPLv3</string>
+    <string name="about_copyright">Mira · LGPLv3</string>
     <string name="star_on_github">Beri Bintang di GitHub</string>
     <string name="update_log">Catatan Pembaruan</string>
     <string name="app_logo_description">Ikon Aplikasi</string>
@@ -1014,7 +1014,7 @@
     <string name="overlay_permission">Izin Overlay</string>
     <string name="battery_optimization">Pengecualian Optimasi Baterai</string>
     <string name="location_permission">Izin Lokasi</string>
-    <string name="operit_terminal">Terminal Operit</string>
+    <string name="operit_terminal">Terminal Mira</string>
     <string name="permission_level_standard">Izin Standar</string>
     <string name="permission_level_accessibility">Izin Aksesibilitas</string>
     <string name="permission_level_admin">Izin Administrator</string>
@@ -2579,17 +2579,17 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="perm_desc_read_sms">Izinkan aplikasi membaca SMS</string>
     <string name="perm_desc_receive_wap_push">Izinkan aplikasi menerima pesan push WAP</string>
     <string name="perm_desc_receive_mms">Izinkan aplikasi menerima MMS</string>
-    <string name="operit_terminal_wizard_title">Panduan Pengaturan OperitTerminal</string>
-    <string name="operit_terminal_not_installed">OperitTerminal belum terinstal</string>
-    <string name="operit_terminal_update_available">Pembaruan OperitTerminal tersedia</string>
-    <string name="operit_terminal_up_to_date">OperitTerminal sudah versi terbaru</string>
-    <string name="operit_terminal_install_description">OperitTerminal adalah aplikasi terminal yang kuat, menyediakan lingkungan Linux lengkap dan fungsi manajemen paket. Kita perlu menginstal aplikasi ini terlebih dahulu.</string>
-    <string name="operit_terminal_install_button">Instal OperitTerminal</string>
-    <string name="operit_terminal_update_description">Versi baru OperitTerminal ditemukan, disarankan untuk memperbarui demi fungsi dan kompatibilitas yang lebih baik.</string>
+    <string name="operit_terminal_wizard_title">Panduan Pengaturan Mira Terminal</string>
+    <string name="operit_terminal_not_installed">Mira Terminal belum terinstal</string>
+    <string name="operit_terminal_update_available">Pembaruan Mira Terminal tersedia</string>
+    <string name="operit_terminal_up_to_date">Mira Terminal sudah versi terbaru</string>
+    <string name="operit_terminal_install_description">Mira Terminal adalah aplikasi terminal yang kuat, menyediakan lingkungan Linux lengkap dan fungsi manajemen paket. Kita perlu menginstal aplikasi ini terlebih dahulu.</string>
+    <string name="operit_terminal_install_button">Instal Mira Terminal</string>
+    <string name="operit_terminal_update_description">Versi baru Mira Terminal ditemukan, disarankan untuk memperbarui demi fungsi dan kompatibilitas yang lebih baik.</string>
     <string name="operit_terminal_release_notes">Catatan rilis: %1$s</string>
-    <string name="operit_terminal_update_button">Perbarui OperitTerminal</string>
-    <string name="operit_terminal_latest_description">Selamat! Anda telah menginstal versi terbaru OperitTerminal, siap menggunakan fungsi terminal yang kuat.</string>
-    <string name="operit_terminal_open_button">Buka OperitTerminal</string>
+    <string name="operit_terminal_update_button">Perbarui Mira Terminal</string>
+    <string name="operit_terminal_latest_description">Selamat! Anda telah menginstal versi terbaru Mira Terminal, siap menggunakan fungsi terminal yang kuat.</string>
+    <string name="operit_terminal_open_button">Buka Mira Terminal</string>
     <string name="functional_model_config_title">Pengaturan Konfigurasi Model Fungsional</string>
     <string name="functional_model_config_desc">Atur konfigurasi model terpisah untuk fungsi yang berbeda, sehingga setiap fungsi dapat menggunakan pengaturan API yang paling sesuai.</string>
     <string name="manage_all_model_configs">Kelola semua konfigurasi model</string>
@@ -3743,7 +3743,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="refresh_or_try_again_later">Segarkan atau coba lagi nanti</string>
     <string name="recommended_features">Fitur yang direkomendasikan</string>
 
-    <string name="confirm_create_public_forge_message">Harap konfirmasi kembali, sekarang akan membuat repositori publik `OperitForge`. Semua rilis selanjutnya akan menggunakan repositori ini.</string>
+    <string name="confirm_create_public_forge_message">Harap konfirmasi kembali, sekarang akan membuat repositori publik `MiraForge`. Semua rilis selanjutnya akan menggunakan repositori ini.</string>
     <string name="create_and_publish">Buat dan Publikasikan</string>
     <string name="artifact_type_script">Skrip</string>
     <string name="artifact_type_package">Paket Alat</string>
@@ -3926,7 +3926,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="screen_title_artifact_market">Pasar Skrip dan Paket Alat</string>
     <string name="screen_title_artifact_manage">Kelola Skrip dan Paket Alat</string>
     <string name="screen_title_artifact_publish">Terbitkan Skrip atau Paket Alat</string>
-    <string name="artifact_publish_info_description">Entri akan diunggah ke repositori terbitan OperitForge Anda sendiri, lalu didaftarkan otomatis ke pasar skrip atau pasar paket alat sesuai jenisnya. Pastikan konten, versi, dan rentang kompatibilitas sudah akurat.</string>
+    <string name="artifact_publish_info_description">Entri akan diunggah ke repositori terbitan MiraForge Anda sendiri, lalu didaftarkan otomatis ke pasar skrip atau pasar paket alat sesuai jenisnya. Pastikan konten, versi, dan rentang kompatibilitas sudah akurat.</string>
     <string name="artifact_edit_info_description">Anda sedang mengedit informasi entri yang sudah diterbitkan. Pembaruan akan menimpa metadata Issue terkait di repositori pasar.</string>
     <string name="need_login_before_publish_artifact">Perlu login ke GitHub sebelum menerbitkan.</string>
     <string name="local_artifact_entry">Entri lokal</string>
@@ -3945,8 +3945,8 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="publish_failed_title">Gagal menerbitkan</string>
     <string name="retry_market_registration">Coba lagi pendaftaran pasar</string>
     <string name="update_to_market">Perbarui ke pasar</string>
-    <string name="create_operit_forge_title">Buat OperitForge?</string>
-    <string name="create_operit_forge_message">Ini adalah pertama kalinya Anda menerbitkan langsung. Operit perlu membuat repositori publik `OperitForge` di akun GitHub Anda terlebih dahulu.</string>
+    <string name="create_operit_forge_title">Buat MiraForge?</string>
+    <string name="create_operit_forge_message">Ini adalah pertama kalinya Anda menerbitkan langsung. Mira perlu membuat repositori publik `MiraForge` di akun GitHub Anda terlebih dahulu.</string>
     <string name="confirm_create_public_forge_title">Konfirmasi pembuatan repositori publik</string>
 
     <string name="update_failed_with_error">Pembaruan gagal: %1$s</string>
@@ -3987,7 +3987,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="mcp_issue_body_title_install_info">## Informasi Instalasi</string>
     <string name="mcp_issue_body_repo_address">**Alamat Repositori:** %1$s</string>
     <string name="mcp_issue_body_title_install_method">### Metode Instalasi</string>
-    <string name="mcp_issue_body_install_step1">1. Klik "Impor" di halaman konfigurasi Operit MCP</string>
+    <string name="mcp_issue_body_install_step1">1. Klik "Impor" di halaman konfigurasi Mira MCP</string>
     <string name="mcp_issue_body_install_step2">2. Pilih "Impor dari Repositori"</string>
 
     <string name="confirm_remove_package_from_market">Apakah Anda yakin ingin menghapus paket alat "%1$s" dari pasar? Tindakan ini akan menutup Issue terkait, tetapi tidak akan menghapus repositori rilis Anda.</string>
@@ -4004,9 +4004,9 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="confirm_skill_git_import_deployment">Saya telah mengonfirmasi bahwa Skill ini dapat diinstal dan digunakan dengan normal melalui metode impor repositori Git perangkat lunak.</string>
     <string name="skill_publish_success_message">Skill Anda telah berhasil dipublikasikan ke pasar, menunggu persetujuan sebelum dapat ditemukan dan digunakan oleh pengguna lain.</string>
     <string name="skill_update_success_message">Informasi Skill Anda telah berhasil diperbarui.</string>
-    <string name="script_publish_info_description">Skrip akan diunggah terlebih dahulu ke repositori rilis OperitForge Anda sendiri, kemudian metadata akan didaftarkan ke OperitScriptMarket. Pastikan konten, versi, dan deskripsi skrip akurat.</string>
+    <string name="script_publish_info_description">Skrip akan diunggah terlebih dahulu ke repositori rilis MiraForge Anda sendiri, kemudian metadata akan didaftarkan ke MiraPluginMarket. Pastikan konten, versi, dan deskripsi skrip akurat.</string>
     <string name="script_edit_info_description">Anda sedang mengedit informasi skrip yang telah dirilis. Pembaruan akan menimpa metadata di Issue terkait di repositori pasar.</string>
-    <string name="package_publish_info_description">Paket alat akan diunggah terlebih dahulu ke repositori rilis OperitForge Anda sendiri, kemudian metadata akan didaftarkan ke OperitPackageMarket. Pastikan konten, versi, dan deskripsi paket alat akurat.</string>
+    <string name="package_publish_info_description">Paket alat akan diunggah terlebih dahulu ke repositori rilis MiraForge Anda sendiri, kemudian metadata akan didaftarkan ke MiraPluginMarket. Pastikan konten, versi, dan deskripsi paket alat akurat.</string>
     <string name="package_edit_info_description">Anda sedang mengedit informasi paket alat yang telah dirilis. Pembaruan akan menimpa metadata di Issue terkait di repositori pasar.</string>
     <string name="script_publish_success_message">Skrip Anda telah berhasil dipublikasikan ke pasar.</string>
     <string name="script_update_success_message">Informasi skrip Anda telah berhasil diperbarui.</string>
@@ -4157,9 +4157,9 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="mcp_issue_body_install_step3">3. Masukkan alamat repositori: `%1$s`</string>
     <string name="mcp_issue_body_install_step4">4. Atur nama plugin dan klik impor</string>
     <string name="mcp_issue_body_title_tech_info">## Informasi Teknis</string>
-    <string name="mcp_issue_body_tech_platform">- **Platform Rilis:** Pasar Operit MCP</string>
+    <string name="mcp_issue_body_tech_platform">- **Platform Rilis:** Pasar Mira MCP</string>
     <string name="mcp_issue_body_tech_publish_time">- **Waktu Rilis:** %1$s</string>
-    <string name="mcp_issue_body_footer_note">*Issue ini dibuat otomatis oleh Operit*</string>
+    <string name="mcp_issue_body_footer_note">*Issue ini dibuat otomatis oleh Mira*</string>
     <string name="mcp_publish_body_section_plugin_info">## 📋 Informasi Plugin</string>
     <string name="mcp_publish_body_label_description">**Deskripsi:** %1$s</string>
     <string name="mcp_publish_body_section_repo_info">## 🔗 Informasi Repositori</string>
@@ -4167,18 +4167,18 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="mcp_publish_body_section_quick_install">## ⚡ Instalasi Cepat</string>
     <string name="mcp_publish_body_section_install_method">## 📦 Metode Instalasi</string>
     <string name="mcp_publish_body_method_repo_import_title">### Metode 1: Impor dari Repositori</string>
-    <string name="mcp_publish_body_method_repo_import_step1">1. Buka halaman konfigurasi Operit MCP</string>
+    <string name="mcp_publish_body_method_repo_import_step1">1. Buka halaman konfigurasi Mira MCP</string>
     <string name="mcp_publish_body_method_repo_import_step2">2. Klik "Impor" → "Impor dari Repositori"</string>
     <string name="mcp_publish_body_method_repo_import_step3">3. Masukkan alamat repositori: `%1$s`</string>
     <string name="mcp_publish_body_method_repo_import_step4">4. Konfigurasi nama plugin dan impor</string>
     <string name="mcp_publish_body_method_config_import_title">### Metode 2: Impor Konfigurasi</string>
-    <string name="mcp_publish_body_method_config_import_step1">1. Buka halaman konfigurasi Operit MCP</string>
+    <string name="mcp_publish_body_method_config_import_step1">1. Buka halaman konfigurasi Mira MCP</string>
     <string name="mcp_publish_body_method_config_import_step2">2. Klik "Impor" → "Impor Konfigurasi"</string>
     <string name="mcp_publish_body_method_config_import_step3">3. Tempel konfigurasi berikut:</string>
     <string name="mcp_publish_body_section_tech_info">## 🛠️ Informasi Teknis</string>
     <string name="mcp_publish_body_table_header">| Item | Nilai |</string>
     <string name="mcp_publish_body_table_separator">|------|-----|</string>
-    <string name="mcp_publish_body_table_row_platform">| Platform Rilis | Pasar Operit MCP |</string>
+    <string name="mcp_publish_body_table_row_platform">| Platform Rilis | Pasar Mira MCP |</string>
     <string name="mcp_publish_body_table_row_parser_version">| Versi Parser | 1.0 |</string>
     <string name="mcp_publish_body_table_row_publish_time">| Waktu Rilis | %1$s |</string>
     <string name="mcp_plugin_detail_title">Detail Plugin</string>
@@ -4858,7 +4858,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="backup_select_export_format">Pilih format ekspor</string>
     <string name="backup_select_format_hint">Silakan pilih format riwayat percakapan yang akan diekspor:</string>
     <string name="backup_format_json">JSON (Direkomendasikan)</string>
-    <string name="backup_format_json_desc">Format asli Operit, mempertahankan semua data secara lengkap</string>
+    <string name="backup_format_json_desc">Format asli Mira, mempertahankan semua data secara lengkap</string>
     <string name="backup_format_markdown">Markdown</string>
     <string name="backup_format_markdown_desc">Format markup ringan, mudah dibaca dan diedit</string>
     <string name="backup_format_html">HTML</string>
@@ -4867,7 +4867,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="backup_format_txt_desc">Format teks sederhana, mudah dibagikan</string>
     <string name="backup_select_import_format">Pilih format impor</string>
     <string name="backup_import_format_hint">Silakan pilih format riwayat percakapan yang akan diimpor:</string>
-    <string name="backup_format_operit">Operit JSON (Direkomendasikan)</string>
+    <string name="backup_format_operit">Mira JSON (Direkomendasikan)</string>
     <string name="backup_format_operit_desc">Format asli aplikasi ini, mempertahankan semua data secara lengkap</string>
     <string name="backup_format_chatgpt">ChatGPT</string>
     <string name="backup_format_chatgpt_desc">Format ekspor conversations.json OpenAI ChatGPT</string>
@@ -5382,14 +5382,14 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="memory_embedding_error_empty_data">Data respons vektor kosong: %1$s</string>
     <string name="memory_embedding_error_invalid_first_item">Respons vektor data[0] bukan objek: %1$s</string>
 
-    <string name="skill_publish_body_install_step1">1. Buka Operit → Manajemen Paket → Skills</string>
+    <string name="skill_publish_body_install_step1">1. Buka Mira → Manajemen Paket → Skills</string>
     <string name="skill_publish_body_install_step2">2. Ketuk "Impor Skill" → "Impor dari Repositori"</string>
     <string name="skill_publish_body_install_step3">3. Masukkan alamat repositori: `%1$s`</string>
     <string name="skill_publish_body_install_step4">4. Konfirmasi impor</string>
     <string name="skill_publish_body_section_tech_info">## 🛠️ Informasi Teknis</string>
     <string name="skill_publish_body_table_header">| Item | Nilai |</string>
     <string name="skill_publish_body_table_separator">|------|-----|</string>
-    <string name="skill_publish_body_table_row_platform">| Platform Publikasi | Pasar Operit Skill |</string>
+    <string name="skill_publish_body_table_row_platform">| Platform Publikasi | Pasar Mira Skill |</string>
     <string name="skill_publish_body_table_row_parser_version">| Versi Parser | 1.0 |</string>
     <string name="skill_publish_body_table_row_publish_time">| Waktu Publikasi | %1$s |</string>
     <string name="model_param_max_tokens">Jumlah Token Maksimum</string>
@@ -5755,7 +5755,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="demo_cmd_list_activities">Lihat Aktivitas yang Berjalan</string>
     <string name="demo_cmd_list_services">Daftar Layanan Sistem</string>
     <string name="demo_cmd_check_resolution">Lihat Resolusi Layar</string>
-    <string name="demo_cmd_echo_hello">Cetak Hello OperitTerminal</string>
+    <string name="demo_cmd_echo_hello">Cetak Hello Mira Terminal</string>
     <string name="demo_cmd_list_files">Daftar File dan Direktori</string>
     <string name="demo_cmd_show_user">Tampilkan Pengguna Saat Ini</string>
     <string name="demo_cmd_update_package_manager">Perbarui Manajer Paket (Ubuntu)</string>
@@ -7103,7 +7103,7 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="artifact_publish_normalized_id_exists">ID normalisasi pasar «%1$s» sudah ada</string>
     <string name="artifact_publish_identity_conflict_message">%1$s. Jika ini adalah penerbitan versi baru, silakan klik tombol "Terbitkan Versi Pembaruan" di halaman plugin yang sesuai, jangan menerbitkan plugin baru lagi.</string>
     <string name="artifact_publish_stage_validating">Memvalidasi entri lokal</string>
-    <string name="artifact_publish_stage_ensuring_repo">Memeriksa repositori OperitForge</string>
+    <string name="artifact_publish_stage_ensuring_repo">Memeriksa repositori MiraForge</string>
     <string name="artifact_publish_stage_creating_release">Membuat atau memperbarui GitHub Release</string>
     <string name="artifact_publish_stage_uploading_asset">Mengunggah aset rilis</string>
     <string name="artifact_publish_stage_registering_market">Mendaftarkan entri pasar</string>
@@ -7194,11 +7194,11 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="artifact_project_node_view_title">Lihat Node</string>
     <string name="artifact_project_nodes_loading">Memuat node proyek...</string>
     <string name="artifact_project_node_selection_hint">Klik node untuk memilih, klik lagi untuk membatalkan.</string>
-    <string name="plugin_creation_fresh_task_line">Silakan aktifkan operit editor, dan gunakan paket sandbox untuk mengembangkan paket sandbox baru dengan dev toolkit.</string>
+    <string name="plugin_creation_fresh_task_line">Silakan aktifkan Mira plugin editor, dan gunakan paket sandbox untuk mengembangkan paket sandbox baru dengan dev toolkit.</string>
     <string name="plugin_creation_fresh_package_rule_line">Tentukan id paket sandbox baru terlebih dahulu, jangan ganti nama nanti.</string>
     <string name="plugin_creation_fresh_dev_directory_line">Direktori pengembangan tetap di Unduhan ponsel/Operit/dev_package/id yang Anda tentukan. Pengembangan, instalasi, dan pengujian hanya dilakukan di sini.</string>
-    <string name="plugin_creation_continue_task_line">Silakan aktifkan operit editor, cari lokasi paket sandbox %1$s, lanjutkan pengembangan dan pengujian berdasarkan versi ini.</string>
-    <string name="plugin_creation_merge_task_line">Silakan aktifkan operit editor, cari lokasi paket sandbox %1$s, lakukan pengembangan gabungan dan pengujian berdasarkan versi ini.</string>
+    <string name="plugin_creation_continue_task_line">Silakan aktifkan Mira plugin editor, cari lokasi paket sandbox %1$s, lanjutkan pengembangan dan pengujian berdasarkan versi ini.</string>
+    <string name="plugin_creation_merge_task_line">Silakan aktifkan Mira plugin editor, cari lokasi paket sandbox %1$s, lakukan pengembangan gabungan dan pengujian berdasarkan versi ini.</string>
     <string name="plugin_creation_existing_package_rule_line">Id paket sandbox saat ini adalah %1$s. Id paket dan nama plugin harus tetap digunakan, jangan ganti nama atau buat paket baru.</string>
     <string name="plugin_creation_existing_dev_directory_line">Direktori pengembangan tetap di Unduhan ponsel/Operit/dev_package/%1$s. Pengembangan, instalasi, dan pengujian hanya dilakukan di sini.</string>
     <string name="plugin_creation_update_sandbox_package_dev">Perbarui SandboxPackage_DEV terlebih dahulu.</string>

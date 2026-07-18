@@ -58,7 +58,6 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private const val GITHUB_PROJECT_URL = "https://github.com/kernelx30/Mira"
-private const val UPSTREAM_PROJECT_URL = "https://github.com/AAswordman/Operit"
 
 private enum class PatchUpdatePhase {
     SELECTING_MIRROR,
@@ -971,21 +970,6 @@ fun AboutScreen(
                         subtitleText = GITHUB_PROJECT_URL,
                         onClick = {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_PROJECT_URL)).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        }
-                    )
-
-                    HorizontalDivider(modifier = Modifier.padding(start = 66.dp))
-
-                    SettingsRow(
-                        icon = Icons.Default.ForkRight,
-                        iconTint = MaterialTheme.colorScheme.secondary,
-                        title = stringResource(id = R.string.upstream_project),
-                        subtitleText = UPSTREAM_PROJECT_URL,
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(UPSTREAM_PROJECT_URL)).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             context.startActivity(intent)

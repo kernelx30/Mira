@@ -86,10 +86,10 @@
     <string name="about_title">Acerca de Mira</string>
     <string name="about_version">Versión: %1$s</string>
     <string name="about_description">Mira es una aplicación de asistente inteligente que ayuda a los usuarios a utilizar sus dispositivos de manera más eficiente, proporcionando funciones como análisis de interfaz y chat.</string>
-    <string name="about_developer">Desarrollador: &lt;a href="https://github.com/AAswordman"&gt;AAswordman&lt;/a&gt;</string>
-    <string name="about_contact">Contáctenos: aaswordsman@foxmail.com</string>
+    <string name="about_developer">Mantenedor de Mira: &lt;a href="https://github.com/kernelx30"&gt;kernelx30&lt;/a&gt;</string>
+    <string name="about_contact">GitHub Issues: https://github.com/kernelx30/Mira/issues</string>
     <string name="about_website">&lt;a href="https://github.com/AAswordman/Operit"&gt;GitHub: https://github.com/AAswordman/Operit&lt;/a&gt;</string>
-    <string name="about_copyright">Mira · Based on Operit · LGPLv3</string>
+    <string name="about_copyright">Mira · LGPLv3</string>
 
     <!-- AI Chat Screen -->
     <string name="configure_ai">Configurar interfaz AI</string>
@@ -1942,7 +1942,7 @@
     <string name="overlay_permission">Permiso de superposición</string>
     <string name="battery_optimization">Exención de optimización de batería</string>
     <string name="location_permission">Permiso de ubicación</string>
-    <string name="operit_terminal">Terminal Operit</string>
+    <string name="operit_terminal">Terminal Mira</string>
     <string name="permission_level_standard">Permiso estándar</string>
     <string name="permission_level_accessibility">Permiso de accesibilidad</string>
     <string name="permission_level_admin">Permiso de administrador</string>
@@ -3231,17 +3231,17 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="speech_services_info_tts_desc">El servicio TTS convierte texto en voz. Puede usar el TTS del sistema integrado o conectarse a una interfaz de voz HTTP/WebSocket remota.</string>
     <string name="speech_services_info_stt_title">Voz a texto (STT)</string>
     <string name="speech_services_info_stt_desc">El servicio STT convierte voz en texto. Admite los motores integrados Sherpa NCNN y Sherpa MNN, ambos ejecutables localmente sin necesidad de conexión a internet. Sherpa MNN integra la función VAD (detección de actividad de voz) para mejorar la precisión del reconocimiento y la eficiencia de recursos.</string>
-    <string name="operit_terminal_wizard_title">Asistente de configuración de OperitTerminal</string>
-    <string name="operit_terminal_not_installed">OperitTerminal no está instalado</string>
-    <string name="operit_terminal_update_available">Hay una actualización disponible para OperitTerminal</string>
-    <string name="operit_terminal_up_to_date">OperitTerminal ya está actualizado</string>
-    <string name="operit_terminal_install_description">OperitTerminal es una potente aplicación de terminal que ofrece un entorno Linux completo y funciones de gestión de paquetes. Necesitamos instalar esta aplicación primero.</string>
-    <string name="operit_terminal_install_button">Instalar OperitTerminal</string>
-    <string name="operit_terminal_update_description">Se ha encontrado una nueva versión de OperitTerminal. Se recomienda actualizar para obtener mejores funciones y compatibilidad.</string>
+    <string name="operit_terminal_wizard_title">Asistente de configuración de Mira Terminal</string>
+    <string name="operit_terminal_not_installed">Mira Terminal no está instalado</string>
+    <string name="operit_terminal_update_available">Hay una actualización disponible para Mira Terminal</string>
+    <string name="operit_terminal_up_to_date">Mira Terminal ya está actualizado</string>
+    <string name="operit_terminal_install_description">Mira Terminal es una potente aplicación de terminal que ofrece un entorno Linux completo y funciones de gestión de paquetes. Necesitamos instalar esta aplicación primero.</string>
+    <string name="operit_terminal_install_button">Instalar Mira Terminal</string>
+    <string name="operit_terminal_update_description">Se ha encontrado una nueva versión de Mira Terminal. Se recomienda actualizar para obtener mejores funciones y compatibilidad.</string>
     <string name="operit_terminal_release_notes">Notas de la actualización: %1$s</string>
-    <string name="operit_terminal_update_button">Actualizar OperitTerminal</string>
-    <string name="operit_terminal_latest_description">¡Felicidades! Ya tiene instalada la última versión de OperitTerminal. Puede empezar a usar sus potentes funciones de terminal.</string>
-    <string name="operit_terminal_open_button">Abrir OperitTerminal</string>
+    <string name="operit_terminal_update_button">Actualizar Mira Terminal</string>
+    <string name="operit_terminal_latest_description">¡Felicidades! Ya tiene instalada la última versión de Mira Terminal. Puede empezar a usar sus potentes funciones de terminal.</string>
+    <string name="operit_terminal_open_button">Abrir Mira Terminal</string>
     <string name="test_item_chat">Chat</string>
     <string name="test_item_toolcall">Tool Call</string>
     <string name="test_item_image">Imagen</string>
@@ -4086,7 +4086,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="screen_title_market">Mercado</string>
     <string name="screen_title_artifact_manage">Gestionar scripts y paquetes de herramientas</string>
     <string name="screen_title_artifact_publish">Publicar script o paquete de herramientas</string>
-    <string name="artifact_publish_info_description">El elemento se subirá primero a tu repositorio de publicación de OperitForge y luego se registrará automáticamente en el mercado de scripts o en el mercado de paquetes de herramientas según el tipo. Asegúrate de que el contenido, la versión y el rango de compatibilidad sean correctos.</string>
+    <string name="artifact_publish_info_description">El elemento se subirá primero a tu repositorio de publicación de MiraForge y luego se registrará automáticamente en el mercado de scripts o en el mercado de paquetes de herramientas según el tipo. Asegúrate de que el contenido, la versión y el rango de compatibilidad sean correctos.</string>
     <string name="artifact_edit_info_description">Estás editando la información de un elemento ya publicado. La actualización sobrescribirá los metadatos del Issue correspondiente en el repositorio del mercado.</string>
     <string name="need_login_before_publish_artifact">Necesitas iniciar sesión en GitHub antes de publicar.</string>
     <string name="local_artifact_entry">Elemento local</string>
@@ -4105,10 +4105,10 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="publish_failed_title">Error al publicar</string>
     <string name="retry_market_registration">Reintentar registro en el mercado</string>
     <string name="update_to_market">Actualizar en el mercado</string>
-    <string name="create_operit_forge_title">¿Crear OperitForge?</string>
-    <string name="create_operit_forge_message">Esta es tu primera publicación directa. Operit necesita crear el repositorio público `OperitForge` en tu cuenta de GitHub.</string>
+    <string name="create_operit_forge_title">¿Crear MiraForge?</string>
+    <string name="create_operit_forge_message">Esta es tu primera publicación directa. Mira necesita crear el repositorio público `MiraForge` en tu cuenta de GitHub.</string>
     <string name="confirm_create_public_forge_title">Confirmar creación de repositorio público</string>
-    <string name="confirm_create_public_forge_message">Confirma nuevamente: ahora se creará el repositorio público `OperitForge`. Las publicaciones futuras reutilizarán este repositorio.</string>
+    <string name="confirm_create_public_forge_message">Confirma nuevamente: ahora se creará el repositorio público `MiraForge`. Las publicaciones futuras reutilizarán este repositorio.</string>
     <string name="create_and_publish">Crear y publicar</string>
     <string name="artifact_type_script">Script</string>
     <string name="artifact_type_package">Paquete de herramientas</string>
@@ -4326,14 +4326,14 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="mcp_issue_body_title_install_info">## Información de instalación</string>
     <string name="mcp_issue_body_repo_address">**Dirección del repositorio:** %1$s</string>
     <string name="mcp_issue_body_title_install_method">### Método de instalación</string>
-    <string name="mcp_issue_body_install_step1">1. En la página de configuración de Operit MCP, haga clic en «Importar»</string>
+    <string name="mcp_issue_body_install_step1">1. En la página de configuración de Mira MCP, haga clic en «Importar»</string>
     <string name="mcp_issue_body_install_step2">2. Seleccione «Importar desde repositorio»</string>
     <string name="mcp_issue_body_install_step3">3. Ingrese la dirección del repositorio: `%1$s`</string>
     <string name="mcp_issue_body_install_step4">4. Establezca el nombre del plugin y haga clic en Importar</string>
     <string name="mcp_issue_body_title_tech_info">## Información técnica</string>
-    <string name="mcp_issue_body_tech_platform">- **Plataforma de publicación:** Mercado Operit MCP</string>
+    <string name="mcp_issue_body_tech_platform">- **Plataforma de publicación:** Mercado Mira MCP</string>
     <string name="mcp_issue_body_tech_publish_time">- **Fecha de publicación:** %1$s</string>
-    <string name="mcp_issue_body_footer_note">*Este issue fue generado automáticamente por Operit*</string>
+    <string name="mcp_issue_body_footer_note">*Este issue fue generado automáticamente por Mira*</string>
     <string name="mcp_publish_body_section_plugin_info">## 📋 Información del plugin</string>
     <string name="mcp_publish_body_label_description">**Descripción:** %1$s</string>
     <string name="mcp_publish_body_section_repo_info">## 🔗 Información del repositorio</string>
@@ -4341,18 +4341,18 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="mcp_publish_body_section_quick_install">## ⚡ Instalación rápida</string>
     <string name="mcp_publish_body_section_install_method">## 📦 Método de instalación</string>
     <string name="mcp_publish_body_method_repo_import_title">### Método 1: Importar desde repositorio</string>
-    <string name="mcp_publish_body_method_repo_import_step1">1. Abra la página de configuración de Operit MCP</string>
+    <string name="mcp_publish_body_method_repo_import_step1">1. Abra la página de configuración de Mira MCP</string>
     <string name="mcp_publish_body_method_repo_import_step2">2. Haga clic en «Importar» → «Importar desde repositorio»</string>
     <string name="mcp_publish_body_method_repo_import_step3">3. Ingrese la dirección del repositorio: `%1$s`</string>
     <string name="mcp_publish_body_method_repo_import_step4">4. Configure el nombre del plugin e impórtelo</string>
     <string name="mcp_publish_body_method_config_import_title">### Método 2: Importar configuración</string>
-    <string name="mcp_publish_body_method_config_import_step1">1. Abra la página de configuración de Operit MCP</string>
+    <string name="mcp_publish_body_method_config_import_step1">1. Abra la página de configuración de Mira MCP</string>
     <string name="mcp_publish_body_method_config_import_step2">2. Haga clic en «Importar» → «Importar configuración»</string>
     <string name="mcp_publish_body_method_config_import_step3">3. Pegue la siguiente configuración:</string>
     <string name="mcp_publish_body_section_tech_info">## 🛠️ Información técnica</string>
     <string name="mcp_publish_body_table_header">| Elemento | Valor |</string>
     <string name="mcp_publish_body_table_separator">|------|-----|</string>
-    <string name="mcp_publish_body_table_row_platform">| Plataforma de publicación | Mercado Operit MCP |</string>
+    <string name="mcp_publish_body_table_row_platform">| Plataforma de publicación | Mercado Mira MCP |</string>
     <string name="mcp_publish_body_table_row_parser_version">| Versión del analizador | 1.0 |</string>
     <string name="mcp_publish_body_table_row_publish_time">| Fecha de publicación | %1$s |</string>
     <string name="mcp_plugin_detail_title">Detalles del plugin</string>
@@ -4423,9 +4423,9 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="confirm_skill_git_import_deployment">Confirmo que esta Skill se puede instalar y usar correctamente mediante la importación del repositorio Git del software</string>
     <string name="skill_publish_success_message">Tu Skill se ha publicado con éxito en el mercado. Una vez aprobada, otros usuarios podrán descubrirla y usarla.</string>
     <string name="skill_update_success_message">La información de tu Skill se ha actualizado con éxito.</string>
-    <string name="script_publish_info_description">El script se cargará primero en tu repositorio de publicación de OperitForge y luego los metadatos se registrarán en OperitScriptMarket. Asegúrate de que el contenido, la versión y la descripción del script sean correctos.</string>
+    <string name="script_publish_info_description">El script se cargará primero en tu repositorio de publicación de MiraForge y luego los metadatos se registrarán en MiraPluginMarket. Asegúrate de que el contenido, la versión y la descripción del script sean correctos.</string>
     <string name="script_edit_info_description">Estás editando la información de un script ya publicado. La actualización sobrescribirá los metadatos del Issue correspondiente en el repositorio del mercado.</string>
-    <string name="package_publish_info_description">El paquete se cargará primero en tu repositorio de publicación de OperitForge y luego los metadatos se registrarán en OperitPackageMarket. Asegúrate de que el contenido, la versión y la descripción del paquete sean correctos.</string>
+    <string name="package_publish_info_description">El paquete se cargará primero en tu repositorio de publicación de MiraForge y luego los metadatos se registrarán en MiraPluginMarket. Asegúrate de que el contenido, la versión y la descripción del paquete sean correctos.</string>
     <string name="package_edit_info_description">Estás editando la información de un paquete ya publicado. La actualización sobrescribirá los metadatos del Issue correspondiente en el repositorio del mercado.</string>
     <string name="script_publish_success_message">Tu script se ha publicado con éxito en el mercado.</string>
     <string name="script_update_success_message">La información de tu script se ha actualizado con éxito.</string>
@@ -4971,7 +4971,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="backup_select_export_format">Seleccionar formato de exportación</string>
     <string name="backup_select_format_hint">Seleccione el formato del historial de chat a exportar:</string>
     <string name="backup_format_json">JSON (recomendado)</string>
-    <string name="backup_format_json_desc">Formato nativo de Operit, conserva todos los datos como el cambio de mensajes.</string>
+    <string name="backup_format_json_desc">Formato nativo de Mira, conserva todos los datos como el cambio de mensajes.</string>
     <string name="backup_format_markdown">Markdown</string>
     <string name="backup_format_markdown_desc">Formato de marcado ligero, fácil de leer y editar.</string>
     <string name="backup_format_html">HTML</string>
@@ -4980,7 +4980,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="backup_format_txt_desc">Formato de texto simple, fácil de compartir.</string>
     <string name="backup_select_import_format">Seleccionar formato de importación</string>
     <string name="backup_import_format_hint">Seleccione el formato del historial de chat a importar:</string>
-    <string name="backup_format_operit">Operit JSON (recomendado)</string>
+    <string name="backup_format_operit">Mira JSON (recomendado)</string>
     <string name="backup_format_operit_desc">Formato nativo de esta aplicación, conserva todos los datos como el cambio de mensajes.</string>
     <string name="backup_format_chatgpt">ChatGPT</string>
     <string name="backup_format_chatgpt_desc">Formato de exportación conversations.json de OpenAI ChatGPT.</string>
@@ -5324,14 +5324,14 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="skill_publish_body_section_repo_info">## 🔗 Información del repositorio</string>
     <string name="skill_publish_body_label_repo_url">**URL del repositorio:** %1$s</string>
     <string name="skill_publish_body_section_install_method">## 📦 Método de instalación</string>
-    <string name="skill_publish_body_install_step1">1. Abre Operit → Gestión de paquetes → Skills</string>
+    <string name="skill_publish_body_install_step1">1. Abre Mira → Gestión de paquetes → Skills</string>
     <string name="skill_publish_body_install_step2">2. Haz clic en «Importar Skill» → «Importar desde repositorio»</string>
     <string name="skill_publish_body_install_step3">3. Introduce la URL del repositorio: `%1$s`</string>
     <string name="skill_publish_body_install_step4">4. Confirma la importación</string>
     <string name="skill_publish_body_section_tech_info">## 🛠️ Información técnica</string>
     <string name="skill_publish_body_table_header">| Elemento | Valor |</string>
     <string name="skill_publish_body_table_separator">|------|-----|</string>
-    <string name="skill_publish_body_table_row_platform">| Plataforma de publicación | Mercado de Skills de Operit |</string>
+    <string name="skill_publish_body_table_row_platform">| Plataforma de publicación | Mercado de Skills de Mira |</string>
     <string name="skill_publish_body_table_row_parser_version">| Versión del analizador | 1.0 |</string>
     <string name="skill_publish_body_table_row_publish_time">| Fecha de publicación | %1$s |</string>
     <string name="model_param_max_tokens">Máximo de tokens generados</string>
@@ -5855,7 +5855,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="demo_cmd_list_activities">Ver actividades activas</string>
     <string name="demo_cmd_list_services">Listar servicios del sistema</string>
     <string name="demo_cmd_check_resolution">Ver resolución de pantalla</string>
-    <string name="demo_cmd_echo_hello">Imprimir Hello OperitTerminal</string>
+    <string name="demo_cmd_echo_hello">Imprimir Hello Mira Terminal</string>
     <string name="demo_cmd_list_files">Listar archivos y directorios</string>
     <string name="demo_cmd_show_user">Mostrar usuario actual</string>
     <string name="demo_cmd_update_package_manager">Actualizar gestor de paquetes (Ubuntu)</string>
@@ -7170,7 +7170,7 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="artifact_publish_normalized_id_exists">El ID normalizado del mercado «%1$s» ya existe</string>
     <string name="artifact_publish_identity_conflict_message">%1$s. Si se trata de publicar una nueva versión, haga clic en el botón «Publicar versión actualizada» en la página del complemento correspondiente, en lugar de volver a publicar un nuevo complemento.</string>
     <string name="artifact_publish_stage_validating">Validando entradas locales</string>
-    <string name="artifact_publish_stage_ensuring_repo">Verificando repositorio de OperitForge</string>
+    <string name="artifact_publish_stage_ensuring_repo">Verificando repositorio de MiraForge</string>
     <string name="artifact_publish_stage_creating_release">Creando o actualizando GitHub Release</string>
     <string name="artifact_publish_stage_uploading_asset">Subiendo recurso de publicación</string>
     <string name="artifact_publish_stage_registering_market">Registrando entrada en el mercado</string>
@@ -7261,11 +7261,11 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="artifact_project_node_view_title">Vista de nodo</string>
     <string name="artifact_project_nodes_loading">Cargando nodos del proyecto...</string>
     <string name="artifact_project_node_selection_hint">Haz clic para seleccionar un nodo; vuelve a hacer clic para deseleccionarlo.</string>
-    <string name="plugin_creation_fresh_task_line">Activa el editor Operit y usa el kit de desarrollo sandbox para desarrollar un nuevo kit sandbox.</string>
+    <string name="plugin_creation_fresh_task_line">Activa el editor Mira y usa el kit de desarrollo sandbox para desarrollar un nuevo kit sandbox.</string>
     <string name="plugin_creation_fresh_package_rule_line">Primero determina el ID del nuevo kit sandbox; no lo renombres después.</string>
     <string name="plugin_creation_fresh_dev_directory_line">El directorio de desarrollo se fija en Descargas/Operit/dev_package/el ID que determinaste. El desarrollo, la instalación y las pruebas se realizan solo aquí.</string>
-    <string name="plugin_creation_continue_task_line">Activa el editor Operit, busca la ubicación del kit sandbox %1$s y continúa desarrollando y probando sobre esta versión.</string>
-    <string name="plugin_creation_merge_task_line">Activa el editor Operit, busca la ubicación del kit sandbox %1$s y realiza desarrollo de fusión y pruebas sobre esta versión.</string>
+    <string name="plugin_creation_continue_task_line">Activa el editor Mira, busca la ubicación del kit sandbox %1$s y continúa desarrollando y probando sobre esta versión.</string>
+    <string name="plugin_creation_merge_task_line">Activa el editor Mira, busca la ubicación del kit sandbox %1$s y realiza desarrollo de fusión y pruebas sobre esta versión.</string>
     <string name="plugin_creation_existing_package_rule_line">El ID actual del kit sandbox es %1$s. Tanto el ID del kit como el nombre del plugin deben mantenerse; no los renombres ni crees un nuevo kit.</string>
     <string name="plugin_creation_existing_dev_directory_line">El directorio de desarrollo se fija en Descargas/Operit/dev_package/%1$s. El desarrollo, la instalación y las pruebas se realizan solo aquí.</string>
     <string name="plugin_creation_update_sandbox_package_dev">Primero actualiza SandboxPackage_DEV.</string>

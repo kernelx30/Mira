@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "docs/Mira_User_Guide_CN.html"
+      - "docs/Mira_Plugin_Development_CN.html"
       - "docs/index.html"
       - "docs/assets/mira-icon.svg"
       - "docs/assets/guide/beginner/**"
@@ -40,6 +41,8 @@ jobs:
           set -euo pipefail
           mkdir -p _site/assets/guide _site/assets/README_examples
           cp docs/Mira_User_Guide_CN.html _site/index.html
+          cp docs/Mira_Plugin_Development_CN.html _site/plugin.html
+          cp docs/Mira_Plugin_Development_CN.html _site/Mira_Plugin_Development_CN.html
           cp docs/assets/mira-icon.svg _site/assets/mira-icon.svg
           cp -R docs/assets/guide/beginner _site/assets/guide/
           cp -R docs/assets/README_examples/mira _site/assets/README_examples/

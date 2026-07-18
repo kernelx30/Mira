@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mira 插件、脚本、Skill、MCP 与 ToolPkg 开发、调试和 MiraForge 发布文档。">
+  <title>Mira 插件开发文档</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f9fc; --surface: #fff; --text: #172033; --muted: #5f6b7a;
+      --line: #dfe5ec; --blue: #1565c0; --blue-soft: #eaf3ff;
+      --code: #101722; --code-text: #e8eef7;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #11151b; --surface: #181e27; --text: #edf2f8; --muted: #a9b4c2; --line: #303946; --blue: #75b4ff; --blue-soft: #172b43; }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.72 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    a { color: var(--blue); }
+    header { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); }
+    .bar { max-width: 1180px; min-height: 58px; margin: auto; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; }
+    .brand img { width: 32px; height: 32px; }
+    .bar nav { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; }
+    .layout { max-width: 1180px; margin: auto; display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 34px; padding: 30px 20px 72px; }
+    .toc { position: sticky; top: 86px; align-self: start; display: grid; gap: 5px; }
+    .toc strong { margin-bottom: 8px; }
+    .toc a { color: var(--muted); text-decoration: none; padding: 7px 10px; border-left: 2px solid transparent; }
+    .toc a:hover { color: var(--blue); border-left-color: var(--blue); }
+    main { min-width: 0; }
+    .hero { padding: 8px 0 30px; border-bottom: 1px solid var(--line); }
+    h1 { margin: 8px 0 12px; font-size: clamp(32px, 5vw, 52px); line-height: 1.12; letter-spacing: 0; }
+    h2 { margin: 48px 0 12px; font-size: 27px; letter-spacing: 0; }
+    h3 { margin: 30px 0 8px; font-size: 20px; letter-spacing: 0; }
+    p { margin: 8px 0 14px; }
+    .lead { max-width: 760px; font-size: 19px; color: var(--muted); }
+    .meta { color: var(--muted); font-size: 14px; }
+    .callout { margin: 20px 0; padding: 14px 16px; border-left: 3px solid var(--blue); background: var(--blue-soft); }
+    .callout b { display: block; margin-bottom: 3px; }
+    .table-wrap { overflow-x: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; min-width: 640px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { font-size: 14px; color: var(--muted); }
+    pre { overflow: auto; padding: 16px; border-radius: 6px; background: var(--code); color: var(--code-text); line-height: 1.55; }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92em; }
+    :not(pre) > code { padding: 2px 5px; border-radius: 4px; background: var(--blue-soft); }
+    .steps { padding-left: 22px; }
+    .steps li { margin: 7px 0; }
+    .links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .links a { display: block; padding: 16px; background: var(--surface); text-decoration: none; }
+    .links span { display: block; color: var(--muted); font-size: 14px; }
+    footer { margin-top: 54px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    @media (max-width: 820px) {
+      .layout { display: block; padding-top: 18px; }
+      .toc { position: static; margin-bottom: 26px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .toc strong { grid-column: 1 / -1; }
+      .bar nav a:nth-child(2) { display: none; }
+    }
+    @media (max-width: 520px) {
+      .layout { padding-inline: 16px; }
+      .toc, .links { grid-template-columns: 1fr; }
+      .bar { padding-inline: 16px; }
+      h2 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <div class="brand"><img src="assets/mira-icon.svg" alt=""><span>Mira 插件开发</span></div>
+      <nav><a href="./">新手教程</a><a href="https://github.com/kernelx30/Mira">GitHub</a><a href="https://github.com/kernelx30/Mira/issues">Issue</a></nav>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="目录">
+      <strong>开发流程</strong>
+      <a href="#choose">1. 选择扩展类型</a>
+      <a href="#quick">2. 应用内快速创作</a>
+      <a href="#toolpkg">3. 最小 ToolPkg</a>
+      <a href="#debug">4. 调试与安装</a>
+      <a href="#publish">5. MiraForge 发布</a>
+      <a href="#compat">6. Operit 兼容</a>
+      <a href="#security">7. 安全与隐私</a>
+      <a href="#reference">8. 完整参考</a>
+    </nav>
+
+    <main>
+      <section class="hero">
+        <div class="meta">Mira 0.1.x · ToolPkg schema 1 · 2026-07-18</div>
+        <h1>Mira 插件开发文档</h1>
+        <p class="lead">从一句自然语言需求到可安装、可调试、可发布的插件。Mira 继续兼容 Operit 的脚本、ToolPkg、Skill 与 MCP 协议，新插件优先发布到 MiraForge。</p>
+      </section>
+
+      <section id="choose">
+        <h2>1. 先选对扩展类型</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>类型</th><th>适合什么</th><th>主要文件</th><th>运行位置</th></tr></thead>
+          <tbody>
+            <tr><td>Skill</td><td>给模型一套专业流程、规范和参考资料</td><td><code>SKILL.md</code> + 附件</td><td>由模型阅读并按需调用工具</td></tr>
+            <tr><td>MCP</td><td>连接已有的标准化服务或远程工具</td><td>MCP server 配置或项目</td><td>本地进程或远程服务</td></tr>
+            <tr><td>JS/TS 脚本</td><td>实现一个轻量、独立的工具集合</td><td><code>.js</code> / <code>.ts</code></td><td>Mira QuickJS sandbox</td></tr>
+            <tr><td>ToolPkg</td><td>包含多个子工具、资源、UI、Hook、模板或 Provider</td><td><code>manifest.json</code>、<code>main.js</code>、子包与资源</td><td>包级 main、sandbox、UI、provider 等上下文</td></tr>
+          </tbody>
+        </table></div>
+        <div class="callout"><b>别一上来就造 ToolPkg</b>只有说明和流程时用 Skill；已有 MCP 服务时直接接 MCP；单个工具先写脚本。需要多个子包、UI、资源、生命周期或市场发布时再用 ToolPkg。</div>
+      </section>
+
+      <section id="quick">
+        <h2>2. 应用内快速创作</h2>
+        <p>普通用户不需要先学完整 API。Mira 已有“快速创作你的插件”入口：</p>
+        <ol class="steps">
+          <li>进入“设置 -> 隐私与高级功能 -> 高级功能 -> 扩展与技能”。</li>
+          <li>打开“快速创作你的插件”，执行“自动下载并执行”，安装或更新包创作 Skill。</li>
+          <li>输入需求，例如“做一个批量整理下载目录图片并生成索引的工具”。</li>
+          <li>让 Mira 先生成目录、清单和脚本，再检查权限、网络地址、文件范围和错误处理。</li>
+          <li>安装后同时启用 ToolPkg 容器和目标子包，新建会话再测试工具调用。</li>
+        </ol>
+        <p>这条路径会优先从 Mira 仓库下载创作支持，必要时读取 Operit 兼容源。最终产物仍需开发者自己检查，不能把“模型生成”当作代码审计。</p>
+      </section>
+
+      <section id="toolpkg">
+        <h2>3. 一个能跑的最小 ToolPkg</h2>
+        <h3>目录</h3>
+        <pre><code>hello_mira/
+├── manifest.json
+├── main.js
+└── packages/
+    └── hello.js</code></pre>
+
+        <h3><code>manifest.json</code></h3>
+        <pre><code>{
+  "schema_version": 1,
+  "toolpkg_id": "io.github.yourname.hello_mira",
+  "version": "0.1.0",
+  "author": ["YOUR_NAME"],
+  "main": "main.js",
+  "display_name": {
+    "zh": "Mira 问候工具",
+    "en": "Mira Greeting Tool"
+  },
+  "description": {
+    "zh": "演示一个最小可调用工具",
+    "en": "A minimal callable tool example"
+  },
+  "subpackages": [
+    {
+      "id": "hello",
+      "entry": "packages/hello.js",
+      "enabled_by_default": false,
+      "display_name": { "zh": "问候", "en": "Greeting" },
+      "description": { "zh": "生成一句问候", "en": "Generate a greeting" }
+    }
+  ]
+}</code></pre>
+
+        <h3><code>main.js</code></h3>
+        <pre><code>function registerToolPkg() {
+  // Register UI, hooks, providers, or IPC here when needed.
+}
+
+exports.registerToolPkg = registerToolPkg;</code></pre>
+
+        <h3><code>packages/hello.js</code></h3>
+        <pre><code>/* METADATA
+{
+  "name": "HelloMira",
+  "description": "Simple greeting tools",
+  "category": "Utility",
+  "tools": [
+    {
+      "name": "hello_mira",
+      "description": "向指定名字发送一句问候",
+      "parameters": [
+        {
+          "name": "name",
+          "description": "要问候的名字",
+          "type": "string",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
+*/
+
+async function hello_mira(params) {
+  const name = String(params.name || "朋友");
+  complete({ success: true, message: `你好，${name}。` });
+}
+
+exports.hello_mira = hello_mira;</code></pre>
+        <p><code>toolpkg_id</code> 要长期稳定且全局唯一。已经发布后不要为了换品牌随便改 ID，否则用户会得到两个互不关联的包。</p>
+      </section>
+
+      <section id="debug">
+        <h2>4. 打包、调试与安装</h2>
+        <p>ToolPkg 本质是 ZIP，但不是“执行一次 JS”那么简单。它还要解析清单、安装资源、启用容器、注册子包、刷新 Hook 和运行时映射。</p>
+        <h3>推荐：调试安装脚本</h3>
+        <pre><code># Windows，设备已开启 USB 调试
+tools\debug_toolpkg.bat path\to\hello_mira
+
+# 指定设备
+tools\debug_toolpkg.bat path\to\hello_mira --device DEVICE_SERIAL
+
+# Linux / macOS
+bash tools/debug_toolpkg.sh path/to/hello_mira</code></pre>
+        <h3>查看日志</h3>
+        <pre><code>adb logcat -d -s ToolPkgDebugInstallReceiver:* ToolPkg:* PackageManager:*
+adb logcat -d -s JsEngine:* ToolPkg:* PackageManager:*</code></pre>
+        <ol class="steps">
+          <li>确认脚本返回安装成功，ToolPkg 容器已经启用。</li>
+          <li>进入包详情，启用实际子包；只开容器不等于工具可用。</li>
+          <li>给当前角色开放目标包与 <code>use_package</code>。</li>
+          <li>新建会话，让工具快照重新生成。</li>
+          <li>用与工具描述高度一致的提示词测试，并保留原始 Tool Call 轨迹。</li>
+        </ol>
+      </section>
+
+      <section id="publish">
+        <h2>5. 发布到 MiraForge</h2>
+        <ol class="steps">
+          <li>在 Mira 的 GitHub 账号设置中完成登录。</li>
+          <li>进入插件市场或扩展管理的发布入口。</li>
+          <li>首次发布时确认创建公开仓库 <code>MiraForge</code>。</li>
+          <li>选择脚本或 ToolPkg，填写稳定 ID、版本、说明、分类、源码与权限信息。</li>
+          <li>Mira 先把文件上传到你自己的 MiraForge，再向兼容市场登记元数据。</li>
+          <li>发布后从另一台设备或干净安装状态验证下载、启用、调用和更新。</li>
+        </ol>
+        <div class="callout"><b>版本更新不能覆盖事实</b>包版本应使用递增的语义化版本。修改已发布条目时保留同一个稳定 ID、作者仓库和来源链，Release 里不要悄悄替换同名文件。</div>
+      </section>
+
+      <section id="compat">
+        <h2>6. Operit 兼容规则</h2>
+        <ul>
+          <li>Mira 继续识别既有 JS Bridge、ToolPkg、Skill、MCP 和 <code>.operit/market.json</code> 标记。</li>
+          <li>现有 OperitForge 条目按原仓库或 Release 下载和更新，不要求重新发布。</li>
+          <li>新条目优先发布到 MiraForge；需要兼容 Operit 时避免使用只在 Mira 新版本存在的 API。</li>
+          <li>内部仍可能出现 <code>com.ai.assistance.operit</code>、<code>OPERIT_DOWNLOAD_DIR</code> 等稳定协议名。它们是兼容接口，不是仓库或更新源。</li>
+          <li>发布说明必须写清最低 Mira/Operit 版本、权限、外部服务、环境变量和已知限制。</li>
+        </ul>
+      </section>
+
+      <section id="security">
+        <h2>7. 安全与隐私检查</h2>
+        <ul>
+          <li>只读取完成任务所需的目录、文件和聊天上下文，不扫描无关私人数据。</li>
+          <li>Token 和 API Key 通过环境变量或用户配置传入，不硬编码进脚本、日志或示例。</li>
+          <li>联网工具明确列出域名、请求字段、超时、重试与数据去向。</li>
+          <li>文件覆盖、删除、批量操作和高权限调用提供预览、确认和可恢复路径。</li>
+          <li>所有异常都返回结构化失败结果，不把堆栈、Header、Cookie 或完整路径直接发给模型。</li>
+          <li>UI、后台 Hook 和长任务在卸载或禁用时释放监听器、线程、文件和网络连接。</li>
+        </ul>
+      </section>
+
+      <section id="reference">
+        <h2>8. 完整 API 与格式参考</h2>
+        <div class="links">
+          <a href="https://github.com/kernelx30/Mira/blob/main/docs/SCRIPT_DEV_GUIDE.md">脚本开发指南<span>METADATA、TypeScript/JavaScript、Tools API 与运行方式</span></a>
+          <a href="https://github.com/kernelx30/Mira/blob/main/docs/TOOLPKG_FORMAT_GUIDE.md">ToolPkg 格式指南<span>Manifest、子包、资源、UI、Hook、IPC、模板与调试</span></a>
+          <a href="https://github.com/kernelx30/Mira/tree/main/docs/doc-src/package-dev">包开发 API 索引<span>Files、Network、System、Chat、Memory、Workflow 等模块</span></a>
+          <a href="https://github.com/kernelx30/Mira/blob/main/docs/doc-src/dev-core/JAVA_BRIDGE_INTERFACE.md">Java Bridge 接口<span>高级 Android 与 JVM 桥接开发</span></a>
+          <a href="https://github.com/kernelx30/Mira/tree/main/examples">示例目录<span>从现有脚本和 ToolPkg 结构开始改</span></a>
+          <a href="https://github.com/kernelx30/Mira/issues">开发问题与兼容反馈<span>提交最小示例、版本、日志和复现步骤</span></a>
+        </div>
+      </section>
+
+      <footer>Mira 插件开发文档 · 新发布优先 MiraForge · 兼容现有 Operit 扩展生态</footer>
+    </main>
+  </div>
+</body>
+</html>

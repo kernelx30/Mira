@@ -781,10 +781,10 @@
     <string name="about_version">版本: %1$s</string>
     <string name="about_description">Mira 是一个本地优先、可成长、能说话也能做事的 Android 私人 AI 伴侣。角色、记忆、语音与 Agent 能力都由你掌控。</string>
     <string name="about_developer">Mira 维护者: &lt;a href="https://github.com/kernelx30"&gt;kernelx30&lt;/a&gt;</string>
-    <string name="about_contact">联系我们: aaswordsman@foxmail.com</string>
+    <string name="about_contact">GitHub Issues: https://github.com/kernelx30/Mira/issues</string>
     <string name="about_website">&lt;a href="https://github.com/kernelx30/Mira"&gt;GitHub: https://github.com/kernelx30/Mira&lt;/a&gt;</string>
     <string name="upstream_project">上游项目 Operit</string>
-    <string name="about_copyright">Mira · 基于 Operit 构建 · LGPLv3</string>
+    <string name="about_copyright">Mira · LGPLv3</string>
     <string name="star_on_github">在 GitHub 点个 Star</string>
     <string name="update_log">更新日志</string>
     <string name="app_logo_description">应用图标</string>
@@ -1183,7 +1183,7 @@
     <string name="quick_plugin_creator_title">快速创作你的插件</string>
     <string name="quick_plugin_creator_desc">内置和市场都找不到想要的插件？创作你自己想要的！</string>
     <string name="quick_plugin_creator_step1_title">1. 更新或者下载包创作 Skill</string>
-    <string name="quick_plugin_creator_step1_desc">点击按钮后会自动下载 `install_or_update.js`，并调用 operit_editor 的 debug_run_sandbox_script 执行安装或更新。</string>
+    <string name="quick_plugin_creator_step1_desc">点击按钮后会自动下载 `install_or_update.js`，并调用内置插件编辑器完成安装或更新。</string>
     <string name="quick_plugin_creator_run_setup">自动下载并执行</string>
     <string name="quick_plugin_creator_pull_skill_update">拉取 Skill 更新</string>
     <string name="quick_plugin_creator_setup_success">包创作 Skill 安装或更新完成</string>
@@ -1526,7 +1526,7 @@
     <string name="overlay_permission">悬浮窗权限</string>
     <string name="battery_optimization">电池优化豁免</string>
     <string name="location_permission">位置权限</string>
-    <string name="operit_terminal">Operit终端</string>
+    <string name="operit_terminal">Mira 终端</string>
     
     <!-- 权限级别描述 -->
     <string name="permission_level_standard">标准权限</string>
@@ -1768,7 +1768,7 @@
     <string name="patch_install_confirm_message">检测到新补丁版本：%1$s\n\n是否现在安装？</string>
     <string name="developer">开发者</string>
     <string name="contact">联系方式</string>
-    <string name="project_url">上游项目</string>
+    <string name="project_url">Mira GitHub 仓库</string>
     <string name="open_source_licenses">开源许可声明</string>
     <string name="license_format">许可: %1$s</string>
     <string name="visit_project">访问项目</string>
@@ -3070,17 +3070,17 @@
     <string name="perm_desc_receive_mms">允许应用接收彩信</string>
     
     <!-- OperitTerminal Wizard Card -->
-    <string name="operit_terminal_wizard_title">OperitTerminal 设置向导</string>
-    <string name="operit_terminal_not_installed">OperitTerminal 未安装</string>
-    <string name="operit_terminal_update_available">OperitTerminal 有更新可用</string>
-    <string name="operit_terminal_up_to_date">OperitTerminal 已是最新版本</string>
-    <string name="operit_terminal_install_description">OperitTerminal 是一个功能强大的终端应用，提供完整的 Linux 环境和包管理功能。我们需要先安装这个应用。</string>
-    <string name="operit_terminal_install_button">安装 OperitTerminal</string>
-    <string name="operit_terminal_update_description">发现 OperitTerminal 的新版本，建议更新以获得更好的功能和兼容性。</string>
+    <string name="operit_terminal_wizard_title">Mira 终端环境</string>
+    <string name="operit_terminal_not_installed">Mira 终端环境未安装</string>
+    <string name="operit_terminal_update_available">Mira 终端环境有更新可用</string>
+    <string name="operit_terminal_up_to_date">Mira 终端环境已是最新版本</string>
+    <string name="operit_terminal_install_description">安装 Mira 使用的 Linux 终端环境与包管理能力。</string>
+    <string name="operit_terminal_install_button">安装终端环境</string>
+    <string name="operit_terminal_update_description">发现终端环境的新版本，建议更新以获得更好的功能和兼容性。</string>
     <string name="operit_terminal_release_notes">更新说明：%1$s</string>
-    <string name="operit_terminal_update_button">更新 OperitTerminal</string>
-    <string name="operit_terminal_latest_description">恭喜！您已安装最新版本的 OperitTerminal，可以开始使用其强大的终端功能。</string>
-    <string name="operit_terminal_open_button">打开 OperitTerminal</string>
+    <string name="operit_terminal_update_button">更新终端环境</string>
+    <string name="operit_terminal_latest_description">Mira 终端环境已就绪，可以开始使用终端工具。</string>
+    <string name="operit_terminal_open_button">打开 Mira 终端</string>
     
     <!-- Functional Config Screen -->
     <string name="functional_model_config_title">功能模型配置设置</string>
@@ -4680,7 +4680,7 @@
     <string name="screen_title_market">市场</string>
     <string name="screen_title_artifact_manage">管理脚本与工具包</string>
     <string name="screen_title_artifact_publish">发布脚本或工具包</string>
-    <string name="artifact_publish_info_description">条目会先上传到您自己的 OperitForge 发布仓库，再根据类型自动登记到脚本市场或工具包市场。请确认内容、版本和兼容范围准确无误。</string>
+    <string name="artifact_publish_info_description">条目会先上传到您自己的 MiraForge 发布仓库，再登记到 Mira 兼容插件市场。现有 Operit 插件格式仍可直接安装和更新。</string>
     <string name="change">更改</string>
     <string name="comma_separator">，</string>
     <string name="github_search_failed">GitHub 搜索失败</string>
@@ -4701,7 +4701,7 @@
     <string name="artifact_publish_normalized_id_exists">市场归一化 ID「%1$s」已存在</string>
     <string name="artifact_publish_identity_conflict_message">%1$s。如果这是发布新版本，请在对应的插件页面里点击“发布更新版本”按钮，而不是重新发布一个新的插件。</string>
     <string name="artifact_publish_stage_validating">正在校验本地条目</string>
-    <string name="artifact_publish_stage_ensuring_repo">正在检查 OperitForge 仓库</string>
+    <string name="artifact_publish_stage_ensuring_repo">正在检查 MiraForge 仓库</string>
     <string name="artifact_publish_stage_creating_release">正在创建或更新 GitHub Release</string>
     <string name="artifact_publish_stage_uploading_asset">正在上传发布资源</string>
     <string name="artifact_publish_stage_registering_market">正在登记市场条目</string>
@@ -4767,13 +4767,13 @@
     <string name="artifact_project_node_view_title">节点查看</string>
     <string name="artifact_project_nodes_loading">正在加载项目节点...</string>
     <string name="artifact_project_node_selection_hint">点击节点选中，再次点击可取消。</string>
-    <string name="plugin_creation_fresh_task_line">请你激活operit editor，并使用沙盒包开发 dev 工具包开发新的沙盒包。</string>
+    <string name="plugin_creation_fresh_task_line">请激活 Mira 内置插件编辑器，并使用沙盒包开发工具包创建新的沙盒包。</string>
     <string name="plugin_creation_fresh_package_rule_line">先确定新的沙盒包 id，后续不要改名。</string>
-    <string name="plugin_creation_fresh_dev_directory_line">开发目录固定为 手机下载/Operit/dev_package/你确定的id。开发、安装和测试都只在这里完成。</string>
-    <string name="plugin_creation_continue_task_line">请你激活operit editor，查找沙盒包 %1$s 的位置，在此版本基础上继续开发并测试。</string>
-    <string name="plugin_creation_merge_task_line">请你激活operit editor，查找沙盒包 %1$s 的位置，在此版本基础上做合并开发并测试。</string>
+    <string name="plugin_creation_fresh_dev_directory_line">按 SandboxPackage_DEV 指定的兼容开发目录创建项目；开发、安装和测试都在同一项目目录完成。</string>
+    <string name="plugin_creation_continue_task_line">请激活 Mira 内置插件编辑器，找到沙盒包 %1$s，并在当前版本基础上继续开发和测试。</string>
+    <string name="plugin_creation_merge_task_line">请激活 Mira 内置插件编辑器，找到沙盒包 %1$s，并在当前版本基础上完成合并开发和测试。</string>
     <string name="plugin_creation_existing_package_rule_line">当前沙盒包 id 是 %1$s。包 id 和插件名字都必须沿用，不要改名，也不要新起包。</string>
-    <string name="plugin_creation_existing_dev_directory_line">开发目录固定为 手机下载/Operit/dev_package/%1$s。开发、安装和测试都只在这里完成。</string>
+    <string name="plugin_creation_existing_dev_directory_line">使用 SandboxPackage_DEV 为 %1$s 指定的兼容开发目录；开发、安装和测试都在该目录完成。</string>
     <string name="plugin_creation_update_sandbox_package_dev">先更新 SandboxPackage_DEV。</string>
     <string name="plugin_creation_copy_types_to_dev_dir">把 skills 里的 types 覆盖复制到开发目录。</string>
     <string name="plugin_creation_use_terminal_ts_js_hint">尽量用终端，优先写 ts 和 js，再编译出最终 js。tsconfig 参考 examples。</string>
@@ -4799,10 +4799,10 @@
     <string name="publish_failed_title">发布失败</string>
     <string name="retry_market_registration">重试市场登记</string>
     <string name="update_to_market">更新到市场</string>
-    <string name="create_operit_forge_title">创建 OperitForge？</string>
-    <string name="create_operit_forge_message">这是你第一次直连发布。Operit 需要先在你的 GitHub 账号下创建公开仓库 `OperitForge`。</string>
+    <string name="create_operit_forge_title">创建 MiraForge？</string>
+    <string name="create_operit_forge_message">这是你第一次直连发布。Mira 需要先在你的 GitHub 账号下创建公开仓库 `MiraForge`。</string>
     <string name="confirm_create_public_forge_title">确认创建公开仓库</string>
-    <string name="confirm_create_public_forge_message">请再次确认，现在创建公开仓库 `OperitForge`。后续发布都会复用这个仓库。</string>
+    <string name="confirm_create_public_forge_message">请再次确认，现在创建公开仓库 `MiraForge`。后续发布都会复用这个仓库。</string>
     <string name="create_and_publish">创建并发布</string>
     <string name="artifact_type_script">脚本</string>
     <string name="artifact_type_package">工具包</string>
@@ -4913,9 +4913,9 @@
     <string name="skill_publish_name_empty">Skill 名称不能为空。</string>
     <string name="skill_publish_check_name_conflict_failed">检查 Skill 名称是否重名失败：%1$s</string>
     <string name="skill_publish_name_taken_message">Skill 市场里已经有同名插件「%1$s」，请换一个名称。</string>
-    <string name="script_publish_info_description">脚本会先上传到您自己的 OperitForge 发布仓库，再将元数据登记到 OperitScriptMarket。请确认脚本内容、版本和描述准确无误。</string>
+    <string name="script_publish_info_description">脚本会先上传到您自己的 MiraForge 发布仓库，再登记到 Mira 兼容插件市场。请确认脚本内容、版本和描述准确无误。</string>
     <string name="script_edit_info_description">您正在编辑已发布脚本的信息。更新后会覆盖市场仓库中对应 Issue 的元数据。</string>
-    <string name="package_publish_info_description">工具包会先上传到您自己的 OperitForge 发布仓库，再将元数据登记到 OperitPackageMarket。请确认工具包内容、版本和描述准确无误。</string>
+    <string name="package_publish_info_description">工具包会先上传到您自己的 MiraForge 发布仓库，再登记到 Mira 兼容插件市场。请确认工具包内容、版本和描述准确无误。</string>
     <string name="package_edit_info_description">您正在编辑已发布工具包的信息。更新后会覆盖市场仓库中对应 Issue 的元数据。</string>
     <string name="script_publish_success_message">您的脚本已成功发布到市场。</string>
     <string name="script_update_success_message">您的脚本信息已成功更新。</string>
@@ -4994,14 +4994,14 @@
     <string name="mcp_issue_body_title_install_info">## 安装信息</string>
     <string name="mcp_issue_body_repo_address">**仓库地址:** %1$s</string>
     <string name="mcp_issue_body_title_install_method">### 安装方式</string>
-    <string name="mcp_issue_body_install_step1">1. 在 Operit MCP 配置页面点击「导入」</string>
+    <string name="mcp_issue_body_install_step1">1. 在 Mira MCP 配置页面点击「导入」</string>
     <string name="mcp_issue_body_install_step2">2. 选择「从仓库导入」</string>
     <string name="mcp_issue_body_install_step3">3. 输入仓库地址: `%1$s`</string>
     <string name="mcp_issue_body_install_step4">4. 设置插件名称并点击导入</string>
     <string name="mcp_issue_body_title_tech_info">## 技术信息</string>
-    <string name="mcp_issue_body_tech_platform">- **发布平台:** Operit MCP 市场</string>
+    <string name="mcp_issue_body_tech_platform">- **发布平台:** Mira 兼容插件市场</string>
     <string name="mcp_issue_body_tech_publish_time">- **发布时间:** %1$s</string>
-    <string name="mcp_issue_body_footer_note">*此Issue由 Operit 自动生成*</string>
+    <string name="mcp_issue_body_footer_note">*此 Issue 由 Mira 自动生成*</string>
 
     <string name="mcp_publish_body_section_plugin_info">## 📋 插件信息</string>
     <string name="mcp_publish_body_label_description">**描述:** %1$s</string>
@@ -5010,18 +5010,18 @@
     <string name="mcp_publish_body_section_quick_install">## ⚡ 快速安装</string>
     <string name="mcp_publish_body_section_install_method">## 📦 安装方式</string>
     <string name="mcp_publish_body_method_repo_import_title">### 方式一：从仓库导入</string>
-    <string name="mcp_publish_body_method_repo_import_step1">1. 打开 Operit MCP 配置页面</string>
+    <string name="mcp_publish_body_method_repo_import_step1">1. 打开 Mira MCP 配置页面</string>
     <string name="mcp_publish_body_method_repo_import_step2">2. 点击「导入」→「从仓库导入」</string>
     <string name="mcp_publish_body_method_repo_import_step3">3. 输入仓库地址：`%1$s`</string>
     <string name="mcp_publish_body_method_repo_import_step4">4. 配置插件名称并导入</string>
     <string name="mcp_publish_body_method_config_import_title">### 方式二：配置导入</string>
-    <string name="mcp_publish_body_method_config_import_step1">1. 打开 Operit MCP 配置页面</string>
+    <string name="mcp_publish_body_method_config_import_step1">1. 打开 Mira MCP 配置页面</string>
     <string name="mcp_publish_body_method_config_import_step2">2. 点击「导入」→「配置导入」</string>
     <string name="mcp_publish_body_method_config_import_step3">3. 粘贴以下配置：</string>
     <string name="mcp_publish_body_section_tech_info">## 🛠️ 技术信息</string>
     <string name="mcp_publish_body_table_header">| 项目 | 值 |</string>
     <string name="mcp_publish_body_table_separator">|------|-----|</string>
-    <string name="mcp_publish_body_table_row_platform">| 发布平台 | Operit MCP 市场 |</string>
+    <string name="mcp_publish_body_table_row_platform">| 发布平台 | Mira 兼容插件市场 |</string>
     <string name="mcp_publish_body_table_row_parser_version">| 解析版本 | 1.0 |</string>
     <string name="mcp_publish_body_table_row_publish_time">| 发布时间 | %1$s |</string>
 
@@ -5856,7 +5856,7 @@
     <string name="backup_select_export_format">选择导出格式</string>
     <string name="backup_select_format_hint">请选择要导出的聊天记录格式：</string>
     <string name="backup_format_json">JSON（推荐）</string>
-    <string name="backup_format_json_desc">Operit 原生格式，完整保留消息切换等所有数据</string>
+    <string name="backup_format_json_desc">Mira JSON 格式，完整保留消息切换等数据</string>
     <string name="backup_format_markdown">Markdown</string>
     <string name="backup_format_markdown_desc">轻量级标记格式，便于阅读和编辑</string>
     <string name="backup_format_html">HTML</string>
@@ -5867,8 +5867,8 @@
     <!-- 导入格式选择 -->
     <string name="backup_select_import_format">选择导入格式</string>
     <string name="backup_import_format_hint">请选择要导入的聊天记录格式：</string>
-    <string name="backup_format_operit">Operit JSON（推荐）</string>
-    <string name="backup_format_operit_desc">本应用的原生格式，完整保留消息切换等所有数据</string>
+    <string name="backup_format_operit">Mira JSON（推荐）</string>
+    <string name="backup_format_operit_desc">Mira 原生格式，完整保留消息切换等数据</string>
     <string name="backup_format_chatgpt">ChatGPT</string>
     <string name="backup_format_chatgpt_desc">OpenAI ChatGPT conversations.json 导出格式</string>
     <string name="backup_format_chatbox">ChatBox</string>
@@ -5987,7 +5987,7 @@
     <string name="logcat_cannot_open_output_stream">无法打开输出流</string>
     <string name="logcat_mediestore_save_failed">MediaStore保存失败：%1$s</string>
     <string name="logcat_cannot_create_download_dir">无法创建下载目录</string>
-    <string name="logcat_cannot_create_operit_dir">无法创建operit目录</string>
+    <string name="logcat_cannot_create_operit_dir">无法创建兼容数据目录</string>
     <string name="logcat_file_create_failed">文件创建失败或为空</string>
     <string name="logcat_filesystem_save_failed">文件系统保存失败：%1$s</string>
 
@@ -6430,14 +6430,14 @@
     <string name="skill_publish_body_section_repo_info">## 🔗 仓库信息</string>
     <string name="skill_publish_body_label_repo_url">**仓库地址:** %1$s</string>
     <string name="skill_publish_body_section_install_method">## 📦 安装方式</string>
-    <string name="skill_publish_body_install_step1">1. 打开 Operit → 包管理 → Skills</string>
+    <string name="skill_publish_body_install_step1">1. 打开 Mira → 扩展与技能 → Skills</string>
     <string name="skill_publish_body_install_step2">2. 点击「导入 Skill」→ 「从仓库导入」</string>
     <string name="skill_publish_body_install_step3">3. 输入仓库地址：`%1$s`</string>
     <string name="skill_publish_body_install_step4">4. 确认导入</string>
     <string name="skill_publish_body_section_tech_info">## 🛠️ 技术信息</string>
     <string name="skill_publish_body_table_header">| 项目 | 值 |</string>
     <string name="skill_publish_body_table_separator">|------|-----|</string>
-    <string name="skill_publish_body_table_row_platform">| 发布平台 | Operit Skill 市场 |</string>
+    <string name="skill_publish_body_table_row_platform">| 发布平台 | Mira 兼容插件市场 |</string>
     <string name="skill_publish_body_table_row_parser_version">| 解析版本 | 1.0 |</string>
     <string name="skill_publish_body_table_row_publish_time">| 发布时间 | %1$s |</string>
 
@@ -6940,7 +6940,7 @@
     <string name="demo_cmd_list_activities">查看活动的Activity</string>
     <string name="demo_cmd_list_services">列出系统服务</string>
     <string name="demo_cmd_check_resolution">查看屏幕分辨率</string>
-    <string name="demo_cmd_echo_hello">打印Hello OperitTerminal</string>
+    <string name="demo_cmd_echo_hello">打印 Hello Mira Terminal</string>
     <string name="demo_cmd_list_files">列出文件和目录</string>
     <string name="demo_cmd_show_user">显示当前用户</string>
     <string name="demo_cmd_update_package_manager">更新包管理器 (Ubuntu)</string>

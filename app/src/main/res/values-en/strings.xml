@@ -776,10 +776,10 @@
     <string name="about_version">Version: %1$s</string>
     <string name="about_description">Mira is a local-first Android AI companion that grows with you, remembers what matters, speaks naturally, and can act through tools you control.</string>
     <string name="about_developer">Mira maintainer: &lt;a href="https://github.com/kernelx30"&gt;kernelx30&lt;/a&gt;</string>
-    <string name="about_contact">Contact Us: aaswordsman@foxmail.com</string>
+    <string name="about_contact">GitHub Issues: https://github.com/kernelx30/Mira/issues</string>
     <string name="about_website">&lt;a href="https://github.com/kernelx30/Mira"&gt;GitHub: https://github.com/kernelx30/Mira&lt;/a&gt;</string>
     <string name="upstream_project">Upstream project: Operit</string>
-    <string name="about_copyright">Mira · Based on Operit · LGPLv3</string>
+    <string name="about_copyright">Mira · LGPLv3</string>
     <string name="star_on_github">Star on GitHub</string>
     <string name="update_log">Update Log</string>
     <string name="app_logo_description">App Logo</string>
@@ -1539,7 +1539,7 @@
     <string name="overlay_permission">Overlay Permission</string>
     <string name="battery_optimization">Battery Optimization Exemption</string>
     <string name="location_permission">Location Permission</string>
-    <string name="operit_terminal">Operit Terminal</string>
+    <string name="operit_terminal">Mira Terminal</string>
     
     <!-- Permission Level Descriptions -->
     <string name="permission_level_standard">Standard Permission</string>
@@ -1746,7 +1746,7 @@
 
     <string name="developer">Developer</string>
     <string name="contact">Contact</string>
-    <string name="project_url">Upstream project</string>
+    <string name="project_url">Mira GitHub Repository</string>
     <string name="open_source_licenses">Open Source Licenses</string>
     <string name="license_format">License: %1$s</string>
     <string name="visit_project">Visit Project</string>
@@ -4489,17 +4489,17 @@
     <string name="delete_tag_confirm">Are you sure you want to delete tag "%1$s"? This action cannot be undone.</string>
 
     <!-- OperitTerminal Wizard Card -->
-    <string name="operit_terminal_wizard_title">OperitTerminal Setup Wizard</string>
-    <string name="operit_terminal_not_installed">OperitTerminal not installed</string>
-    <string name="operit_terminal_update_available">OperitTerminal update available</string>
-    <string name="operit_terminal_up_to_date">OperitTerminal is up to date</string>
-    <string name="operit_terminal_install_description">OperitTerminal is a powerful terminal application that provides a complete Linux environment and package management capabilities. We need to install this application first.</string>
-    <string name="operit_terminal_install_button">Install OperitTerminal</string>
-    <string name="operit_terminal_update_description">A new version of OperitTerminal is available. It is recommended to update for better features and compatibility.</string>
+    <string name="operit_terminal_wizard_title">Mira Terminal Environment</string>
+    <string name="operit_terminal_not_installed">Mira terminal environment is not installed</string>
+    <string name="operit_terminal_update_available">Mira terminal environment update available</string>
+    <string name="operit_terminal_up_to_date">Mira terminal environment is up to date</string>
+    <string name="operit_terminal_install_description">Install the Linux terminal environment and package-management capabilities used by Mira.</string>
+    <string name="operit_terminal_install_button">Install Terminal Environment</string>
+    <string name="operit_terminal_update_description">A terminal environment update is available for improved features and compatibility.</string>
     <string name="operit_terminal_release_notes">Release Notes: %1$s</string>
-    <string name="operit_terminal_update_button">Update OperitTerminal</string>
-    <string name="operit_terminal_latest_description">Congratulations! You have installed the latest version of OperitTerminal and can start using its powerful terminal features.</string>
-    <string name="operit_terminal_open_button">Open OperitTerminal</string>
+    <string name="operit_terminal_update_button">Update Terminal Environment</string>
+    <string name="operit_terminal_latest_description">The Mira terminal environment is ready.</string>
+    <string name="operit_terminal_open_button">Open Mira Terminal</string>
 
     <!-- Function Types -->
     <string name="function_type_translation">Translation Function</string>
@@ -4708,14 +4708,14 @@
     <string name="mcp_issue_body_title_install_info">## Installation Info</string>
     <string name="mcp_issue_body_repo_address">**Repository:** %1$s</string>
     <string name="mcp_issue_body_title_install_method">### Installation</string>
-    <string name="mcp_issue_body_install_step1">1. Open Operit MCP configuration screen and tap "Import"</string>
+    <string name="mcp_issue_body_install_step1">1. Open Mira MCP settings and tap "Import"</string>
     <string name="mcp_issue_body_install_step2">2. Select "Import from Repo"</string>
     <string name="mcp_issue_body_install_step3">3. Enter repository URL: `%1$s`</string>
     <string name="mcp_issue_body_install_step4">4. Set plugin name and tap import</string>
     <string name="mcp_issue_body_title_tech_info">## Technical Info</string>
-    <string name="mcp_issue_body_tech_platform">- **Platform:** Operit MCP Market</string>
+    <string name="mcp_issue_body_tech_platform">- **Platform:** Mira-compatible plugin market</string>
     <string name="mcp_issue_body_tech_publish_time">- **Published at:** %1$s</string>
-    <string name="mcp_issue_body_footer_note">*This Issue was generated automatically by Operit*</string>
+    <string name="mcp_issue_body_footer_note">*This Issue was generated automatically by Mira*</string>
 
     <string name="mcp_publish_body_section_plugin_info">## 📋 Plugin Info</string>
     <string name="mcp_publish_body_label_description">**Description:** %1$s</string>
@@ -4724,18 +4724,18 @@
     <string name="mcp_publish_body_section_quick_install">## ⚡ Quick Install</string>
     <string name="mcp_publish_body_section_install_method">## 📦 Installation</string>
     <string name="mcp_publish_body_method_repo_import_title">### Method 1: Import from Repo</string>
-    <string name="mcp_publish_body_method_repo_import_step1">1. Open Operit MCP configuration screen</string>
+    <string name="mcp_publish_body_method_repo_import_step1">1. Open Mira MCP settings</string>
     <string name="mcp_publish_body_method_repo_import_step2">2. Tap "Import" → "Import from Repo"</string>
     <string name="mcp_publish_body_method_repo_import_step3">3. Enter repository URL: `%1$s`</string>
     <string name="mcp_publish_body_method_repo_import_step4">4. Set plugin name and import</string>
     <string name="mcp_publish_body_method_config_import_title">### Method 2: Import Config</string>
-    <string name="mcp_publish_body_method_config_import_step1">1. Open Operit MCP configuration screen</string>
+    <string name="mcp_publish_body_method_config_import_step1">1. Open Mira MCP settings</string>
     <string name="mcp_publish_body_method_config_import_step2">2. Tap "Import" → "Import Config"</string>
     <string name="mcp_publish_body_method_config_import_step3">3. Paste the following config:</string>
     <string name="mcp_publish_body_section_tech_info">## 🛠️ Technical Info</string>
     <string name="mcp_publish_body_table_header">| Item | Value |</string>
     <string name="mcp_publish_body_table_separator">|------|-----|</string>
-    <string name="mcp_publish_body_table_row_platform">| Platform | Operit MCP Market |</string>
+    <string name="mcp_publish_body_table_row_platform">| Platform | Mira-compatible plugin market |</string>
     <string name="mcp_publish_body_table_row_parser_version">| Parser Version | 1.0 |</string>
     <string name="mcp_publish_body_table_row_publish_time">| Published at | %1$s |</string>
     
@@ -5430,7 +5430,7 @@
     <string name="backup_select_export_format">Select Export Format</string>
     <string name="backup_select_format_hint">Please select the chat history format to export:</string>
     <string name="backup_format_json">JSON (Recommended)</string>
-    <string name="backup_format_json_desc">Operit native format, preserves variants and all other data</string>
+    <string name="backup_format_json_desc">Mira JSON format, preserving message variants and related data</string>
     <string name="backup_format_markdown">Markdown</string>
     <string name="backup_format_markdown_desc">Lightweight markup format, easy to read and edit</string>
     <string name="backup_format_html">HTML</string>
@@ -5441,8 +5441,8 @@
     <!-- Import Format Selection -->
     <string name="backup_select_import_format">Select Import Format</string>
     <string name="backup_import_format_hint">Please select the chat history format to import:</string>
-    <string name="backup_format_operit">Operit JSON (Recommended)</string>
-    <string name="backup_format_operit_desc">Native format of this app, preserves variants and all other data</string>
+    <string name="backup_format_operit">Mira JSON (Recommended)</string>
+    <string name="backup_format_operit_desc">Mira native format, preserving message variants and related data</string>
     <string name="backup_format_chatgpt">ChatGPT</string>
     <string name="backup_format_chatgpt_desc">OpenAI ChatGPT conversations.json export format</string>
     <string name="backup_format_chatbox">ChatBox</string>
@@ -5613,7 +5613,7 @@
     <string name="logcat_cannot_open_output_stream">Cannot open output stream</string>
     <string name="logcat_mediestore_save_failed">MediaStore save failed: %1$s</string>
     <string name="logcat_cannot_create_download_dir">Cannot create download directory</string>
-    <string name="logcat_cannot_create_operit_dir">Cannot create operit directory</string>
+    <string name="logcat_cannot_create_operit_dir">Cannot create compatibility data directory</string>
     <string name="logcat_file_create_failed">File creation failed or is empty</string>
     <string name="logcat_filesystem_save_failed">Filesystem save failed: %1$s</string>
 
@@ -6127,14 +6127,14 @@
     <string name="skill_publish_body_section_repo_info">## 🔗 Repository Info</string>
     <string name="skill_publish_body_label_repo_url">**Repository URL:** %1$s</string>
     <string name="skill_publish_body_section_install_method">## 📦 Installation</string>
-    <string name="skill_publish_body_install_step1">1. Open Operit → Package Manager → Skills</string>
+    <string name="skill_publish_body_install_step1">1. Open Mira → Extensions and Skills → Skills</string>
     <string name="skill_publish_body_install_step2">2. Tap "Import Skill" → "Import from Repository"</string>
     <string name="skill_publish_body_install_step3">3. Enter repository URL: `%1$s`</string>
     <string name="skill_publish_body_install_step4">4. Confirm import</string>
     <string name="skill_publish_body_section_tech_info">## 🛠️ Technical Info</string>
     <string name="skill_publish_body_table_header">| Item | Value |</string>
     <string name="skill_publish_body_table_separator">|------|-------|</string>
-    <string name="skill_publish_body_table_row_platform">| Platform | Operit Skill Market |</string>
+    <string name="skill_publish_body_table_row_platform">| Platform | Mira-compatible plugin market |</string>
     <string name="skill_publish_body_table_row_parser_version">| Parser version | 1.0 |</string>
     <string name="skill_publish_body_table_row_publish_time">| Publish time | %1$s |</string>
 
@@ -6475,7 +6475,7 @@
     <string name="demo_cmd_list_activities">List active Activities</string>
     <string name="demo_cmd_list_services">List system services</string>
     <string name="demo_cmd_check_resolution">Check screen resolution</string>
-    <string name="demo_cmd_echo_hello">Print Hello OperitTerminal</string>
+    <string name="demo_cmd_echo_hello">Print Hello Mira Terminal</string>
     <string name="demo_cmd_list_files">List files and directories</string>
     <string name="demo_cmd_show_user">Show current user</string>
     <string name="demo_cmd_update_package_manager">Update package manager (Ubuntu)</string>
@@ -7702,10 +7702,10 @@
     <string name="publish_failed_title">Publish failed</string>
     <string name="retry_market_registration">Retry market registration</string>
     <string name="update_to_market">Update to market</string>
-    <string name="create_operit_forge_title">Create OperitForge?</string>
-    <string name="create_operit_forge_message">This is your first direct publish. Operit needs to create a public repository `OperitForge` under your GitHub account.</string>
+    <string name="create_operit_forge_title">Create MiraForge?</string>
+    <string name="create_operit_forge_message">This is your first direct publish. Mira needs to create a public repository `MiraForge` under your GitHub account.</string>
     <string name="confirm_create_public_forge_title">Confirm create public repository</string>
-    <string name="confirm_create_public_forge_message">Please confirm again: create the public repository `OperitForge` now. Future publishes will reuse this repository.</string>
+    <string name="confirm_create_public_forge_message">Please confirm again: create the public repository `MiraForge` now. Future publishes will reuse this repository.</string>
     <string name="create_and_publish">Create and publish</string>
     <string name="artifact_type_script">Script</string>
     <string name="artifact_type_package">Package</string>
@@ -7769,9 +7769,9 @@
     <string name="artifact_publication_approved_waiting_schedule">Approved. Please wait for scheduled release.</string>
     <string name="confirm_remove_script_from_market">Are you sure you want to remove the script「%1$s」from the market? This will close the corresponding Issue but will not delete your publish repository.</string>
     <string name="confirm_remove_package_from_market">Are you sure you want to remove the package「%1$s」from the market? This will close the corresponding Issue but will not delete your publish repository.</string>
-    <string name="script_publish_info_description">The script will first be uploaded to your own OperitForge publish repository, then the metadata will be registered to OperitScriptMarket. Please ensure the script content, version, and description are accurate.</string>
+    <string name="script_publish_info_description">The script will first be uploaded to your own MiraForge repository, then registered in the Mira-compatible plugin market. Existing Operit plugin formats remain supported.</string>
     <string name="script_edit_info_description">You are editing the information of a published script. After updating, the metadata of the corresponding Issue in the market repository will be overwritten.</string>
-    <string name="package_publish_info_description">The package will first be uploaded to your own OperitForge publish repository, then the metadata will be registered to OperitPackageMarket. Please ensure the package content, version, and description are accurate.</string>
+    <string name="package_publish_info_description">The package will first be uploaded to your own MiraForge repository, then registered in the Mira-compatible plugin market. Existing Operit plugin formats remain supported.</string>
     <string name="package_edit_info_description">You are editing the information of a published package. After updating, the metadata of the corresponding Issue in the market repository will be overwritten.</string>
     <string name="script_publish_success_message">Your script has been successfully published to the market.</string>
     <string name="script_update_success_message">Your script information has been successfully updated.</string>
@@ -7891,7 +7891,7 @@
     <string name="screen_title_market">Market</string>
     <string name="screen_title_artifact_manage">Manage Scripts &amp; Packages</string>
     <string name="screen_title_artifact_publish">Publish Script or Package</string>
-    <string name="artifact_publish_info_description">The entry will first be uploaded to your own OperitForge publishing repository, then automatically registered in the script market or package market based on its type. Please ensure the content, version, and compatibility range are accurate.</string>
+    <string name="artifact_publish_info_description">The entry will first be uploaded to your own MiraForge repository, then registered in the Mira-compatible plugin market. Existing Operit plugin formats remain supported.</string>
     <string name="artifact_edit_info_description">You are editing the information of a published entry. After updating, the metadata of the corresponding Issue in the market repository will be overwritten.</string>
     <string name="need_login_before_publish_artifact">You need to log in to GitHub before publishing.</string>
     <string name="local_artifact_entry">Local Entry</string>
@@ -7908,7 +7908,7 @@
     <string name="quick_plugin_creator_title">Quickly Create Your Plugin</string>
     <string name="quick_plugin_creator_desc">Cannot find the plugin you want in the built-in list or marketplace? Create your own.</string>
     <string name="quick_plugin_creator_step1_title">1. Update or download the package creation Skill</string>
-    <string name="quick_plugin_creator_step1_desc">Click the button to automatically download install_or_update.js and run the operit_editor debug_run_sandbox_script for installation or update.</string>
+    <string name="quick_plugin_creator_step1_desc">Click to download install_or_update.js and run it through Mira’s built-in plugin editor.</string>
     <string name="quick_plugin_creator_run_setup">Auto download and execute</string>
     <string name="quick_plugin_creator_pull_skill_update">Pull Skill Updates</string>
     <string name="quick_plugin_creator_setup_success">Package creation Skill installation or update completed</string>
@@ -8071,7 +8071,7 @@
     <string name="artifact_publish_normalized_id_exists">Normalized market ID "%1$s" already exists</string>
     <string name="artifact_publish_identity_conflict_message">%1$s. If this is a new version release, please click the "Publish update version" button on the corresponding plugin page instead of publishing a new plugin.</string>
     <string name="artifact_publish_stage_validating">Validating local entries</string>
-    <string name="artifact_publish_stage_ensuring_repo">Checking OperitForge repository</string>
+    <string name="artifact_publish_stage_ensuring_repo">Checking MiraForge repository</string>
     <string name="artifact_publish_stage_creating_release">Creating or updating GitHub Release</string>
     <string name="artifact_publish_stage_uploading_asset">Uploading release assets</string>
     <string name="artifact_publish_stage_registering_market">Registering market entry</string>
@@ -8134,13 +8134,13 @@
     <string name="artifact_project_node_view_title">Node View</string>
     <string name="artifact_project_nodes_loading">Loading project nodes...</string>
     <string name="artifact_project_node_selection_hint">Click to select a node, click again to deselect.</string>
-    <string name="plugin_creation_fresh_task_line">Please activate the Operit Editor and use the sandbox package dev toolkit to develop a new sandbox package.</string>
+    <string name="plugin_creation_fresh_task_line">Activate Mira’s built-in plugin editor and use the sandbox package toolkit to create a new package.</string>
     <string name="plugin_creation_fresh_package_rule_line">First determine the new sandbox package ID, do not rename it later.</string>
-    <string name="plugin_creation_fresh_dev_directory_line">The development directory is fixed to Downloads/Operit/dev_package/your_determined_id. Development, installation, and testing are all done here.</string>
-    <string name="plugin_creation_continue_task_line">Please activate the Operit Editor, locate the sandbox package %1$s, and continue development and testing based on this version.</string>
-    <string name="plugin_creation_merge_task_line">Please activate the Operit Editor, locate the sandbox package %1$s, and perform merge development and testing based on this version.</string>
+    <string name="plugin_creation_fresh_dev_directory_line">Use the compatibility development directory assigned by SandboxPackage_DEV; develop, install, and test in the same project directory.</string>
+    <string name="plugin_creation_continue_task_line">Activate Mira’s built-in plugin editor, locate sandbox package %1$s, and continue development and testing from this version.</string>
+    <string name="plugin_creation_merge_task_line">Activate Mira’s built-in plugin editor, locate sandbox package %1$s, and merge and test changes from this version.</string>
     <string name="plugin_creation_existing_package_rule_line">Current sandbox package ID is %1$s. The package ID and plugin name must be kept; do not rename or create a new package.</string>
-    <string name="plugin_creation_existing_dev_directory_line">The development directory is fixed to Downloads/Operit/dev_package/%1$s. Development, installation, and testing are all done here.</string>
+    <string name="plugin_creation_existing_dev_directory_line">Use the compatibility development directory assigned to %1$s by SandboxPackage_DEV; develop, install, and test in that directory.</string>
     <string name="plugin_creation_update_sandbox_package_dev">First update SandboxPackage_DEV.</string>
     <string name="plugin_creation_copy_types_to_dev_dir">Copy the types from skills to the development directory, overwriting existing files.</string>
     <string name="plugin_creation_use_terminal_ts_js_hint">Use the terminal as much as possible, prioritize writing ts and js, then compile to final js. Refer to examples for tsconfig.</string>
