@@ -71,6 +71,7 @@ import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketDetailA
 import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketDetailBanner
 import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketDetailCommentDialog
 import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketDetailCommentsState
+import com.ai.assistance.operit.ui.features.packages.market.GitHubMarketRepository
 import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketDetailHeader
 import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketDetailIconAction
 import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketDetailInfoRow
@@ -118,6 +119,7 @@ fun UnifiedMarketDetailEntryScreen(
     val installStates by viewModel.installStates.collectAsState()
     val localInstallStates by viewModel.localInstallStates.collectAsState()
     val entryId = entry.id
+    val isMiraEntry = GitHubMarketRepository.isMiraEntryId(entryId)
     val sourceUrl = entry.source?.url.orEmpty()
     val review = remember(entry) { entry.resolveMarketReviewSnapshot() }
     val currentComments = commentsMap[entryId].orEmpty()
@@ -351,7 +353,12 @@ fun UnifiedMarketDetailEntryScreen(
         reactions =
             UnifiedMarketDetailReactionsState(
                 title = stringResource(R.string.mcp_plugin_community_feedback),
-                helperText = if (currentUser == null) stringResource(R.string.mcp_plugin_login_required) else null,
+                helperText =
+                    when {
+                        !isMiraEntry -> stringResource(R.string.market_legacy_entry_read_only)
+                        currentUser == null -> stringResource(R.string.mcp_plugin_login_required)
+                        else -> null
+                    },
                 isLoading = entryId in isLoadingReactions,
                 isMutating = entryId in isReacting,
                 options =
@@ -362,7 +369,7 @@ fun UnifiedMarketDetailEntryScreen(
                             icon = Icons.Default.ThumbUp,
                             tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
                             isSelected = hasThumbsUp,
-                            enabled = currentUser != null,
+                            enabled = currentUser != null && isMiraEntry,
                             onClick = {
                                 if (!hasThumbsUp) {
                                     hasThumbsUp = true
@@ -378,9 +385,14 @@ fun UnifiedMarketDetailEntryScreen(
                 comments = currentComments,
                 isLoading = entryId in isLoadingComments,
                 isPosting = entryId in isPostingComment,
-                canPost = currentUser != null,
-                postHint = if (currentUser == null) stringResource(R.string.mcp_plugin_login_required) else null,
-                currentUserLogin = currentUser?.login,
+                canPost = currentUser != null && isMiraEntry,
+                postHint =
+                    when {
+                        !isMiraEntry -> stringResource(R.string.market_legacy_entry_read_only)
+                        currentUser == null -> stringResource(R.string.mcp_plugin_login_required)
+                        else -> null
+                    },
+                currentUserLogin = currentUser?.login?.takeIf { isMiraEntry },
                 onRefresh = { viewModel.loadEntryComments(entryId) },
                 onRequestPost = {
                     replyingCommentId = null

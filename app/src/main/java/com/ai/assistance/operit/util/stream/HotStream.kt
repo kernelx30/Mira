@@ -3,11 +3,15 @@ package com.ai.assistance.operit.util.stream
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 
 /** 共享Stream接口，类似于SharedFlow */
 interface SharedStream<T> : Stream<T> {
@@ -304,7 +308,8 @@ fun <T> Stream<T>.share(
         scope: CoroutineScope,
         replay: Int = 0,
         started: StreamStart = StreamStart.EAGERLY,
-        onComplete: suspend () -> Unit = {}
+        onComplete: suspend () -> Unit = {},
+        onBeforeClose: suspend () -> Unit = {}
 ): SharedStream<T> {
     val sharedStream = MutableSharedStreamImpl<T>(replay = replay)
     var upstreamJob: Job? = null
@@ -313,15 +318,14 @@ fun <T> Stream<T>.share(
         StreamStart.EAGERLY -> {
             // 这个Job现在是scope的直接子Job
             upstreamJob =
-                    scope.launch {
+                    scope.launch(start = CoroutineStart.UNDISPATCHED) {
                         try {
+                            // Establish the finally block before dispatch. A DEFAULT launch whose
+                            // parent was just cancelled can skip its body and leave the stream open.
+                            yield()
                             this@share.collect { value -> sharedStream.emit(value) }
                         } finally {
-                            // 当上游流完成或被取消时，我们不再需要这个共享流。
-                            // 但由于SharedFlow本身不会"关闭"，依赖协程的结构化并发来清理是最好的方式。
-                            // 此处的finally确保了协程在任何情况下（完成、取消、异常）都能结束。
-                            sharedStream.close() // 关闭流以允许收集器完成
-                            onComplete()
+                            finishSharing(sharedStream, onBeforeClose, onComplete)
                         }
                     }
         }
@@ -332,14 +336,18 @@ fun <T> Stream<T>.share(
                     subscriptionCountFlow.collect { count ->
                         if (count > 0 && upstreamJob?.isActive != true) {
                             upstreamJob =
-                                    scope.launch {
+                                    scope.launch(start = CoroutineStart.UNDISPATCHED) {
                                         try {
+                                            yield()
                                             this@share.collect { emittedValue ->
                                                 sharedStream.emit(emittedValue)
                                             }
                                         } finally {
-                                            sharedStream.close() // 关闭流以允许收集器完成
-                                            onComplete()
+                                            finishSharing(
+                                                    sharedStream,
+                                                    onBeforeClose,
+                                                    onComplete
+                                            )
                                         }
                                     }
                         } else if (count == 0) {
@@ -353,12 +361,12 @@ fun <T> Stream<T>.share(
                             "Warning: Stream.share LAZILY mode could not observe subscriptions, may behave like EAGERLY."
                     )
                     // Fallback to EAGERLY behavior
-                    scope.launch {
+                    scope.launch(start = CoroutineStart.UNDISPATCHED) {
                         try {
+                            yield()
                             this@share.collect { value -> sharedStream.emit(value) }
                         } finally {
-                            sharedStream.close() // 关闭流以允许收集器完成
-                            onComplete()
+                            finishSharing(sharedStream, onBeforeClose, onComplete)
                         }
                     }
                 }
@@ -367,6 +375,25 @@ fun <T> Stream<T>.share(
     }
 
     return sharedStream
+}
+
+/** 完成状态必须先于关闭提交；任一钩子失败也不能跳过后续清理。 */
+private suspend fun <T> finishSharing(
+        sharedStream: MutableSharedStreamImpl<T>,
+        onBeforeClose: suspend () -> Unit,
+        onComplete: suspend () -> Unit
+) {
+    withContext(NonCancellable) {
+        try {
+            onBeforeClose()
+        } finally {
+            try {
+                sharedStream.close()
+            } finally {
+                onComplete()
+            }
+        }
+    }
 }
 
 /** 将Stream转变为StateStream，类似于Flow的stateIn */

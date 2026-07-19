@@ -136,11 +136,17 @@ fun Stream<String>.shareRevisable(
     scope: CoroutineScope,
     replay: Int = 0,
     started: StreamStart = StreamStart.EAGERLY,
-    onComplete: suspend () -> Unit = {}
+    onComplete: suspend () -> Unit = {},
+    onBeforeClose: suspend () -> Unit = {}
 ): SharedStream<String> {
-    val sharedTextStream = share(scope = scope, replay = replay, started = started, onComplete = onComplete)
+    val sharedTextStream =
+        share(
+            scope = scope,
+            replay = replay,
+            started = started,
+            onComplete = onComplete,
+            onBeforeClose = onBeforeClose
+        )
     val carrier = this as? TextStreamEventCarrier ?: return sharedTextStream
-    val sharedEventStream =
-        carrier.eventChannel.share(scope = scope, replay = Int.MAX_VALUE, started = started)
-    return sharedTextStream.withEventChannel(sharedEventStream)
+    return sharedTextStream.withEventChannel(carrier.eventChannel)
 }

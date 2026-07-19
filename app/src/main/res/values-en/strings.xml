@@ -93,10 +93,10 @@
     <string name="mate_memory_manual_correct_title">Correct memory</string>
     <string name="mate_memory_manual_scope_desc">Ownership controls which character and conversation can recall this memory.</string>
     <string name="mate_memory_manual_topic">Topic</string>
-    <string name="mate_memory_manual_topic_required">Use a short topic such as “Birthday”, “Food preference”, or “Our promise”.</string>
+    <string name="mate_memory_manual_topic_required">Use a short topic, including custom traits such as “Birthday”, “Favorite game”, “Personality: shy”, or “Our promise”.</string>
     <string name="mate_memory_manual_topic_optional">Leave this empty to keep the original topic and version chain.</string>
     <string name="mate_memory_manual_content">Memory</string>
-    <string name="mate_memory_manual_create_desc">Manual entries are stored as explicit user facts with local evidence.</string>
+    <string name="mate_memory_manual_create_desc">Manual entries are stored as explicit user facts with local evidence. Both the topic and value can be customized.</string>
     <string name="mate_memory_manual_correct_desc">A correction creates a new version and preserves the superseded text.</string>
     <string name="mate_memory_manual_cancel">Cancel</string>
     <string name="mate_memory_manual_save_action">Save</string>
@@ -238,6 +238,27 @@
     <string name="chat_style_bubble_rounded_corners_desc">When disabled, message bubbles use square corners</string>
     <string name="chat_style_bubble_rounded_corners_user">User</string>
     <string name="chat_style_bubble_rounded_corners_ai">AI</string>
+    <string name="bubble_personalization_title">Bubble themes</string>
+    <string name="bubble_personalization_desc">Choose a coordinated look, then fine-tune it. Presets style bubbles, text, corners, width, and avatars together.</string>
+    <string name="bubble_personalization_current_preset">Current preset: %1$s</string>
+    <string name="bubble_personalization_custom">Current: Custom</string>
+    <string name="bubble_personalization_advanced">Fine tuning</string>
+    <string name="bubble_personalization_custom_colors">Custom colors</string>
+    <string name="bubble_personalization_custom_colors_desc">Tap a swatch to style each bubble and text color. Alpha and recent colors are supported.</string>
+    <string name="bubble_preset_mira_blue">Mira Blue</string>
+    <string name="bubble_preset_wechat_green">WeChat Green</string>
+    <string name="bubble_preset_sakura">Sakura</string>
+    <string name="bubble_preset_mint">Mint</string>
+    <string name="bubble_preset_mist_purple">Mist Purple</string>
+    <string name="bubble_preset_monochrome">Monochrome</string>
+    <string name="bubble_user_corner_radius">Your bubble roundness</string>
+    <string name="bubble_ai_corner_radius">Character bubble roundness</string>
+    <string name="bubble_user_max_width">Your bubble max width</string>
+    <string name="bubble_ai_max_width">Character bubble max width</string>
+    <string name="bubble_message_spacing">Message vertical spacing</string>
+    <string name="bubble_shadow_strength">Solid and image bubble shadow</string>
+    <string name="bubble_value_dp">%1$d dp</string>
+    <string name="bubble_value_percent">%1$d%%</string>
     <string name="chat_style_bubble_advanced_options">Advanced options</string>
     <string name="chat_style_bubble_padding_left">Left padding</string>
     <string name="chat_style_bubble_padding_right">Right padding</string>
@@ -776,10 +797,8 @@
     <string name="about_version">Version: %1$s</string>
     <string name="about_description">Mira is a local-first Android AI companion that grows with you, remembers what matters, speaks naturally, and can act through tools you control.</string>
     <string name="about_developer">Mira maintainer: &lt;a href="https://github.com/kernelx30"&gt;kernelx30&lt;/a&gt;</string>
-    <string name="about_contact">Contact Us: aaswordsman@foxmail.com</string>
-    <string name="about_website">&lt;a href="https://github.com/kernelx30/Mira"&gt;GitHub: https://github.com/kernelx30/Mira&lt;/a&gt;</string>
-    <string name="upstream_project">Upstream project: Operit</string>
-    <string name="about_copyright">Mira · Based on Operit · LGPLv3</string>
+    <string name="about_contact">GitHub Issues: https://github.com/kernelx30/Mira/issues</string>
+    <string name="about_copyright">Mira · LGPLv3</string>
     <string name="star_on_github">Star on GitHub</string>
     <string name="update_log">Update Log</string>
     <string name="app_logo_description">App Logo</string>
@@ -1302,7 +1321,7 @@
         a. The automation features included in this software are intended for personal learning, research, and daily assistance only.<br>
         b. <b>It is strictly prohibited to use this software and its features for any form of commercial or for-profit activities, or for large-scale automated operations that may improperly affect third-party services.</b><br>
         c. You will be solely responsible for compensating any damages caused to third parties resulting from your use of this software. The community reserves the right to hold you accountable for any misuse.</p>
-        <p><b>4. Privacy Protection</b><br>We respect and protect the privacy of all our users. We commit to the following:<br>a. <b>Local Processing:</b> The voice recognition and speech synthesis features of this application operate entirely on your device. Related data will not be uploaded to any cloud servers.<br>b. <b>Third-Party AI Services:</b> The AI chat service used by this application is supported by third-party large model providers (such as DeepSeek). When you use this feature, your conversation data is sent directly to the respective service provider and does not pass through or get stored on our servers. We recommend that you also review and understand the privacy policies of the respective AI service providers.<br>c. <b>Data Security:</b> Apart from the cases mentioned above, we do not actively collect or store any of your personal information and will take reasonable data security measures to protect the local data necessary for the application\'s operation.</p>
+        <p><b>4. Privacy Protection</b><br>We respect and protect the privacy of all our users. We commit to the following:<br>a. <b>Local and Cloud Voice:</b> Mira supports on-device speech recognition and synthesis, and also supports third-party voice services that you configure yourself (such as Doubao, MiniMax, MIMO, or OpenAI). When a cloud service is enabled, the related audio or text is sent to that provider. Without a configured cloud service, Mira does not upload voice data on its own.<br>b. <b>Third-Party AI Services:</b> The AI chat service used by this application is supported by third-party large model providers (such as DeepSeek). When you use this feature, your conversation data is sent directly to the respective service provider and does not pass through or get stored on our servers. We recommend that you also review and understand the privacy policies of the respective AI service providers.<br>c. <b>Data Security:</b> Apart from the cases mentioned above, we do not actively collect or store any of your personal information and will take reasonable data security measures to protect the local data necessary for the application\'s operation.</p>
         <p><b>5. Agreement Modification</b><br>We reserve the right to modify these terms at any time. You can review the most current version of the agreement within the application. Your continued use of the service constitutes your acceptance of the revised terms.</p>
     ]]></string>
     <string name="agreement_disclaimer">If there is any inconsistency or conflict between the "Plain Language Version" and the "Formal Legal Agreement", the "Formal Legal Agreement" in Chinese shall prevail. We reserve the final right of interpretation.</string>
@@ -1539,7 +1558,7 @@
     <string name="overlay_permission">Overlay Permission</string>
     <string name="battery_optimization">Battery Optimization Exemption</string>
     <string name="location_permission">Location Permission</string>
-    <string name="operit_terminal">Operit Terminal</string>
+    <string name="operit_terminal">Mira Terminal</string>
     
     <!-- Permission Level Descriptions -->
     <string name="permission_level_standard">Standard Permission</string>
@@ -1636,6 +1655,7 @@
     <!-- Crash Report Screen -->
     <string name="crash_report_header">The application has encountered an unrecoverable error and needs to restart.</string>
     <string name="crash_report_restart_button">Restart Application</string>
+    <string name="crash_report_restart_failed">Restart scheduling failed. Please open Mira manually.</string>
     <string name="crash_report_details_title">Error Details</string>
     <string name="crash_report_copy_button">Copy</string>
     <string name="crash_report_export_button">Export</string>
@@ -1746,7 +1766,7 @@
 
     <string name="developer">Developer</string>
     <string name="contact">Contact</string>
-    <string name="project_url">Upstream project</string>
+    <string name="project_url">Mira GitHub Repository</string>
     <string name="open_source_licenses">Open Source Licenses</string>
     <string name="license_format">License: %1$s</string>
     <string name="visit_project">Visit Project</string>
@@ -3372,7 +3392,7 @@
     <string name="memory">Memory</string>
     <string name="memory_desc">Memory selection includes user preferences and memory base under that preference. To create a new memory base, go to settings to create a new user preference and select it here</string>
     <string name="memory_auto_update">Auto Save Memory</string>
-    <string name="memory_auto_update_desc">When enabled, candidate content from the current conversation is queued after the reply is finalized, then written into the memory library by periodic background processing while the app process remains alive.</string>
+    <string name="memory_auto_update_desc">When enabled, every completed turn is judged by the memory model for durable facts. Direct, high-confidence facts are saved automatically, while failed work is retried by the background queue.</string>
     <string name="memory_auto_update_runtime_status">Pending memory extraction items: %1$d, next save in %2$d minute(s)</string>
     <string name="chat_summarizing_memory">Summarizing memory...</string>
     <string name="chat_input_processing_collect_failed">Failed to collect input processing state: %1$s</string>
@@ -3722,6 +3742,12 @@
     <string name="layout_reset_settings_desc">Reset all layout adjustment settings to default values</string>
     
     <string name="settings_data_permissions">Data and Permissions</string>
+    <string name="settings_section_community_project">Community and Project</string>
+    <string name="settings_join_mira_qq_group">Join Mira Home</string>
+    <string name="settings_join_mira_qq_group_desc">QQ community group · 1070153809</string>
+    <string name="settings_mira_github_repository">Mira GitHub Repository</string>
+    <string name="settings_mira_github_repository_desc">Source code, releases, issues, and updates</string>
+    <string name="settings_check_updates_desc">View the current version and check Mira Releases for updates</string>
     <string name="settings_tool_permissions_subtitle">Tool permissions and security settings</string>
     <string name="settings_privacy_data_cleanup">Privacy and Data Cleanup</string>
     <string name="settings_clear_cookies">Clear Cookies</string>
@@ -4488,18 +4514,18 @@
     <string name="delete_tag">Delete Tag</string>
     <string name="delete_tag_confirm">Are you sure you want to delete tag "%1$s"? This action cannot be undone.</string>
 
-    <!-- OperitTerminal Wizard Card -->
-    <string name="operit_terminal_wizard_title">OperitTerminal Setup Wizard</string>
-    <string name="operit_terminal_not_installed">OperitTerminal not installed</string>
-    <string name="operit_terminal_update_available">OperitTerminal update available</string>
-    <string name="operit_terminal_up_to_date">OperitTerminal is up to date</string>
-    <string name="operit_terminal_install_description">OperitTerminal is a powerful terminal application that provides a complete Linux environment and package management capabilities. We need to install this application first.</string>
-    <string name="operit_terminal_install_button">Install OperitTerminal</string>
-    <string name="operit_terminal_update_description">A new version of OperitTerminal is available. It is recommended to update for better features and compatibility.</string>
+    <!-- Mira Terminal runtime wizard -->
+    <string name="operit_terminal_wizard_title">Mira Terminal Environment</string>
+    <string name="operit_terminal_not_installed">Mira terminal environment is not installed</string>
+    <string name="operit_terminal_update_available">Mira terminal environment update available</string>
+    <string name="operit_terminal_up_to_date">Mira terminal environment is up to date</string>
+    <string name="operit_terminal_install_description">Install the Linux terminal environment and package-management capabilities used by Mira.</string>
+    <string name="operit_terminal_install_button">Install Terminal Environment</string>
+    <string name="operit_terminal_update_description">A terminal environment update is available for improved features and compatibility.</string>
     <string name="operit_terminal_release_notes">Release Notes: %1$s</string>
-    <string name="operit_terminal_update_button">Update OperitTerminal</string>
-    <string name="operit_terminal_latest_description">Congratulations! You have installed the latest version of OperitTerminal and can start using its powerful terminal features.</string>
-    <string name="operit_terminal_open_button">Open OperitTerminal</string>
+    <string name="operit_terminal_update_button">Update Terminal Environment</string>
+    <string name="operit_terminal_latest_description">The Mira terminal environment is ready.</string>
+    <string name="operit_terminal_open_button">Open Mira Terminal</string>
 
     <!-- Function Types -->
     <string name="function_type_translation">Translation Function</string>
@@ -4708,14 +4734,14 @@
     <string name="mcp_issue_body_title_install_info">## Installation Info</string>
     <string name="mcp_issue_body_repo_address">**Repository:** %1$s</string>
     <string name="mcp_issue_body_title_install_method">### Installation</string>
-    <string name="mcp_issue_body_install_step1">1. Open Operit MCP configuration screen and tap "Import"</string>
+    <string name="mcp_issue_body_install_step1">1. Open Mira MCP settings and tap "Import"</string>
     <string name="mcp_issue_body_install_step2">2. Select "Import from Repo"</string>
     <string name="mcp_issue_body_install_step3">3. Enter repository URL: `%1$s`</string>
     <string name="mcp_issue_body_install_step4">4. Set plugin name and tap import</string>
     <string name="mcp_issue_body_title_tech_info">## Technical Info</string>
-    <string name="mcp_issue_body_tech_platform">- **Platform:** Operit MCP Market</string>
+    <string name="mcp_issue_body_tech_platform">- **Platform:** Mira-compatible plugin market</string>
     <string name="mcp_issue_body_tech_publish_time">- **Published at:** %1$s</string>
-    <string name="mcp_issue_body_footer_note">*This Issue was generated automatically by Operit*</string>
+    <string name="mcp_issue_body_footer_note">*This Issue was generated automatically by Mira*</string>
 
     <string name="mcp_publish_body_section_plugin_info">## 📋 Plugin Info</string>
     <string name="mcp_publish_body_label_description">**Description:** %1$s</string>
@@ -4724,18 +4750,18 @@
     <string name="mcp_publish_body_section_quick_install">## ⚡ Quick Install</string>
     <string name="mcp_publish_body_section_install_method">## 📦 Installation</string>
     <string name="mcp_publish_body_method_repo_import_title">### Method 1: Import from Repo</string>
-    <string name="mcp_publish_body_method_repo_import_step1">1. Open Operit MCP configuration screen</string>
+    <string name="mcp_publish_body_method_repo_import_step1">1. Open Mira MCP settings</string>
     <string name="mcp_publish_body_method_repo_import_step2">2. Tap "Import" → "Import from Repo"</string>
     <string name="mcp_publish_body_method_repo_import_step3">3. Enter repository URL: `%1$s`</string>
     <string name="mcp_publish_body_method_repo_import_step4">4. Set plugin name and import</string>
     <string name="mcp_publish_body_method_config_import_title">### Method 2: Import Config</string>
-    <string name="mcp_publish_body_method_config_import_step1">1. Open Operit MCP configuration screen</string>
+    <string name="mcp_publish_body_method_config_import_step1">1. Open Mira MCP settings</string>
     <string name="mcp_publish_body_method_config_import_step2">2. Tap "Import" → "Import Config"</string>
     <string name="mcp_publish_body_method_config_import_step3">3. Paste the following config:</string>
     <string name="mcp_publish_body_section_tech_info">## 🛠️ Technical Info</string>
     <string name="mcp_publish_body_table_header">| Item | Value |</string>
     <string name="mcp_publish_body_table_separator">|------|-----|</string>
-    <string name="mcp_publish_body_table_row_platform">| Platform | Operit MCP Market |</string>
+    <string name="mcp_publish_body_table_row_platform">| Platform | Mira-compatible plugin market |</string>
     <string name="mcp_publish_body_table_row_parser_version">| Parser Version | 1.0 |</string>
     <string name="mcp_publish_body_table_row_publish_time">| Published at | %1$s |</string>
     
@@ -5395,6 +5421,11 @@
 
     <string name="backup_chat_history">Chat History</string>
     <string name="backup_chat_history_subtitle">Cross-format backup, export and recovery</string>
+    <string name="backup_import_from_operit">Import from Operit</string>
+    <string name="backup_importing_from_operit">Importing from Operit…</string>
+    <string name="backup_import_from_operit_no_backup_title">No Operit chat backup found</string>
+    <string name="backup_import_from_operit_no_backup_message">Export a chat history JSON file from Data Backup &amp; Restore in Operit first, then choose the exported file.</string>
+    <string name="backup_import_from_operit_choose_file">Choose chat backup</string>
     <string name="backup_chat_current_count">Currently %1$d chat record(s).</string>
     
     <string name="backup_export">Export</string>
@@ -5402,8 +5433,9 @@
     <string name="backup_delete_all">Delete All</string>
     
     <string name="backup_memory_library">Memory Library</string>
-    <string name="backup_memory_library_subtitle">Cross-profile backup and recovery</string>
+    <string name="backup_memory_library_subtitle">Export legacy memories, companion records, evidence, episodes, relations, and grants</string>
     <string name="backup_memory_current_count">Currently %1$d memor(y/ies) and %2$d link(s).</string>
+    <string name="backup_memory_stats_failed">Failed to read memory statistics: %1$s</string>
     
     <string name="backup_model_config">Model Configurations</string>
     <string name="backup_model_config_subtitle">Backup and restore all model settings, including API keys and parameters</string>
@@ -5430,7 +5462,7 @@
     <string name="backup_select_export_format">Select Export Format</string>
     <string name="backup_select_format_hint">Please select the chat history format to export:</string>
     <string name="backup_format_json">JSON (Recommended)</string>
-    <string name="backup_format_json_desc">Operit native format, preserves variants and all other data</string>
+    <string name="backup_format_json_desc">Mira JSON preserves messages and reply variants; back up original attachment files separately</string>
     <string name="backup_format_markdown">Markdown</string>
     <string name="backup_format_markdown_desc">Lightweight markup format, easy to read and edit</string>
     <string name="backup_format_html">HTML</string>
@@ -5441,8 +5473,8 @@
     <!-- Import Format Selection -->
     <string name="backup_select_import_format">Select Import Format</string>
     <string name="backup_import_format_hint">Please select the chat history format to import:</string>
-    <string name="backup_format_operit">Operit JSON (Recommended)</string>
-    <string name="backup_format_operit_desc">Native format of this app, preserves variants and all other data</string>
+    <string name="backup_format_operit">Mira JSON (Recommended)</string>
+    <string name="backup_format_operit_desc">Mira native format preserves messages and reply variants; back up original attachment files separately</string>
     <string name="backup_format_chatgpt">ChatGPT</string>
     <string name="backup_format_chatgpt_desc">OpenAI ChatGPT conversations.json export format</string>
     <string name="backup_format_chatbox">ChatBox</string>
@@ -5476,8 +5508,8 @@
     <string name="backup_open_file_failed">Unable to open file</string>
     <string name="backup_import_file_empty">The imported file is empty</string>
 
-    <string name="backup_memory_import_result_success">Imported into profile "%1$s":\n- New memories: %2$d\n- Updated memories: %3$d\n- Skipped memories: %4$d\n- New links: %5$d</string>
-    <string name="backup_memory_export_result_success">Exported from profile "%1$s": %2$d memory(ies) and %3$d link(s) to:\n%4$s</string>
+    <string name="backup_memory_import_result_success">Imported into profile "%1$s":\n- New memories: %2$d\n- Updated memories: %3$d\n- Skipped memories: %4$d\n- New relations: %5$d\n- Evidence: %6$d\n- Episodes: %7$d\n- Grants: %8$d</string>
+    <string name="backup_memory_export_result_success">Exported from profile "%1$s":\n- Memories: %2$d\n- Relations: %3$d\n- Evidence: %4$d\n- Episodes: %5$d\n- Grants: %6$d\nFile: %7$s</string>
 
     <string name="backup_model_config_import_result_success">Successfully imported model configurations:\n- New: %1$d\n- Updated: %2$d%3$s</string>
     <string name="backup_model_config_import_result_skipped">\n- Skipped invalid configs: %1$d</string>
@@ -5613,7 +5645,7 @@
     <string name="logcat_cannot_open_output_stream">Cannot open output stream</string>
     <string name="logcat_mediestore_save_failed">MediaStore save failed: %1$s</string>
     <string name="logcat_cannot_create_download_dir">Cannot create download directory</string>
-    <string name="logcat_cannot_create_operit_dir">Cannot create operit directory</string>
+    <string name="logcat_cannot_create_operit_dir">Cannot create compatibility data directory</string>
     <string name="logcat_file_create_failed">File creation failed or is empty</string>
     <string name="logcat_filesystem_save_failed">Filesystem save failed: %1$s</string>
 
@@ -5640,6 +5672,11 @@
     <string name="toolreg_input_in_terminal_session_desc">Write input to terminal session [%1$s] (control=%2$s)</string>
     <string name="toolreg_get_terminal_session_screen_desc">Get current terminal screen content for session [%1$s] (single screen)</string>
     <string name="toolreg_query_memory_desc">Query memory library: %1$s</string>
+    <string name="toolreg_export_companion_memory_desc">Export complete Mira memory archive</string>
+    <string name="toolreg_export_chat_history_desc">Export chat history</string>
+    <string name="toolreg_manage_mira_settings_desc">Mira settings: %1$s %2$s</string>
+    <string name="toolreg_save_companion_memory_desc">Save companion memory: %1$s</string>
+    <string name="toolreg_delete_companion_memory_desc">Delete companion memory: %1$s</string>
     <string name="toolreg_get_memory_by_title_desc">Get memory by title: %1$s</string>
 
     <string name="toolreg_user_pref_birth_date">Birth date</string>
@@ -6127,14 +6164,14 @@
     <string name="skill_publish_body_section_repo_info">## 🔗 Repository Info</string>
     <string name="skill_publish_body_label_repo_url">**Repository URL:** %1$s</string>
     <string name="skill_publish_body_section_install_method">## 📦 Installation</string>
-    <string name="skill_publish_body_install_step1">1. Open Operit → Package Manager → Skills</string>
+    <string name="skill_publish_body_install_step1">1. Open Mira → Extensions and Skills → Skills</string>
     <string name="skill_publish_body_install_step2">2. Tap "Import Skill" → "Import from Repository"</string>
     <string name="skill_publish_body_install_step3">3. Enter repository URL: `%1$s`</string>
     <string name="skill_publish_body_install_step4">4. Confirm import</string>
     <string name="skill_publish_body_section_tech_info">## 🛠️ Technical Info</string>
     <string name="skill_publish_body_table_header">| Item | Value |</string>
     <string name="skill_publish_body_table_separator">|------|-------|</string>
-    <string name="skill_publish_body_table_row_platform">| Platform | Operit Skill Market |</string>
+    <string name="skill_publish_body_table_row_platform">| Platform | Mira-compatible plugin market |</string>
     <string name="skill_publish_body_table_row_parser_version">| Parser version | 1.0 |</string>
     <string name="skill_publish_body_table_row_publish_time">| Publish time | %1$s |</string>
 
@@ -6475,7 +6512,7 @@
     <string name="demo_cmd_list_activities">List active Activities</string>
     <string name="demo_cmd_list_services">List system services</string>
     <string name="demo_cmd_check_resolution">Check screen resolution</string>
-    <string name="demo_cmd_echo_hello">Print Hello OperitTerminal</string>
+    <string name="demo_cmd_echo_hello">Print Hello Mira Terminal</string>
     <string name="demo_cmd_list_files">List files and directories</string>
     <string name="demo_cmd_show_user">Show current user</string>
     <string name="demo_cmd_update_package_manager">Update package manager (Ubuntu)</string>
@@ -7702,10 +7739,10 @@
     <string name="publish_failed_title">Publish failed</string>
     <string name="retry_market_registration">Retry market registration</string>
     <string name="update_to_market">Update to market</string>
-    <string name="create_operit_forge_title">Create OperitForge?</string>
-    <string name="create_operit_forge_message">This is your first direct publish. Operit needs to create a public repository `OperitForge` under your GitHub account.</string>
+    <string name="create_operit_forge_title">Create MiraForge?</string>
+    <string name="create_operit_forge_message">This is your first direct publish. Mira needs to create a public repository `MiraForge` under your GitHub account.</string>
     <string name="confirm_create_public_forge_title">Confirm create public repository</string>
-    <string name="confirm_create_public_forge_message">Please confirm again: create the public repository `OperitForge` now. Future publishes will reuse this repository.</string>
+    <string name="confirm_create_public_forge_message">Please confirm again: create the public repository `MiraForge` now. Future publishes will reuse this repository.</string>
     <string name="create_and_publish">Create and publish</string>
     <string name="artifact_type_script">Script</string>
     <string name="artifact_type_package">Package</string>
@@ -7769,9 +7806,9 @@
     <string name="artifact_publication_approved_waiting_schedule">Approved. Please wait for scheduled release.</string>
     <string name="confirm_remove_script_from_market">Are you sure you want to remove the script「%1$s」from the market? This will close the corresponding Issue but will not delete your publish repository.</string>
     <string name="confirm_remove_package_from_market">Are you sure you want to remove the package「%1$s」from the market? This will close the corresponding Issue but will not delete your publish repository.</string>
-    <string name="script_publish_info_description">The script will first be uploaded to your own OperitForge publish repository, then the metadata will be registered to OperitScriptMarket. Please ensure the script content, version, and description are accurate.</string>
+    <string name="script_publish_info_description">The script will first be uploaded to your own MiraForge repository, then registered in the Mira-compatible plugin market. Existing Operit plugin formats remain supported.</string>
     <string name="script_edit_info_description">You are editing the information of a published script. After updating, the metadata of the corresponding Issue in the market repository will be overwritten.</string>
-    <string name="package_publish_info_description">The package will first be uploaded to your own OperitForge publish repository, then the metadata will be registered to OperitPackageMarket. Please ensure the package content, version, and description are accurate.</string>
+    <string name="package_publish_info_description">The package will first be uploaded to your own MiraForge repository, then registered in the Mira-compatible plugin market. Existing Operit plugin formats remain supported.</string>
     <string name="package_edit_info_description">You are editing the information of a published package. After updating, the metadata of the corresponding Issue in the market repository will be overwritten.</string>
     <string name="script_publish_success_message">Your script has been successfully published to the market.</string>
     <string name="script_update_success_message">Your script information has been successfully updated.</string>
@@ -7891,7 +7928,7 @@
     <string name="screen_title_market">Market</string>
     <string name="screen_title_artifact_manage">Manage Scripts &amp; Packages</string>
     <string name="screen_title_artifact_publish">Publish Script or Package</string>
-    <string name="artifact_publish_info_description">The entry will first be uploaded to your own OperitForge publishing repository, then automatically registered in the script market or package market based on its type. Please ensure the content, version, and compatibility range are accurate.</string>
+    <string name="artifact_publish_info_description">The entry will first be uploaded to your own MiraForge repository, then registered in the Mira-compatible plugin market. Existing Operit plugin formats remain supported.</string>
     <string name="artifact_edit_info_description">You are editing the information of a published entry. After updating, the metadata of the corresponding Issue in the market repository will be overwritten.</string>
     <string name="need_login_before_publish_artifact">You need to log in to GitHub before publishing.</string>
     <string name="local_artifact_entry">Local Entry</string>
@@ -7908,7 +7945,7 @@
     <string name="quick_plugin_creator_title">Quickly Create Your Plugin</string>
     <string name="quick_plugin_creator_desc">Cannot find the plugin you want in the built-in list or marketplace? Create your own.</string>
     <string name="quick_plugin_creator_step1_title">1. Update or download the package creation Skill</string>
-    <string name="quick_plugin_creator_step1_desc">Click the button to automatically download install_or_update.js and run the operit_editor debug_run_sandbox_script for installation or update.</string>
+    <string name="quick_plugin_creator_step1_desc">Click to download install_or_update.js and run it through Mira’s built-in plugin editor.</string>
     <string name="quick_plugin_creator_run_setup">Auto download and execute</string>
     <string name="quick_plugin_creator_pull_skill_update">Pull Skill Updates</string>
     <string name="quick_plugin_creator_setup_success">Package creation Skill installation or update completed</string>
@@ -7944,11 +7981,21 @@
     <string name="speech_services_vits_options_placeholder">{\"sample_rate\":\"22050\",\"noise_scale\":\"0.667\",\"length_scale\":\"1.0\",\"noise_w\":\"0.8\",\"frontend\":\"lexicon\"}</string>
     <string name="speech_services_vits_options_hint">Optional: sample_rate, threads, noise_scale, length_scale, noise_w, frontend, text_mode, speaker_count, input names, blank/bos/eos tokens, model_path, config_path, lexicon_path, etc.</string>
     <string name="speech_services_vits_options_error">Invalid VITS/Piper Parameters JSON</string>
-    <string name="github_login_method_description">Please select a GitHub login method. Embedded mode is suitable for devices that cannot launch an external browser; external browser mode offers better compatibility.</string>
-    <string name="github_login_method_embedded">Login with Embedded Page</string>
-    <string name="github_login_method_external">Login with External Browser</string>
-    <string name="github_login_external_waiting">Browser opened. Please return to the app after completing authorization.</string>
-    <string name="github_login_external_cancelled">GitHub authorization cancelled</string>
+    <string name="github_device_login_requesting_code">Requesting a one-time code from GitHub…</string>
+    <string name="github_device_login_instructions">Copy the code below and open GitHub to authorize Mira. Mira will sign in automatically after approval.</string>
+    <string name="github_device_login_code_label">GitHub device code</string>
+    <string name="github_device_login_copy_code">Copy code</string>
+    <string name="github_device_login_code_copied">Code copied</string>
+    <string name="github_device_login_open_github">Open GitHub</string>
+    <string name="github_device_login_waiting">Waiting for GitHub authorization. The code expires in about %1$d minutes.</string>
+    <string name="github_device_login_retry">Get new code</string>
+    <string name="github_device_login_browser_failed">No browser is available to open GitHub</string>
+    <string name="github_device_login_client_id_missing">This build has no GitHub OAuth Client ID</string>
+    <string name="github_device_login_expired">The code expired. Get a new code and try again.</string>
+    <string name="github_device_login_denied">GitHub authorization was cancelled</string>
+    <string name="github_device_login_rejected">GitHub rejected this sign-in request</string>
+    <string name="github_device_login_verification_failed">GitHub credential verification failed. The existing account was not changed.</string>
+    <string name="github_device_login_insufficient_scope">GitHub did not grant the permissions required for publishing and market features</string>
     <string name="chat_message_locator_favorites_filter">Favorites Only</string>
     <string name="attachment_package">Package</string>
     <string name="attachment_package_select_title">Select Package</string>
@@ -8071,7 +8118,7 @@
     <string name="artifact_publish_normalized_id_exists">Normalized market ID "%1$s" already exists</string>
     <string name="artifact_publish_identity_conflict_message">%1$s. If this is a new version release, please click the "Publish update version" button on the corresponding plugin page instead of publishing a new plugin.</string>
     <string name="artifact_publish_stage_validating">Validating local entries</string>
-    <string name="artifact_publish_stage_ensuring_repo">Checking OperitForge repository</string>
+    <string name="artifact_publish_stage_ensuring_repo">Checking MiraForge repository</string>
     <string name="artifact_publish_stage_creating_release">Creating or updating GitHub Release</string>
     <string name="artifact_publish_stage_uploading_asset">Uploading release assets</string>
     <string name="artifact_publish_stage_registering_market">Registering market entry</string>
@@ -8134,13 +8181,13 @@
     <string name="artifact_project_node_view_title">Node View</string>
     <string name="artifact_project_nodes_loading">Loading project nodes...</string>
     <string name="artifact_project_node_selection_hint">Click to select a node, click again to deselect.</string>
-    <string name="plugin_creation_fresh_task_line">Please activate the Operit Editor and use the sandbox package dev toolkit to develop a new sandbox package.</string>
+    <string name="plugin_creation_fresh_task_line">Activate Mira’s built-in plugin editor and use the sandbox package toolkit to create a new package.</string>
     <string name="plugin_creation_fresh_package_rule_line">First determine the new sandbox package ID, do not rename it later.</string>
-    <string name="plugin_creation_fresh_dev_directory_line">The development directory is fixed to Downloads/Operit/dev_package/your_determined_id. Development, installation, and testing are all done here.</string>
-    <string name="plugin_creation_continue_task_line">Please activate the Operit Editor, locate the sandbox package %1$s, and continue development and testing based on this version.</string>
-    <string name="plugin_creation_merge_task_line">Please activate the Operit Editor, locate the sandbox package %1$s, and perform merge development and testing based on this version.</string>
+    <string name="plugin_creation_fresh_dev_directory_line">Use the compatibility development directory assigned by SandboxPackage_DEV; develop, install, and test in the same project directory.</string>
+    <string name="plugin_creation_continue_task_line">Activate Mira’s built-in plugin editor, locate sandbox package %1$s, and continue development and testing from this version.</string>
+    <string name="plugin_creation_merge_task_line">Activate Mira’s built-in plugin editor, locate sandbox package %1$s, and merge and test changes from this version.</string>
     <string name="plugin_creation_existing_package_rule_line">Current sandbox package ID is %1$s. The package ID and plugin name must be kept; do not rename or create a new package.</string>
-    <string name="plugin_creation_existing_dev_directory_line">The development directory is fixed to Downloads/Operit/dev_package/%1$s. Development, installation, and testing are all done here.</string>
+    <string name="plugin_creation_existing_dev_directory_line">Use the compatibility development directory assigned to %1$s by SandboxPackage_DEV; develop, install, and test in that directory.</string>
     <string name="plugin_creation_update_sandbox_package_dev">First update SandboxPackage_DEV.</string>
     <string name="plugin_creation_copy_types_to_dev_dir">Copy the types from skills to the development directory, overwriting existing files.</string>
     <string name="plugin_creation_use_terminal_ts_js_hint">Use the terminal as much as possible, prioritize writing ts and js, then compile to final js. Refer to examples for tsconfig.</string>
@@ -8261,6 +8308,11 @@
     <string name="search_voice_hint">Search voice name or voice_type</string>
     <string name="manage_character_group_chat">Create / manage group chat</string>
     <string name="mira_memory_saved_receipt">Remembered: %1$s</string>
+    <string name="mira_memory_deleted_receipt">Deleted memory: %1$s</string>
+    <string name="mira_memory_receipt_correct_action">Correct</string>
+    <string name="mira_memory_receipt_evidence_title">Recorded from</string>
+    <string name="mira_memory_receipt_not_found">This memory has changed. Open the memory archive to review it.</string>
+    <string name="mira_memory_receipt_correction_saved">Memory corrected. The previous version remains in history.</string>
     <string name="voice_call_expressive_tts">Expressive speech</string>
     <string name="voice_call_expressive_tts_desc">Adjust emotion, pace, and pauses to match each reply</string>
     <string name="voice_call_expression_restrained">Restrained</string>
@@ -8298,4 +8350,7 @@
     <string name="profile_display_name_value">Name: %1$s</string>
     <string name="profile_preferred_address_value">Preferred address: %1$s</string>
     <string name="profile_pronouns_value">Pronouns or terms: %1$s</string>
+    <string name="backup_restart_schedule_failed">Could not schedule restart. Please reopen Mira manually.</string>
+    <string name="update_no_downloadable_apk">No downloadable APK</string>
+    <string name="market_legacy_entry_read_only">This entry comes from the Operit compatibility catalog and is read-only in Mira. Installation remains available.</string>
 </resources>

@@ -291,6 +291,7 @@ class SherpaMnnSpeechProvider(private val context: Context) : SpeechService {
         if (isRecognizing) return false
 
         _recognitionState.value = SpeechService.RecognitionState.PREPARING
+        _recognitionError.value = SpeechService.RecognitionError(0, "")
         _recognitionResult.value = SpeechService.RecognitionResult(text = "", isFinal = false, confidence = 0f)
         
         // 重置 VAD 和创建新的 stream
@@ -660,4 +661,3 @@ class SherpaMnnSpeechProvider(private val context: Context) : SpeechService {
         }
     }
 }
-

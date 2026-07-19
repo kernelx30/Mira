@@ -56,6 +56,38 @@ import kotlin.math.sqrt
  * rest of the application.
  */
 class MemoryRepository(private val context: Context, profileId: String) {
+    internal data class PortableMemorySnapshot(
+        val id: Long,
+        val uuid: String,
+        val title: String,
+        val content: String,
+        val contentType: String,
+        val source: String,
+        val credibility: Float,
+        val importance: Float,
+        val documentPath: String?,
+        val chunkIndexFilePath: String?,
+        val folderPath: String?,
+        val embedding: Embedding?,
+        val createdAt: Date,
+        val updatedAt: Date,
+        val lastAccessedAt: Date,
+        val tagNames: List<String>,
+        val propertyValues: Map<String, String>,
+    )
+
+    internal data class PortableLinkSnapshot(
+        val sourceId: Long,
+        val targetId: Long,
+        val type: String,
+        val weight: Float,
+        val description: String,
+    )
+
+    internal data class PortableImportSnapshot(
+        val memories: List<PortableMemorySnapshot>,
+        val links: List<PortableLinkSnapshot>,
+    )
 
     companion object {
         /** Represents a strong link, e.g., "A is a B". */
@@ -2668,6 +2700,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 folderPath = memory.folderPath,
                 createdAt = memory.createdAt,
                 updatedAt = memory.updatedAt,
+                lastAccessedAtMs = memory.lastAccessedAt.time,
                 tagNames = tagNames,
                 propertyValues = propertyValues,
             )
@@ -2704,7 +2737,7 @@ class MemoryRepository(private val context: Context, profileId: String) {
             memories = serializableMemories,
             links = serializableLinks.distinct(), // 去重
             exportDate = Date(),
-            version = "1.0"
+            version = "1.1"
         )
         
         // 序列化为 JSON
@@ -2713,6 +2746,160 @@ class MemoryRepository(private val context: Context, profileId: String) {
             ignoreUnknownKeys = true
         }
         json.encodeToString(exportData)
+    }
+
+    suspend fun getPortableExportCounts(): Pair<Int, Int> = withContext(Dispatchers.IO) {
+        val memories = memoryBox.query(Memory_.isDocumentNode.equal(false)).build().find()
+        val memoryIds = memories.mapTo(hashSetOf()) { it.id }
+        val linkCount =
+            linkBox.all.count { link ->
+                link.source.targetId in memoryIds && link.target.targetId in memoryIds
+            }
+        memories.size to linkCount
+    }
+
+    /**
+     * 统一记忆包同时写 ObjectBox 与 Room。这里保留 ObjectBox 导入前的完整内存快照，
+     * 让 Room 写入或最终提交失败时可以执行补偿回滚，而不是留下半套记忆。
+     */
+    internal fun capturePortableImportSnapshot(importedUuids: Set<String>): PortableImportSnapshot =
+        store.callInTx {
+            val memories =
+                if (importedUuids.isEmpty()) {
+                    emptyList()
+                } else {
+                    memoryBox.query(Memory_.isDocumentNode.equal(false)).build().find()
+                        .filter { it.uuid in importedUuids }
+                }
+            val memoryIds = memories.mapTo(hashSetOf()) { it.id }
+            PortableImportSnapshot(
+                memories =
+                    memories.map { memory ->
+                        memory.tags.reset()
+                        memory.properties.reset()
+                        PortableMemorySnapshot(
+                            id = memory.id,
+                            uuid = memory.uuid,
+                            title = memory.title,
+                            content = memory.content,
+                            contentType = memory.contentType,
+                            source = memory.source,
+                            credibility = memory.credibility,
+                            importance = memory.importance,
+                            documentPath = memory.documentPath,
+                            chunkIndexFilePath = memory.chunkIndexFilePath,
+                            folderPath = memory.folderPath,
+                            embedding = memory.embedding?.let { Embedding(it.vector.copyOf()) },
+                            createdAt = Date(memory.createdAt.time),
+                            updatedAt = Date(memory.updatedAt.time),
+                            lastAccessedAt = Date(memory.lastAccessedAt.time),
+                            tagNames = memory.tags.map { it.name },
+                            propertyValues = memory.properties.associate { it.key to it.value },
+                        )
+                    },
+                links =
+                    linkBox.all.mapNotNull { link ->
+                        val sourceId = link.source.targetId
+                        val targetId = link.target.targetId
+                        if (sourceId !in memoryIds && targetId !in memoryIds) {
+                            null
+                        } else {
+                            PortableLinkSnapshot(
+                                sourceId = sourceId,
+                                targetId = targetId,
+                                type = link.type,
+                                weight = link.weight,
+                                description = link.description,
+                            )
+                        }
+                    },
+            )
+        }
+
+    internal fun restorePortableImportSnapshot(
+        snapshot: PortableImportSnapshot,
+        createdMemoryIds: Set<Long>,
+    ) {
+        store.runInTx {
+            val snapshotIds = snapshot.memories.mapTo(hashSetOf()) { it.id }
+            val affectedIds = snapshotIds + createdMemoryIds
+            val currentMemories = affectedIds.mapNotNull { memoryId -> memoryBox.get(memoryId) }
+
+            val importedLinkIds =
+                linkBox.all
+                    .filter { it.source.targetId in affectedIds || it.target.targetId in affectedIds }
+                    .map { it.id }
+            if (importedLinkIds.isNotEmpty()) {
+                linkBox.removeByIds(importedLinkIds)
+            }
+
+            currentMemories.forEach { memory ->
+                memory.properties.reset()
+                val propertyIds = memory.properties.map { it.id }.filter { it > 0L }
+                memory.properties.clear()
+                memory.tags.reset()
+                memory.tags.clear()
+                memoryBox.put(memory)
+                if (propertyIds.isNotEmpty()) {
+                    propertyBox.removeByIds(propertyIds)
+                }
+            }
+            if (createdMemoryIds.isNotEmpty()) {
+                memoryBox.removeByIds(createdMemoryIds.toList())
+            }
+
+            snapshot.memories.forEach { saved ->
+                val memory = requireNotNull(memoryBox.get(saved.id)) {
+                    "Portable memory rollback lost existing memory id=${saved.id}"
+                }
+                memory.uuid = saved.uuid
+                memory.title = saved.title
+                memory.content = saved.content
+                memory.contentType = saved.contentType
+                memory.source = saved.source
+                memory.credibility = saved.credibility
+                memory.importance = saved.importance
+                memory.documentPath = saved.documentPath
+                memory.chunkIndexFilePath = saved.chunkIndexFilePath
+                memory.folderPath = saved.folderPath
+                memory.embedding = saved.embedding?.let { Embedding(it.vector.copyOf()) }
+                memory.createdAt = Date(saved.createdAt.time)
+                memory.updatedAt = Date(saved.updatedAt.time)
+                memory.lastAccessedAt = Date(saved.lastAccessedAt.time)
+                saved.tagNames.forEach { tagName ->
+                    val tag =
+                        tagBox.query(MemoryTag_.name.equal(tagName)).build().findFirst()
+                            ?: MemoryTag(name = tagName).also { tagBox.put(it) }
+                    memory.tags.add(tag)
+                }
+                saved.propertyValues.forEach { (key, value) ->
+                    val property = MemoryProperty(key = key, value = value)
+                    propertyBox.put(property)
+                    memory.properties.add(property)
+                }
+                memoryBox.put(memory)
+            }
+
+            snapshot.links.forEach { saved ->
+                val source = requireNotNull(memoryBox.get(saved.sourceId)) {
+                    "Portable memory rollback lost link source id=${saved.sourceId}"
+                }
+                val target = requireNotNull(memoryBox.get(saved.targetId)) {
+                    "Portable memory rollback lost link target id=${saved.targetId}"
+                }
+                val link =
+                    MemoryLink(
+                        type = saved.type,
+                        weight = saved.weight,
+                        description = saved.description,
+                    )
+                link.source.target = source
+                link.target.target = target
+                source.links.add(link)
+                memoryBox.put(source)
+            }
+        }
+        rebuildAllMemoryVectorIndices()
     }
     
     /**
@@ -2723,7 +2910,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
      */
     suspend fun importMemoriesFromJson(
         jsonString: String,
-        strategy: ImportStrategy = ImportStrategy.SKIP
+        strategy: ImportStrategy = ImportStrategy.SKIP,
+        onMemoryCreated: ((Long) -> Unit)? = null,
     ): MemoryImportResult = withContext(Dispatchers.IO) {
         val json = Json { 
             ignoreUnknownKeys = true
@@ -2731,7 +2919,21 @@ class MemoryRepository(private val context: Context, profileId: String) {
         
         try {
             val exportData = json.decodeFromString<MemoryExportData>(jsonString)
-            
+            require(exportData.version == "1.0" || exportData.version == "1.1") {
+                "Unsupported legacy memory format version: ${exportData.version}"
+            }
+            val importedUuids = exportData.memories.map { it.uuid }
+            require(importedUuids.all { it.isNotBlank() }) { "Memory UUID must not be blank" }
+            require(importedUuids.distinct().size == importedUuids.size) {
+                "Duplicate memory UUIDs in import data"
+            }
+            val importedUuidSet = importedUuids.toSet()
+            require(
+                exportData.links.all {
+                    it.sourceUuid in importedUuidSet && it.targetUuid in importedUuidSet
+                }
+            ) { "Memory link references a missing memory" }
+            val result = store.callInTx {
             var newCount = 0
             var updatedCount = 0
             var skippedCount = 0
@@ -2758,7 +2960,11 @@ class MemoryRepository(private val context: Context, profileId: String) {
                             credibility = serializableMemory.credibility
                             importance = serializableMemory.importance
                             folderPath = normalizeFolderPath(serializableMemory.folderPath)
-                            updatedAt = Date()
+                            embedding = null
+                            createdAt = serializableMemory.createdAt
+                            updatedAt = serializableMemory.updatedAt
+                            lastAccessedAt =
+                                Date(serializableMemory.lastAccessedAtMs ?: serializableMemory.updatedAt.time)
                         }
                         memoryBox.put(existingMemory)
                         updatedCount++
@@ -2766,18 +2972,10 @@ class MemoryRepository(private val context: Context, profileId: String) {
                         
                         // 更新标签
                         updateMemoryTags(existingMemory, serializableMemory.tagNames)
-                        if (serializableMemory.propertyValues.isNotEmpty()) {
-                            setMemoryProperties(
-                                memory = existingMemory,
-                                values = serializableMemory.propertyValues,
-                                removeKeys =
-                                    if (CompanionMemoryKeys.KIND in serializableMemory.propertyValues) {
-                                        CompanionMemoryKeys.ALL
-                                    } else {
-                                        emptySet()
-                                    },
-                            )
-                        }
+                        replaceMemoryPropertiesForImport(
+                            memory = existingMemory,
+                            values = serializableMemory.propertyValues,
+                        )
                     }
                     
                     else -> {
@@ -2786,12 +2984,11 @@ class MemoryRepository(private val context: Context, profileId: String) {
                             serializableMemory,
                             strategy == ImportStrategy.CREATE_NEW
                         )
-                        if (serializableMemory.propertyValues.isNotEmpty()) {
-                            setMemoryProperties(
-                                memory = newMemory,
-                                values = serializableMemory.propertyValues,
-                            )
-                        }
+                        replaceMemoryPropertiesForImport(
+                            memory = newMemory,
+                            values = serializableMemory.propertyValues,
+                        )
+                        onMemoryCreated?.invoke(newMemory.id)
                         newCount++
                         uuidMap[serializableMemory.uuid] = newMemory
                     }
@@ -2824,6 +3021,10 @@ class MemoryRepository(private val context: Context, profileId: String) {
                         sourceMemory.links.add(newLink)
                         memoryBox.put(sourceMemory)
                         newLinksCount++
+                    } else if (strategy == ImportStrategy.UPDATE) {
+                        existingLink.weight = serializableLink.weight
+                        existingLink.description = serializableLink.description
+                        linkBox.put(existingLink)
                     }
                 }
             }
@@ -2836,6 +3037,9 @@ class MemoryRepository(private val context: Context, profileId: String) {
                 skippedMemories = skippedCount,
                 newLinks = newLinksCount
             )
+            }
+            rebuildAllMemoryVectorIndices()
+            result
             
         } catch (e: Exception) {
             com.ai.assistance.operit.util.AppLogger.e("MemoryRepo", "Failed to import memories", e)
@@ -2863,7 +3067,8 @@ class MemoryRepository(private val context: Context, profileId: String) {
             importance = serializable.importance,
             folderPath = normalizeFolderPath(serializable.folderPath),
             createdAt = serializable.createdAt,
-            updatedAt = serializable.updatedAt
+            updatedAt = serializable.updatedAt,
+            lastAccessedAt = Date(serializable.lastAccessedAtMs ?: serializable.updatedAt.time),
         )
         
         memoryBox.put(memory)
@@ -2889,6 +3094,26 @@ class MemoryRepository(private val context: Context, profileId: String) {
         }
         
         memoryBox.put(memory)
+    }
+
+    /** 导入恢复要求属性与备份完全一致，不能保留目标库中包内不存在的旧属性。 */
+    private fun replaceMemoryPropertiesForImport(
+        memory: Memory,
+        values: Map<String, String>,
+    ) {
+        memory.properties.reset()
+        val existing = memory.properties.toList()
+        existing.forEach(memory.properties::remove)
+        values.forEach { (key, value) ->
+            val property = MemoryProperty(key = key, value = value)
+            propertyBox.put(property)
+            memory.properties.add(property)
+        }
+        memoryBox.put(memory)
+        val removable = existing.filter { it.id > 0L }
+        if (removable.isNotEmpty()) {
+            propertyBox.remove(removable)
+        }
     }
 
 }

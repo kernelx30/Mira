@@ -256,6 +256,9 @@ class RemoteAnnouncementRepository(
 
     companion object {
         private const val TAG = "RemoteAnnouncementRepo"
-        const val DEFAULT_POINTER_URL = "https://operit.app/announcements/latest.json"
+        // Mira 公告只从自己的仓库读取，避免把上游 Operit 的运营内容带进来。
+        // 未发布公告文件时请求返回空，应用不会显示任何远程公告。
+        const val DEFAULT_POINTER_URL =
+            "https://raw.githubusercontent.com/kernelx30/Mira/main/announcements/latest.json"
     }
 }

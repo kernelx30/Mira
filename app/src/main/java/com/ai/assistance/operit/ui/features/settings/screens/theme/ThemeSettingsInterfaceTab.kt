@@ -66,9 +66,9 @@ private fun ThemeSettingsInterfaceColorPanel(
     val customNavigationDrawerAccentColor by preferencesManager.customNavigationDrawerAccentColor.collectAsState(initial = null)
     val chatHeaderTransparent by preferencesManager.chatHeaderTransparent.collectAsState(initial = false)
     val chatHeaderOverlayMode by preferencesManager.chatHeaderOverlayMode.collectAsState(initial = false)
-    val chatInputTransparent by preferencesManager.chatInputTransparent.collectAsState(initial = false)
+    val chatInputTransparent by preferencesManager.chatInputTransparent.collectAsState(initial = true)
     val chatInputFloating by preferencesManager.chatInputFloating.collectAsState(initial = true)
-    val chatInputLiquidGlass by preferencesManager.chatInputLiquidGlass.collectAsState(initial = false)
+    val chatInputLiquidGlass by preferencesManager.chatInputLiquidGlass.collectAsState(initial = true)
     val chatInputWaterGlass by preferencesManager.chatInputWaterGlass.collectAsState(initial = false)
     val forceAppBarContentColor by preferencesManager.forceAppBarContentColor.collectAsState(initial = false)
     val appBarContentColorMode by preferencesManager.appBarContentColorMode.collectAsState(

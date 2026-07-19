@@ -576,8 +576,8 @@ fun ChatHistorySelector(
     val actualLazyListState = lazyListState ?: rememberLazyListState()
     val ungroupedText = stringResource(R.string.ungrouped)
 
-    // 当搜索查询改变时，执行内容搜索（带防抖延迟）
-    LaunchedEffect(searchQuery, chatHistories) {
+    // 标题和正文始终同时参与搜索；正文查询做防抖，避免每次按键都扫数据库。
+    LaunchedEffect(searchQuery) {
         val trimmedQuery = searchQuery.trim()
         if (trimmedQuery.isBlank()) {
             matchedChatIdsByContent = emptySet()
@@ -585,25 +585,13 @@ fun ChatHistorySelector(
             return@LaunchedEffect
         }
 
-        val hasTitleOrGroupMatch =
-            chatHistories.any { history ->
-                history.title.contains(trimmedQuery, ignoreCase = true) ||
-                    (history.group?.contains(trimmedQuery, ignoreCase = true) == true)
-            }
-
-        val shouldSearchByContent = !hasTitleOrGroupMatch && trimmedQuery.length >= 2
-        if (!shouldSearchByContent) {
-            matchedChatIdsByContent = emptySet()
-            isSearching = false
-            return@LaunchedEffect
-        }
-
         // 延迟400ms，如果用户继续输入则取消本次搜索（LaunchedEffect会自动取消）
         delay(400)
-        // 注意：如果 searchQuery 在延迟期间改变，LaunchedEffect 会重新启动，这里检查的是当前值
         isSearching = true
         try {
             matchedChatIdsByContent = chatHistoryManager.searchChatIdsByContent(trimmedQuery)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             matchedChatIdsByContent = emptySet()
         } finally {
@@ -2017,7 +2005,14 @@ fun ChatHistorySelector(
                             is HistoryListItem.Header -> it.key
                             is HistoryListItem.Item -> it.history.id
                         }
-                    }
+                    },
+                    contentType = {
+                        when (it) {
+                            is HistoryListItem.CharacterHeader -> "character_header"
+                            is HistoryListItem.Header -> "section_header"
+                            is HistoryListItem.Item -> "history_item"
+                        }
+                    },
                 ) { item ->
                     when (item) {
                         is HistoryListItem.CharacterHeader -> {

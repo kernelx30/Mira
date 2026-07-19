@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -76,9 +77,14 @@ internal fun resolveMiraThinkingGear(
 
 private data class MiraModelChoice(
     val configId: String,
-    val configName: String,
     val modelIndex: Int,
     val modelName: String,
+)
+
+private data class MiraModelGroup(
+    val configId: String,
+    val configName: String,
+    val models: List<MiraModelChoice>,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,24 +123,29 @@ fun MiraComposerControlBar(
     val contextWindowUsage by actualViewModel.contextWindowUsage.collectAsState()
     val currentChat = chatHistories.firstOrNull { it.id == currentChatId }
 
-    var modelChoices by remember { mutableStateOf<List<MiraModelChoice>>(emptyList()) }
+    var modelGroups by remember { mutableStateOf<List<MiraModelGroup>>(emptyList()) }
+    var expandedModelConfigId by remember { mutableStateOf<String?>(null) }
     var showModelSheet by remember { mutableStateOf(false) }
     var showContextDetails by remember { mutableStateOf(false) }
 
     LaunchedEffect(modelConfigManager) {
         modelConfigManager.initializeIfNeeded()
         modelConfigManager.configListFlow.collect { configIds ->
-            modelChoices =
-                configIds.flatMap { configId ->
-                    val config = modelConfigManager.getModelConfig(configId) ?: return@flatMap emptyList()
-                    getModelList(config.modelName).mapIndexed { index, modelName ->
-                        MiraModelChoice(
-                            configId = config.id,
-                            configName = config.name,
-                            modelIndex = index,
-                            modelName = modelName,
-                        )
-                    }
+            modelGroups =
+                configIds.mapNotNull { configId ->
+                    val config = modelConfigManager.getModelConfig(configId) ?: return@mapNotNull null
+                    MiraModelGroup(
+                        configId = config.id,
+                        configName = config.name,
+                        models =
+                            getModelList(config.modelName).mapIndexed { index, modelName ->
+                                MiraModelChoice(
+                                    configId = config.id,
+                                    modelIndex = index,
+                                    modelName = modelName,
+                                )
+                            },
+                    )
                 }
         }
     }
@@ -149,10 +160,17 @@ fun MiraComposerControlBar(
                 defaultModelName
             }
     val displayModelName =
-        modelChoices
-            .firstOrNull { it.configId == selectedConfigId && it.modelIndex == selectedModelIndex }
+        modelGroups
+            .firstOrNull { it.configId == selectedConfigId }
+            ?.models
+            ?.firstOrNull { it.modelIndex == selectedModelIndex }
             ?.modelName
             ?: fallbackModelName
+    val currentModelGroupId =
+        selectedConfigId?.takeIf { selectedId -> modelGroups.any { it.configId == selectedId } }
+            ?: modelGroups
+                .firstOrNull { group -> group.models.any { it.modelName == displayModelName } }
+                ?.configId
     val effectiveMemoryEnabled = currentChat?.memoryAutoUpdateOverride ?: globalMemoryEnabled
     val maxContextTokens = (maxContextWindowInK * 1024).toLong().coerceAtLeast(0L)
     val contextProgress =
@@ -168,6 +186,12 @@ fun MiraComposerControlBar(
         } else {
             stringResource(R.string.mira_thinking_gear_status, thinkingGear)
         }
+
+    LaunchedEffect(showModelSheet, currentModelGroupId) {
+        if (showModelSheet) {
+            expandedModelConfigId = currentModelGroupId
+        }
+    }
 
     val setImmersiveChatEnabled: (Boolean) -> Unit = { enabled ->
         scope.launch {
@@ -456,17 +480,24 @@ fun MiraComposerControlBar(
                     selected = selectedConfigId == null,
                 ) {
                     actualViewModel.updateCurrentChatModel(null, 0)
+                    showModelSheet = false
                 }
-                modelChoices.forEach { choice ->
-                    MiraModelChoiceRow(
-                        title = choice.modelName,
-                        subtitle = choice.configName,
-                        selected =
-                            selectedConfigId == choice.configId &&
-                                selectedModelIndex == choice.modelIndex,
-                    ) {
-                        actualViewModel.updateCurrentChatModel(choice.configId, choice.modelIndex)
-                    }
+                modelGroups.forEach { group ->
+                    val isExpanded = expandedModelConfigId == group.configId
+                    MiraModelGroupSection(
+                        group = group,
+                        expanded = isExpanded,
+                        selectedConfigId = selectedConfigId,
+                        selectedModelIndex = selectedModelIndex,
+                        onToggleExpanded = {
+                            expandedModelConfigId = if (isExpanded) null else group.configId
+                        },
+                        onSelectModel = { choice ->
+                            actualViewModel.updateCurrentChatModel(choice.configId, choice.modelIndex)
+                            showModelSheet = false
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
                 }
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
                 TextButton(
@@ -505,24 +536,144 @@ private fun formatContextLength(valueInK: Float): String =
 @Composable
 private fun MiraModelChoiceRow(
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     selected: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = onClick)
         Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun MiraModelGroupSection(
+    group: MiraModelGroup,
+    expanded: Boolean,
+    selectedConfigId: String?,
+    selectedModelIndex: Int,
+    onToggleExpanded: () -> Unit,
+    onSelectModel: (MiraModelChoice) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isSelectedGroup = selectedConfigId == group.configId
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Surface(
+            onClick = onToggleExpanded,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(6.dp),
+            color =
+                if (isSelectedGroup) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = group.configName,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isSelectedGroup) FontWeight.SemiBold else FontWeight.Normal,
+                    color =
+                        if (isSelectedGroup) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = stringResource(R.string.chat_model_count, group.models.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector =
+                        if (expanded) {
+                            Icons.Default.KeyboardArrowUp
+                        } else {
+                            Icons.Default.KeyboardArrowDown
+                        },
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        if (expanded) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, top = 2.dp, bottom = 4.dp)
+            ) {
+                group.models.forEach { choice ->
+                    MiraGroupedModelRow(
+                        title = choice.modelName,
+                        selected =
+                            selectedConfigId == choice.configId &&
+                                selectedModelIndex == choice.modelIndex,
+                        onClick = { onSelectModel(choice) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiraGroupedModelRow(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(4.dp),
+        color =
+            if (selected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+            } else {
+                MaterialTheme.colorScheme.surface.copy(alpha = 0f)
+            },
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color =
+                if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

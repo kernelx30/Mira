@@ -88,6 +88,25 @@ class CompanionMemoryValueTest {
     }
 
     @Test
+    fun priorityRecallKeepsCustomPersonalityFactsAvailable() {
+        val personality =
+            record("\"用户有点怕生\"").copy(
+                id = "personality",
+                type = "FACT",
+                predicate = "personality.trait",
+                importance = 0.8,
+            )
+
+        val selected =
+            CompanionMemoryRepository.selectPriorityCandidates(
+                scoredCandidates = listOf(personality to 0.2),
+                limit = 6,
+            )
+
+        assertTrue(selected.any { it.id == "personality" })
+    }
+
+    @Test
     fun oppositePreferenceWordingProducesTheSameConflictKey() {
         assertEquals(
             CompanionMemoryRepository.preferenceConflictKey("吃辣"),

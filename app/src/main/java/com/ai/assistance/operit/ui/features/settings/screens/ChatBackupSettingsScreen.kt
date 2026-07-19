@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -63,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,6 +73,8 @@ import com.ai.assistance.operit.core.companion.CompanionReminderScheduler
 import com.ai.assistance.operit.data.model.ImportStrategy
 import com.ai.assistance.operit.data.model.PreferenceProfile
 import com.ai.assistance.operit.data.backup.OperitBackupDirs
+import com.ai.assistance.operit.data.backup.OperitChatImportSource
+import com.ai.assistance.operit.data.backup.MiraMemoryArchiveManager
 import com.ai.assistance.operit.data.backup.RawSnapshotBackupManager
 import com.ai.assistance.operit.data.backup.RoomDatabaseBackupManager
 import com.ai.assistance.operit.data.backup.RoomDatabaseBackupPreferences
@@ -80,7 +84,7 @@ import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
-import com.ai.assistance.operit.data.repository.MemoryRepository
+import com.ai.assistance.operit.data.repository.ChatImportResult
 import com.ai.assistance.operit.data.converter.ExportFormat
 import com.ai.assistance.operit.data.converter.ChatFormat
 import com.ai.assistance.operit.ui.features.settings.components.BackupFilesStatisticsCard
@@ -105,12 +109,12 @@ import com.ai.assistance.operit.ui.features.settings.components.ProfileSelection
 import com.ai.assistance.operit.ui.features.settings.components.RoomDbBackupListItem
 import com.ai.assistance.operit.ui.features.settings.components.SectionHeader
 import com.ai.assistance.operit.ui.features.settings.components.CharacterCardOperation
-import com.ai.assistance.operit.ui.main.MainActivity
+import com.ai.assistance.operit.util.AppProcessRestarter
+import com.ai.assistance.operit.util.AppLogger
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.system.exitProcess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -143,6 +147,7 @@ enum class RawSnapshotOperation {
 @Composable
 fun ChatBackupSettingsScreen() {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
 
     val chatHistoryManager = remember { ChatHistoryManager.getInstance(context) }
@@ -150,8 +155,6 @@ fun ChatBackupSettingsScreen() {
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val modelConfigManager = remember { ModelConfigManager(context) }
     val activeProfileId by userPreferencesManager.activeProfileIdFlow.collectAsState(initial = "default")
-    var memoryRepo by remember { mutableStateOf<MemoryRepository?>(null) }
-
     var totalChatCount by remember { mutableStateOf(0) }
     var totalCharacterCardCount by remember { mutableStateOf(0) }
     var totalMemoryCount by remember { mutableStateOf(0) }
@@ -218,11 +221,24 @@ fun ChatBackupSettingsScreen() {
     var showImportFormatDialog by remember { mutableStateOf(false) }
     var selectedImportFormat by remember { mutableStateOf(ChatFormat.OPERIT) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var showOperitChatBackupNotFoundDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(activeProfileId) {
-        memoryRepo = MemoryRepository(context, activeProfileId)
         selectedExportProfileId = activeProfileId
         selectedImportProfileId = activeProfileId
+        try {
+            val stats = MiraMemoryArchiveManager.getStats(context, activeProfileId)
+            totalMemoryCount = stats.totalMemories
+            totalMemoryLinkCount = stats.totalLinks
+        } catch (error: Exception) {
+            AppLogger.e("ChatBackupSettings", "读取记忆备份统计失败", error)
+            memoryOperationState = MemoryOperation.FAILED
+            memoryOperationMessage =
+                context.getString(
+                    R.string.backup_memory_stats_failed,
+                    error.localizedMessage ?: error.toString(),
+                )
+        }
     }
 
     LaunchedEffect(profileIds) {
@@ -248,18 +264,58 @@ fun ChatBackupSettingsScreen() {
         }
     }
 
-    LaunchedEffect(memoryRepo) {
-        memoryRepo?.let { repo ->
-            val memories = repo.searchMemories("*")
-            totalMemoryCount = memories.count { !it.isDocumentNode }
-            val graph = repo.getMemoryGraph()
-            totalMemoryLinkCount = graph.edges.size
-        }
-    }
-
     LaunchedEffect(Unit) {
         modelConfigManager.configListFlow.collect { configList ->
             totalModelConfigCount = configList.size
+        }
+    }
+
+    fun startOperitChatImport(importer: suspend () -> ChatImportResult) {
+        scope.launch {
+            operationState = ChatHistoryOperation.IMPORTING
+            operationMessage = ""
+            try {
+                val importResult = importer()
+                if (importResult.total > 0 || importResult.skipped > 0) {
+                    operationState = ChatHistoryOperation.IMPORTED
+                    val skippedText = if (importResult.skipped > 0) {
+                        resources.getString(R.string.backup_import_result_skipped, importResult.skipped)
+                    } else {
+                        ""
+                    }
+                    operationMessage = resources.getString(
+                        R.string.backup_import_result_success,
+                        resources.getString(R.string.backup_format_operit),
+                        importResult.new,
+                        importResult.updated,
+                        skippedText
+                    )
+                } else {
+                    operationState = ChatHistoryOperation.FAILED
+                    operationMessage = resources.getString(R.string.backup_import_result_failed)
+                }
+            } catch (e: Exception) {
+                operationState = ChatHistoryOperation.FAILED
+                operationMessage = resources.getString(
+                    R.string.backup_import_failed_with_reason,
+                    e.localizedMessage ?: e.toString()
+                )
+            }
+        }
+    }
+
+    fun importLatestOperitChatBackupOrChooseFile() {
+        scope.launch {
+            val latestBackup = withContext(Dispatchers.IO) {
+                OperitChatImportSource.findLatestBackup(OperitBackupDirs.operitRootDir())
+            }
+            if (latestBackup != null) {
+                startOperitChatImport {
+                    chatHistoryManager.importOperitChatHistoriesFromFile(latestBackup)
+                }
+            } else {
+                showOperitChatBackupNotFoundDialog = true
+            }
         }
     }
 
@@ -375,6 +431,19 @@ fun ChatBackupSettingsScreen() {
                     // 保存URI，显示格式选择对话框
                     pendingImportUri = uri
                     showImportFormatDialog = true
+                }
+            }
+        }
+
+    val operitChatFilePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.data?.let { uri ->
+                    startOperitChatImport {
+                        chatHistoryManager.importChatHistoriesFromUri(uri, ChatFormat.OPERIT)
+                    }
                 }
             }
         }
@@ -563,6 +632,7 @@ fun ChatBackupSettingsScreen() {
                     }
                     chatFilePickerLauncher.launch(intent)
                 },
+                onImportFromOperit = ::importLatestOperitChatBackupOrChooseFile,
                 onDelete = { showDeleteConfirmDialog = true }
             )
         }
@@ -1127,8 +1197,13 @@ fun ChatBackupSettingsScreen() {
                     scope.launch {
                         memoryOperationState = MemoryOperation.IMPORTING
                         try {
-                            val importRepo = MemoryRepository(context, selectedImportProfileId)
-                            val result = importMemoriesFromUri(context, importRepo, uri, strategy)
+                            val result =
+                                importMemoriesFromUri(
+                                    context = context,
+                                    targetProfileId = selectedImportProfileId,
+                                    uri = uri,
+                                    strategy = strategy,
+                                )
                             memoryOperationState = MemoryOperation.IMPORTED
                             val profileName = allProfiles.find { it.id == selectedImportProfileId }?.name
                                 ?: selectedImportProfileId
@@ -1138,17 +1213,17 @@ fun ChatBackupSettingsScreen() {
                                 result.newMemories,
                                 result.updatedMemories,
                                 result.skippedMemories,
-                                result.newLinks
+                                result.newLinks,
+                                result.importedEvidence,
+                                result.importedEpisodes,
+                                result.importedGrants,
                             )
 
                             if (selectedImportProfileId == activeProfileId) {
-                                val repo = memoryRepo
-                                if (repo != null) {
-                                    val memories = repo.searchMemories("")
-                                    totalMemoryCount = memories.count { !it.isDocumentNode }
-                                    val graph = repo.getMemoryGraph()
-                                    totalMemoryLinkCount = graph.edges.size
-                                }
+                                val stats =
+                                    MiraMemoryArchiveManager.getStats(context, activeProfileId)
+                                totalMemoryCount = stats.totalMemories
+                                totalMemoryLinkCount = stats.totalLinks
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()
@@ -1176,28 +1251,24 @@ fun ChatBackupSettingsScreen() {
                 scope.launch {
                     memoryOperationState = MemoryOperation.EXPORTING
                     try {
-                        val exportRepo = MemoryRepository(context, selectedExportProfileId)
-                        val filePath = exportMemories(context, exportRepo)
-                        if (filePath != null) {
-                            memoryOperationState = MemoryOperation.EXPORTED
-                            val profileName = allProfiles.find { it.id == selectedExportProfileId }?.name
-                                ?: selectedExportProfileId
-                            val memories = exportRepo.searchMemories("")
-                            val memoryCount = memories.count { !it.isDocumentNode }
-                            val graph = exportRepo.getMemoryGraph()
-                            val linkCount = graph.edges.size
-                            memoryOperationMessage = context.getString(
-                                R.string.backup_memory_export_result_success,
-                                profileName,
-                                memoryCount,
-                                linkCount,
-                                filePath
+                        val result =
+                            MiraMemoryArchiveManager.exportToBackupDir(
+                                context = context,
+                                profileId = selectedExportProfileId,
                             )
-                        } else {
-                            memoryOperationState = MemoryOperation.FAILED
-                            memoryOperationMessage =
-                                context.getString(R.string.backup_export_failed_create_file)
-                        }
+                        memoryOperationState = MemoryOperation.EXPORTED
+                        val profileName = allProfiles.find { it.id == selectedExportProfileId }?.name
+                            ?: selectedExportProfileId
+                        memoryOperationMessage = context.getString(
+                            R.string.backup_memory_export_result_success,
+                            profileName,
+                            result.stats.totalMemories,
+                            result.stats.totalLinks,
+                            result.stats.totalEvidence,
+                            result.stats.episodes,
+                            result.stats.grants,
+                            result.file.absolutePath,
+                        )
                     } catch (e: Exception) {
                         e.printStackTrace()
                         memoryOperationState = MemoryOperation.FAILED
@@ -1268,6 +1339,35 @@ fun ChatBackupSettingsScreen() {
                             e.localizedMessage ?: e.toString()
                         )
                     }
+                }
+            }
+        )
+    }
+
+    if (showOperitChatBackupNotFoundDialog) {
+        AlertDialog(
+            onDismissRequest = { showOperitChatBackupNotFoundDialog = false },
+            title = { Text(stringResource(R.string.backup_import_from_operit_no_backup_title)) },
+            text = { Text(stringResource(R.string.backup_import_from_operit_no_backup_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOperitChatBackupNotFoundDialog = false
+                        operitChatFilePickerLauncher.launch(
+                            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "application/json"
+                                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/json", "text/plain"))
+                            }
+                        )
+                    }
+                ) {
+                    Text(stringResource(R.string.backup_import_from_operit_choose_file))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOperitChatBackupNotFoundDialog = false }) {
+                    Text(stringResource(R.string.cancel_action))
                 }
             }
         )
@@ -1516,11 +1616,13 @@ fun ChatBackupSettingsScreen() {
                 TextButton(
                     onClick = {
                         showRoomDbRestoreRestartDialog = false
-                        val intent = Intent(context, MainActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        if (!AppProcessRestarter.scheduleAndExit(context)) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.backup_restart_schedule_failed),
+                                Toast.LENGTH_LONG,
+                            ).show()
                         }
-                        context.startActivity(intent)
-                        exitProcess(0)
                     }
                 ) {
                     Text(stringResource(R.string.backup_room_db_restart_now))
@@ -1543,11 +1645,13 @@ fun ChatBackupSettingsScreen() {
                 TextButton(
                     onClick = {
                         showRawSnapshotRestoreRestartDialog = false
-                        val intent = Intent(context, MainActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        if (!AppProcessRestarter.scheduleAndExit(context)) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.backup_restart_schedule_failed),
+                                Toast.LENGTH_LONG,
+                            ).show()
                         }
-                        context.startActivity(intent)
-                        exitProcess(0)
                     }
                 ) {
                     Text(stringResource(R.string.backup_raw_snapshot_restart_now))
@@ -1594,42 +1698,27 @@ private suspend fun deleteAllChatHistories(context: Context): DeleteAllChatsResu
         }
     }
 
-private suspend fun exportMemories(_context: Context, memoryRepository: MemoryRepository): String? =
-    withContext(Dispatchers.IO) {
-        try {
-            val jsonString = memoryRepository.exportMemoriesToJson()
-
-            val exportDir = OperitBackupDirs.memoryDir()
-
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
-            val timestamp = dateFormat.format(Date())
-            val exportFile = File(exportDir, "memory_backup_$timestamp.json")
-
-            exportFile.writeText(jsonString)
-
-            return@withContext exportFile.absolutePath
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return@withContext null
-        }
-    }
-
 private suspend fun importMemoriesFromUri(
     context: Context,
-    memoryRepository: MemoryRepository,
+    targetProfileId: String,
     uri: Uri,
     strategy: ImportStrategy
 ) = withContext(Dispatchers.IO) {
-    val inputStream = context.contentResolver.openInputStream(uri)
-        ?: throw Exception(context.getString(R.string.backup_open_file_failed))
-    val jsonString = inputStream.bufferedReader().use { it.readText() }
-    inputStream.close()
+    val jsonString =
+        context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            ?: throw Exception(context.getString(R.string.backup_open_file_failed))
 
     if (jsonString.isBlank()) {
         throw Exception(context.getString(R.string.backup_import_file_empty))
     }
 
-    val result = memoryRepository.importMemoriesFromJson(jsonString, strategy)
+    val result =
+        MiraMemoryArchiveManager.importFromJson(
+            context = context,
+            targetProfileId = targetProfileId,
+            jsonString = jsonString,
+            strategy = strategy,
+        )
     CompanionReminderScheduler.getInstance(context).syncAllProfiles()
     result
 }

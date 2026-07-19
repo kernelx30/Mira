@@ -4,6 +4,7 @@ import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
 import com.ai.assistance.operit.data.model.CompanionMemorySourceKind
 import com.ai.assistance.operit.data.model.CompanionMemoryType
 import com.ai.assistance.operit.data.model.CompanionRecordScope
+import com.ai.assistance.operit.data.model.MemoryPerspective
 import com.ai.assistance.operit.data.repository.CompanionMemoryRecallResult
 import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
 import com.ai.assistance.operit.data.repository.encodeCompanionMemoryValue
@@ -77,6 +78,20 @@ class CompanionMemoryContextBuilderTest {
 
         assertFalse(result.contains("小杨"))
         assertTrue(result.contains("test-user"))
+    }
+
+    @Test
+    fun `granted memory is labeled as shared instead of experienced`() {
+        val record = userNameRecord("Alex").copy(perspective = MemoryPerspective.USER_SHARED.name)
+
+        val result =
+            CompanionMemoryContextBuilder.buildPromptNote(
+                recall = CompanionMemoryRecallResult(listOf(record), emptyList()),
+                useEnglish = true,
+            )
+
+        assertTrue(result.contains("shared-by-user"))
+        assertTrue(result.contains("never describe them as your own experience"))
     }
 
     private fun userNameRecord(value: String): CompanionMemoryRecordEntity =

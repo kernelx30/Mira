@@ -8,4 +8,14 @@ internal object LlmRetryPolicy {
         val normalizedAttempt = retryAttempt.coerceAtLeast(1)
         return RETRY_BASE_DELAY_MS * (1L shl (normalizedAttempt - 1))
     }
+
+    fun shouldRetryHttpStatus(statusCode: Int, candidateKeyCount: Int): Boolean {
+        return when {
+            statusCode == 408 || statusCode == 409 || statusCode == 425 -> true
+            statusCode == 429 -> true
+            statusCode == 401 || statusCode == 403 -> candidateKeyCount > 1
+            statusCode in 500..599 -> true
+            else -> false
+        }
+    }
 }

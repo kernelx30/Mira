@@ -464,6 +464,7 @@ fun ChatArea(
                 key = { _, message ->
                     "chat:$currentChatId:message:${message.timestamp}"
                 },
+                contentType = { _, message -> message.sender },
             ) { actualIndex, message ->
                 val startsTimeBlock =
                     showMessageTimestamp &&

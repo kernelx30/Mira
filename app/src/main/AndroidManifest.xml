@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <permission
+        android:name="${applicationId}.permission.INTERNAL_AUTOMATION"
+        android:protectionLevel="signature" />
+
     <!-- Shizuku permissions -->
     <uses-feature
         android:name="android.hardware.telephony"
@@ -74,7 +78,7 @@
 
     <application
         android:name=".core.application.OperitApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher_mira"
@@ -90,7 +94,7 @@
         android:usesCleartextTraffic="true"
         android:largeHeap="true"
         tools:targetApi="31"
-        tools:replace="android:theme,android:icon,android:roundIcon">
+        tools:replace="android:theme,android:icon,android:roundIcon,android:allowBackup">
 
         <!-- OpenCL 库权限声明 (Android 10+ 命名空间隔离解决方案) -->
         <uses-native-library 
@@ -238,14 +242,6 @@
                 <data android:scheme="https" />
             </intent-filter>
             <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="operit"
-                    android:host="github-oauth-callback" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
@@ -377,38 +373,6 @@
         
         <!-- 添加广播接收器配置 -->
         <receiver
-            android:name=".core.tools.javascript.ScriptExecutionReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.ai.assistance.operit.EXECUTE_JS" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".core.tools.packTool.ToolPkgDebugInstallReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.ai.assistance.operit.DEBUG_INSTALL_TOOLPKG" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".core.tools.packTool.PackageDebugRefreshReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.ai.assistance.operit.DEBUG_REFRESH_PACKAGES" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".core.tools.packTool.ToolPkgComposeDslDebugDumpReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.ai.assistance.operit.DUMP_COMPOSE_DSL_UI" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
             android:name=".integrations.intent.ExternalChatReceiver"
             android:exported="true">
             <intent-filter>
@@ -487,10 +451,10 @@
         <receiver
             android:name=".integrations.tasker.WorkflowTaskerReceiver"
             android:exported="true"
-            android:enabled="true">
+            android:enabled="true"
+            android:permission="${applicationId}.permission.INTERNAL_AUTOMATION">
             <intent-filter>
                 <action android:name="com.ai.assistance.operit.TRIGGER_WORKFLOW" />
-                <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
             </intent-filter>
         </receiver>
         

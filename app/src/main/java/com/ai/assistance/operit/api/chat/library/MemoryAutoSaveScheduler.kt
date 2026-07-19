@@ -4,10 +4,11 @@ import android.content.Context
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.core.chat.CompanionMemoryProposalExtractor
-import com.ai.assistance.operit.core.chat.CompanionMemoryTargetResolver
+import com.ai.assistance.operit.core.chat.CompanionMemorySaveEvidencePolicy
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.MemoryAutoSaveCandidate
+import com.ai.assistance.operit.data.model.MemoryTriggerKind
 import com.ai.assistance.operit.data.preferences.MemorySearchSettingsPreferences
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.MemoryAutoSaveCandidateRepository
@@ -24,6 +25,57 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 
+internal enum class MemoryAutoSaveBatchKind(
+    val triggerKind: MemoryTriggerKind,
+    val usesExactUserMessages: Boolean,
+    val autoConfirmHighImportance: Boolean,
+) {
+    EXPLICIT(MemoryTriggerKind.EXPLICIT_REQUEST, true, false),
+    SELECTED(MemoryTriggerKind.USER_SELECTED, true, false),
+    HIGH_VALUE(MemoryTriggerKind.AUTO_EXTRACT, true, true),
+    AUTO(MemoryTriggerKind.AUTO_EXTRACT, false, true),
+}
+
+internal data class ScopedMemoryAutoSaveBatch(
+    val companionId: String,
+    val kind: MemoryAutoSaveBatchKind,
+    val candidates: List<MemoryAutoSaveCandidate>,
+)
+
+internal fun buildScopedMemoryAutoSaveBatches(
+    orderedCandidates: List<MemoryAutoSaveCandidate>,
+    maxCandidatesPerCompanion: Int,
+): List<ScopedMemoryAutoSaveBatch> {
+    require(maxCandidatesPerCompanion > 0)
+
+    return orderedCandidates
+        .asSequence()
+        .filter { it.companionId.isNotBlank() }
+        .groupBy { it.companionId }
+        .flatMap { (companionId, scopedCandidates) ->
+            scopedCandidates
+                .take(maxCandidatesPerCompanion)
+                .groupBy { candidate ->
+                    when {
+                        MemoryAutoSaveCandidate.isExplicitUserRequestSource(candidate.sourceType) ->
+                            MemoryAutoSaveBatchKind.EXPLICIT
+                        MemoryAutoSaveCandidate.isUserSelectedSource(candidate.sourceType) ->
+                            MemoryAutoSaveBatchKind.SELECTED
+                        MemoryAutoSaveCandidate.isHighValueAutoSource(candidate.sourceType) ->
+                            MemoryAutoSaveBatchKind.HIGH_VALUE
+                        else -> MemoryAutoSaveBatchKind.AUTO
+                    }
+                }
+                .map { (kind, candidates) ->
+                    ScopedMemoryAutoSaveBatch(
+                        companionId = companionId,
+                        kind = kind,
+                        candidates = candidates,
+                    )
+                }
+        }
+}
+
 class MemoryAutoSaveScheduler(
     private val context: Context,
     private val scope: CoroutineScope
@@ -34,7 +86,8 @@ class MemoryAutoSaveScheduler(
         const val DEFAULT_POLL_INTERVAL_MS =
             MemorySearchSettingsPreferences.DEFAULT_AUTO_SAVE_INTERVAL_MINUTES * 60 * 1000L
         private const val MAX_MESSAGES_PER_BATCH = 48
-        private const val MAX_CANDIDATES_PER_RUN_PER_CHAT = 20
+        private const val MAX_CANDIDATES_PER_RUN_PER_COMPANION = 20
+        private const val REFERENTIAL_CONTEXT_SCAN_LIMIT = 8
 
         @Volatile
         private var instance: MemoryAutoSaveScheduler? = null
@@ -134,56 +187,38 @@ class MemoryAutoSaveScheduler(
                         compareBy<MemoryAutoSaveCandidate> { it.triggerMessageTimestamp }
                             .thenBy { it.createdAt.time }
                     )
-                    .take(MAX_CANDIDATES_PER_RUN_PER_CHAT)
             if (candidates.isEmpty()) {
+                return repository.getPendingAndFailedCandidates().none { it.chatId == chatId }
+            }
+
+            val unscopedCount = candidates.count { it.companionId.isBlank() }
+            if (unscopedCount > 0) {
+                AppLogger.w(
+                    TAG,
+                    "Pre-compaction memory flush skipped $unscopedCount unscoped candidates: " +
+                        "profileId=$profileId, chatId=$chatId",
+                )
+            }
+            val batches =
+                buildScopedMemoryAutoSaveBatches(
+                    orderedCandidates = candidates,
+                    maxCandidatesPerCompanion = MAX_CANDIDATES_PER_RUN_PER_COMPANION,
+                )
+            if (batches.isEmpty()) {
                 return repository.getPendingAndFailedCandidates().none { it.chatId == chatId }
             }
 
             val memoryService =
                 EnhancedAIService.getAIServiceForFunction(context, FunctionType.MEMORY)
             val messageDao = AppDatabase.getDatabase(context).messageDao()
-            val selectedUserCandidates =
-                candidates.filter {
-                    MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
-                }
-            val highValueCandidates =
-                candidates.filter {
-                    MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
-                }
-            val automaticCandidates =
-                candidates.filter {
-                    !MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType) &&
-                        !MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
-                }
-
-            if (selectedUserCandidates.isNotEmpty()) {
+            batches.forEach { batch ->
                 processChatCandidateGroup(
                     profileId = profileId,
                     chatId = chatId,
-                    candidates = selectedUserCandidates,
+                    batch = batch,
                     repository = repository,
                     messageDao = messageDao,
-                    memoryService = memoryService
-                )
-            }
-            if (highValueCandidates.isNotEmpty()) {
-                processChatCandidateGroup(
-                    profileId = profileId,
-                    chatId = chatId,
-                    candidates = highValueCandidates,
-                    repository = repository,
-                    messageDao = messageDao,
-                    memoryService = memoryService
-                )
-            }
-            if (automaticCandidates.isNotEmpty()) {
-                processChatCandidateGroup(
-                    profileId = profileId,
-                    chatId = chatId,
-                    candidates = automaticCandidates,
-                    repository = repository,
-                    messageDao = messageDao,
-                    memoryService = memoryService
+                    memoryService = memoryService,
                 )
             }
 
@@ -244,49 +279,27 @@ class MemoryAutoSaveScheduler(
                         compareBy<MemoryAutoSaveCandidate> { it.triggerMessageTimestamp }
                             .thenBy { it.createdAt.time }
                     )
-                val batchCandidates = orderedCandidates.take(MAX_CANDIDATES_PER_RUN_PER_CHAT)
-                val selectedUserCandidates =
-                    batchCandidates.filter {
-                        MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
-                    }
-                val highValueCandidates =
-                    batchCandidates.filter {
-                        MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
-                    }
-                val automaticCandidates =
-                    batchCandidates.filter {
-                        !MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType) &&
-                            !MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
-                    }
-
-                if (selectedUserCandidates.isNotEmpty()) {
-                    processChatCandidateGroup(
-                        profileId = profileId,
-                        chatId = chatId,
-                        candidates = selectedUserCandidates,
-                        repository = repository,
-                        messageDao = messageDao,
-                        memoryService = activeMemoryService
+                val unscopedCount = orderedCandidates.count { it.companionId.isBlank() }
+                if (unscopedCount > 0) {
+                    AppLogger.w(
+                        TAG,
+                        "Periodic memory pass skipped $unscopedCount unscoped candidates: " +
+                            "profileId=$profileId, chatId=$chatId",
                     )
                 }
-                if (highValueCandidates.isNotEmpty()) {
-                    processChatCandidateGroup(
-                        profileId = profileId,
-                        chatId = chatId,
-                        candidates = highValueCandidates,
-                        repository = repository,
-                        messageDao = messageDao,
-                        memoryService = activeMemoryService
+                val batches =
+                    buildScopedMemoryAutoSaveBatches(
+                        orderedCandidates = orderedCandidates,
+                        maxCandidatesPerCompanion = MAX_CANDIDATES_PER_RUN_PER_COMPANION,
                     )
-                }
-                if (automaticCandidates.isNotEmpty()) {
+                batches.forEach { batch ->
                     processChatCandidateGroup(
                         profileId = profileId,
                         chatId = chatId,
-                        candidates = automaticCandidates,
+                        batch = batch,
                         repository = repository,
                         messageDao = messageDao,
-                        memoryService = activeMemoryService
+                        memoryService = activeMemoryService,
                     )
                 }
             }
@@ -340,27 +353,30 @@ class MemoryAutoSaveScheduler(
     private suspend fun processChatCandidateGroup(
         profileId: String,
         chatId: String,
-        candidates: List<MemoryAutoSaveCandidate>,
+        batch: ScopedMemoryAutoSaveBatch,
         repository: MemoryAutoSaveCandidateRepository,
         messageDao: com.ai.assistance.operit.data.dao.MessageDao,
         memoryService: com.ai.assistance.operit.api.chat.llmprovider.AIService
     ) {
+        val candidates = batch.candidates
         if (candidates.isEmpty()) return
+        if (batch.companionId.isBlank()) {
+            AppLogger.w(
+                TAG,
+                "Memory candidate batch has no companion target; skipping: " +
+                    "profileId=$profileId, chatId=$chatId",
+            )
+            return
+        }
 
-        val isSelectedUserBatch =
-            candidates.all {
-                MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
-            }
-        val isHighValueBatch =
-            candidates.all {
-                MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
-            }
+        val triggerKind = batch.kind.triggerKind
+        val isDirectUserSelection = batch.kind.usesExactUserMessages
         val candidateIds = candidates.map { it.id }
         repository.markProcessing(candidateIds)
 
         try {
             val messages =
-                if (isSelectedUserBatch || isHighValueBatch) {
+                if (isDirectUserSelection) {
                     val selectedMessages =
                         withContext(Dispatchers.IO) {
                             candidates
@@ -371,7 +387,35 @@ class MemoryAutoSaveScheduler(
                                     )
                                 }
                         }
-                    selectedMessages
+                    val referencedMessages =
+                        if (batch.kind == MemoryAutoSaveBatchKind.EXPLICIT) {
+                            withContext(Dispatchers.IO) {
+                                selectedMessages
+                                    .filter { message ->
+                                        CompanionMemorySaveEvidencePolicy.isReferentialSaveRequest(
+                                            message.content,
+                                        )
+                                    }
+                                    .mapNotNull { message ->
+                                        messageDao
+                                            .getMessagesForChatBeforeTimestampDesc(
+                                                chatId = chatId,
+                                                maxTimestamp = message.timestamp - 1L,
+                                                limit = REFERENTIAL_CONTEXT_SCAN_LIMIT,
+                                            )
+                                            .firstOrNull { previous ->
+                                                previous.sender == "user" &&
+                                                    previous.content.isNotBlank() &&
+                                                    previous.displayMode !=
+                                                        com.ai.assistance.operit.data.model.ChatMessageDisplayMode.HIDDEN_PLACEHOLDER.name
+                                            }
+                                    }
+                            }
+                        } else {
+                            emptyList()
+                        }
+                    (selectedMessages + referencedMessages)
+                        .distinctBy { message -> message.messageId }
                         .filter { it.sender == "user" && it.content.isNotBlank() }
                         .sortedBy { it.timestamp }
                 } else {
@@ -397,20 +441,22 @@ class MemoryAutoSaveScheduler(
                 return
             }
 
-            val companionId = CompanionMemoryTargetResolver.resolve(context, chatId)
-            val autoConfirmHighImportance =
-                candidates.any {
-                    MemoryAutoSaveCandidate.isHighValueAutoSource(it.sourceType)
-                }
+            // The target is captured when the user turn is queued. Re-resolving here would move
+            // an in-flight memory to a different role if the chat binding changes before this pass.
+            // Automatic batches may contain ordinary turns, but direct high-confidence
+            // durable facts should still become usable memory without a manual confirmation.
+            // The extractor keeps ambiguous or weak proposals in review.
+            val autoConfirmHighImportance = batch.kind.autoConfirmHighImportance
             val appliedCount = CompanionMemoryProposalExtractor.extractAndApply(
                 context = context,
                 profileId = profileId,
-                companionId = companionId,
+                companionId = batch.companionId,
                 conversationId = chatId,
                 messages = messages,
                 aiService = memoryService,
-                requireReview = !isSelectedUserBatch,
+                requireReview = !isDirectUserSelection,
                 autoConfirmHighImportance = autoConfirmHighImportance,
+                triggerKind = triggerKind,
             )
             repository.deleteCandidates(candidateIds)
             AppLogger.d(

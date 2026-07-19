@@ -202,6 +202,14 @@ class SpeechServicesPreferences(private val context: Context) {
         dataStore.edit { prefs -> prefs[EXPRESSIVE_TTS_STRENGTH] = strength.name }
     }
 
+    suspend fun saveTtsSpeechRate(rate: Float) {
+        dataStore.edit { prefs -> prefs[TTS_SPEECH_RATE] = rate }
+    }
+
+    suspend fun saveTtsPitch(pitch: Float) {
+        dataStore.edit { prefs -> prefs[TTS_PITCH] = pitch }
+    }
+
     suspend fun saveTtsSettings(
         serviceType: VoiceServiceFactory.VoiceServiceType,
         httpConfig: TtsHttpConfig? = null,
@@ -229,7 +237,9 @@ class SpeechServicesPreferences(private val context: Context) {
                     httpConfig?.let { prefs[TTS_HTTP_CONFIG] = serializerJson.encodeToString(it) }
                 }
                 VoiceServiceFactory.VoiceServiceType.SIMPLE_TTS -> {
-                    // 系统 TTS 不需要额外配置
+                    // 系统 TTS 的语言和音色也需要持久化，否则重建 provider
+                    // 后会回退到系统默认音色（通常是女声）。
+                    httpConfig?.let { prefs[TTS_HTTP_CONFIG] = serializerJson.encodeToString(it) }
                 }
                 VoiceServiceFactory.VoiceServiceType.SILICONFLOW_TTS -> {
                     httpConfig?.let { prefs[TTS_HTTP_CONFIG] = serializerJson.encodeToString(it) }

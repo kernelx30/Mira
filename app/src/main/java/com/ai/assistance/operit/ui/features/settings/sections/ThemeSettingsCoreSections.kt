@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -346,6 +347,12 @@ internal fun ThemeSettingsChatStyleSection(
     onBubbleUserRoundedCornersEnabledInputChange: (Boolean) -> Unit,
     bubbleAiRoundedCornersEnabledInput: Boolean,
     onBubbleAiRoundedCornersEnabledInputChange: (Boolean) -> Unit,
+    bubbleUserCornerRadiusInput: Float,
+    bubbleAiCornerRadiusInput: Float,
+    bubbleUserMaxWidthRatioInput: Float,
+    bubbleAiMaxWidthRatioInput: Float,
+    bubbleMessageVerticalPaddingInput: Float,
+    bubbleShadowElevationInput: Float,
     bubbleUserContentPaddingLeftInput: Float,
     onBubbleUserContentPaddingLeftInputChange: (Float) -> Unit,
     bubbleUserContentPaddingRightInput: Float,
@@ -1501,6 +1508,12 @@ internal fun ThemeSettingsChatStyleSection(
                 bubbleWideLayoutEnabled = bubbleWideLayoutEnabledInput,
                 bubbleUserRoundedCornersEnabled = bubbleUserRoundedCornersEnabledInput,
                 bubbleAiRoundedCornersEnabled = bubbleAiRoundedCornersEnabledInput,
+                bubbleUserCornerRadius = bubbleUserCornerRadiusInput,
+                bubbleAiCornerRadius = bubbleAiCornerRadiusInput,
+                bubbleUserMaxWidthRatio = bubbleUserMaxWidthRatioInput,
+                bubbleAiMaxWidthRatio = bubbleAiMaxWidthRatioInput,
+                bubbleMessageVerticalPadding = bubbleMessageVerticalPaddingInput,
+                bubbleShadowElevation = bubbleShadowElevationInput,
                 bubbleUserContentPaddingLeft = bubbleUserContentPaddingLeftInput,
                 bubbleUserContentPaddingRight = bubbleUserContentPaddingRightInput,
                 bubbleAiContentPaddingLeft = bubbleAiContentPaddingLeftInput,
@@ -2162,6 +2175,12 @@ private fun ChatStylePreviewCard(
     bubbleWideLayoutEnabled: Boolean,
     bubbleUserRoundedCornersEnabled: Boolean,
     bubbleAiRoundedCornersEnabled: Boolean,
+    bubbleUserCornerRadius: Float,
+    bubbleAiCornerRadius: Float,
+    bubbleUserMaxWidthRatio: Float,
+    bubbleAiMaxWidthRatio: Float,
+    bubbleMessageVerticalPadding: Float,
+    bubbleShadowElevation: Float,
     bubbleUserContentPaddingLeft: Float,
     bubbleUserContentPaddingRight: Float,
     bubbleAiContentPaddingLeft: Float,
@@ -2218,21 +2237,38 @@ private fun ChatStylePreviewCard(
                 }
             } else {
                 val previewNameColor = MaterialTheme.colorScheme.onSurface
-                val bubblePreviewMaxWidth = if (bubbleWideLayoutEnabled) 280.dp else 240.dp
+                val previewWidthBase = if (bubbleWideLayoutEnabled) 300.dp else 270.dp
+                val userBubblePreviewMaxWidth = previewWidthBase * bubbleUserMaxWidthRatio.coerceIn(0.6f, 0.96f)
+                val aiBubblePreviewMaxWidth = previewWidthBase * bubbleAiMaxWidthRatio.coerceIn(0.6f, 0.96f)
+                val userRadius = bubbleUserCornerRadius.coerceIn(4f, 28f)
+                val aiRadius = bubbleAiCornerRadius.coerceIn(4f, 28f)
                 val userBubbleShape =
                     if (bubbleUserRoundedCornersEnabled) {
-                        RoundedCornerShape(20.dp, 4.dp, 20.dp, 20.dp)
+                        RoundedCornerShape(
+                            topStart = userRadius.dp,
+                            topEnd = min(4f, userRadius).dp,
+                            bottomEnd = userRadius.dp,
+                            bottomStart = userRadius.dp,
+                        )
                     } else {
                         RoundedCornerShape(0.dp)
                     }
                 val aiBubbleShape =
                     if (bubbleAiRoundedCornersEnabled) {
-                        RoundedCornerShape(4.dp, 20.dp, 20.dp, 20.dp)
+                        RoundedCornerShape(
+                            topStart = min(4f, aiRadius).dp,
+                            topEnd = aiRadius.dp,
+                            bottomEnd = aiRadius.dp,
+                            bottomStart = aiRadius.dp,
+                        )
                     } else {
                         RoundedCornerShape(0.dp)
                     }
 
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    verticalArrangement =
+                        Arrangement.spacedBy((bubbleMessageVerticalPadding.coerceIn(0f, 10f) * 2f).dp),
+                ) {
                     if (bubbleWideLayoutEnabled) {
                         MaterialTheme(typography = userTypography) {
                             if (bubbleShowAvatar) {
@@ -2265,7 +2301,11 @@ private fun ChatStylePreviewCard(
                                     BubbleImageBackgroundSurface(
                                         imageStyle = userImageStyle,
                                         shape = userBubbleShape,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier =
+                                            Modifier
+                                                .shadow(bubbleShadowElevation.coerceIn(0f, 8f).dp, userBubbleShape)
+                                                .widthIn(max = userBubblePreviewMaxWidth)
+                                                .defaultMinSize(minHeight = 44.dp),
                                         contentPadding =
                                             PaddingValues(
                                                 start = bubbleUserContentPaddingLeft.dp,
@@ -2284,8 +2324,9 @@ private fun ChatStylePreviewCard(
                                     Surface(
                                         shape = userBubbleShape,
                                         color = userColor,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier = Modifier.widthIn(max = userBubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
                                         tonalElevation = 1.dp,
+                                        shadowElevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
                                     ) {
                                         Text(
                                             text = stringResource(id = R.string.chat_style_preview_user_message),
@@ -2341,7 +2382,11 @@ private fun ChatStylePreviewCard(
                                     BubbleImageBackgroundSurface(
                                         imageStyle = aiImageStyle,
                                         shape = aiBubbleShape,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier =
+                                            Modifier
+                                                .shadow(bubbleShadowElevation.coerceIn(0f, 8f).dp, aiBubbleShape)
+                                                .widthIn(max = aiBubblePreviewMaxWidth)
+                                                .defaultMinSize(minHeight = 44.dp),
                                         contentPadding =
                                             PaddingValues(
                                                 start = bubbleAiContentPaddingLeft.dp,
@@ -2360,8 +2405,9 @@ private fun ChatStylePreviewCard(
                                     Surface(
                                         shape = aiBubbleShape,
                                         color = aiColor,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier = Modifier.widthIn(max = aiBubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
                                         tonalElevation = 1.dp,
+                                        shadowElevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
                                     ) {
                                         Text(
                                             text = stringResource(id = R.string.chat_style_preview_ai_message),
@@ -2390,7 +2436,11 @@ private fun ChatStylePreviewCard(
                                     BubbleImageBackgroundSurface(
                                         imageStyle = userImageStyle,
                                         shape = userBubbleShape,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier =
+                                            Modifier
+                                                .shadow(bubbleShadowElevation.coerceIn(0f, 8f).dp, userBubbleShape)
+                                                .widthIn(max = userBubblePreviewMaxWidth)
+                                                .defaultMinSize(minHeight = 44.dp),
                                         contentPadding =
                                             PaddingValues(
                                                 start = bubbleUserContentPaddingLeft.dp,
@@ -2409,8 +2459,9 @@ private fun ChatStylePreviewCard(
                                     Surface(
                                         shape = userBubbleShape,
                                         color = userColor,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier = Modifier.widthIn(max = userBubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
                                         tonalElevation = 1.dp,
+                                        shadowElevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
                                     ) {
                                         Text(
                                             text = stringResource(id = R.string.chat_style_preview_user_message),
@@ -2453,7 +2504,11 @@ private fun ChatStylePreviewCard(
                                     BubbleImageBackgroundSurface(
                                         imageStyle = aiImageStyle,
                                         shape = aiBubbleShape,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier =
+                                            Modifier
+                                                .shadow(bubbleShadowElevation.coerceIn(0f, 8f).dp, aiBubbleShape)
+                                                .widthIn(max = aiBubblePreviewMaxWidth)
+                                                .defaultMinSize(minHeight = 44.dp),
                                         contentPadding =
                                             PaddingValues(
                                                 start = bubbleAiContentPaddingLeft.dp,
@@ -2472,8 +2527,9 @@ private fun ChatStylePreviewCard(
                                     Surface(
                                         shape = aiBubbleShape,
                                         color = aiColor,
-                                        modifier = Modifier.widthIn(max = bubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
+                                        modifier = Modifier.widthIn(max = aiBubblePreviewMaxWidth).defaultMinSize(minHeight = 44.dp),
                                         tonalElevation = 1.dp,
+                                        shadowElevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
                                     ) {
                                         Text(
                                             text = stringResource(id = R.string.chat_style_preview_ai_message),

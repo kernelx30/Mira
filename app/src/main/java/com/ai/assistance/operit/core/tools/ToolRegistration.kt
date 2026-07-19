@@ -701,6 +701,65 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
             }
     )
 
+    // 注册结构化伴侣记忆保存工具
+    handler.registerTool(
+            name = "save_companion_memory",
+            descriptionGenerator = { tool ->
+                val label = tool.parameters.find { it.name == "label" }?.value
+                    ?: tool.parameters.find { it.name == "value" }?.value.orEmpty().take(32)
+                s(R.string.toolreg_save_companion_memory_desc, label)
+            },
+            executor = { tool ->
+                ToolGetter.getCompanionMemoryToolExecutor(context).invoke(tool)
+            }
+    )
+
+    // 注册结构化伴侣记忆删除工具
+    handler.registerTool(
+            name = "delete_companion_memory",
+            descriptionGenerator = { tool ->
+                val query = tool.parameters.find { it.name == "query" }?.value.orEmpty().take(48)
+                s(R.string.toolreg_delete_companion_memory_desc, query)
+            },
+            executor = { tool ->
+                ToolGetter.getCompanionMemoryDeleteToolExecutor(context).invoke(tool)
+            }
+    )
+
+    // 注册完整 Mira 记忆包导出工具
+    handler.registerTool(
+            name = "export_companion_memory",
+            descriptionGenerator = {
+                s(R.string.toolreg_export_companion_memory_desc)
+            },
+            executor = { tool ->
+                ToolGetter.getCompanionMemoryExportToolExecutor(context).invoke(tool)
+            }
+    )
+
+    // 直接从当前对话导出聊天记录，不再绕到设置页或猜测数据库文件。
+    handler.registerTool(
+            name = "export_chat_history",
+            descriptionGenerator = {
+                s(R.string.toolreg_export_chat_history_desc)
+            },
+            executor = { tool ->
+                ToolGetter.getChatHistoryExportToolExecutor(context).invoke(tool)
+            }
+    )
+
+    handler.registerTool(
+            name = "manage_mira_settings",
+            descriptionGenerator = { tool ->
+                val action = tool.parameters.find { it.name == "action" }?.value.orEmpty()
+                val settingId = tool.parameters.find { it.name == "setting_id" }?.value.orEmpty()
+                s(R.string.toolreg_manage_mira_settings_desc, action, settingId)
+            },
+            executor = { tool ->
+                ToolGetter.getMiraSettingsToolExecutor(context).invoke(tool)
+            }
+    )
+
     // 注册记忆库查询工具
     handler.registerTool(
             name = "query_memory",

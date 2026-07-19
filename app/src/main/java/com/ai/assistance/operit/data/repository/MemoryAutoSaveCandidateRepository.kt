@@ -8,6 +8,10 @@ import io.objectbox.Box
 import io.objectbox.kotlin.boxFor
 import java.util.Date
 
+internal fun shouldQuarantineLegacyMemoryCandidate(candidate: MemoryAutoSaveCandidate): Boolean =
+    candidate.companionId.isBlank() &&
+        candidate.status != MemoryAutoSaveCandidate.STATUS_SKIPPED_LEGACY_UNSCOPED
+
 class MemoryAutoSaveCandidateRepository(
     context: Context,
     profileId: String
@@ -18,17 +22,19 @@ class MemoryAutoSaveCandidateRepository(
     @Synchronized
     fun enqueue(
         chatId: String,
+        companionId: String,
         triggerMessageTimestamp: Long,
         sourceType: String = MemoryAutoSaveCandidate.SOURCE_TYPE_REPLY_FINALIZED_AUTO
     ): Long {
-        if (chatId.isBlank() || triggerMessageTimestamp <= 0L) return 0L
+        if (chatId.isBlank() || companionId.isBlank() || triggerMessageTimestamp <= 0L) return 0L
         candidateBox
             .query(MemoryAutoSaveCandidate_.chatId.equal(chatId))
             .build()
             .find()
             .firstOrNull {
                 it.triggerMessageTimestamp == triggerMessageTimestamp &&
-                    it.sourceType == sourceType
+                    it.sourceType == sourceType &&
+                    it.companionId == companionId
             }
             ?.let { return it.id }
 
@@ -36,6 +42,7 @@ class MemoryAutoSaveCandidateRepository(
         val candidate =
             MemoryAutoSaveCandidate(
                 chatId = chatId,
+                companionId = companionId,
                 triggerMessageTimestamp = triggerMessageTimestamp,
                 createdAt = now,
                 updatedAt = now,
@@ -47,6 +54,7 @@ class MemoryAutoSaveCandidateRepository(
 
     fun enqueueSelectedUserMessages(
         chatId: String,
+        companionId: String,
         triggerMessageTimestamps: List<Long>
     ): Int {
         val normalizedTimestamps =
@@ -54,7 +62,7 @@ class MemoryAutoSaveCandidateRepository(
                 .filter { it > 0L }
                 .distinct()
                 .sorted()
-        if (chatId.isBlank() || normalizedTimestamps.isEmpty()) return 0
+        if (chatId.isBlank() || companionId.isBlank() || normalizedTimestamps.isEmpty()) return 0
 
         val queuedTimestamps =
             candidateBox
@@ -64,6 +72,7 @@ class MemoryAutoSaveCandidateRepository(
                 .asSequence()
                 .filter {
                     MemoryAutoSaveCandidate.isSelectedUserMessageSource(it.sourceType)
+                        && it.companionId == companionId
                 }
                 .map { it.triggerMessageTimestamp }
                 .toHashSet()
@@ -71,6 +80,7 @@ class MemoryAutoSaveCandidateRepository(
         newTimestamps.forEach { timestamp ->
             enqueue(
                 chatId = chatId,
+                companionId = companionId,
                 triggerMessageTimestamp = timestamp,
                 sourceType = MemoryAutoSaveCandidate.SOURCE_TYPE_SELECTED_USER_MESSAGE
             )
@@ -79,6 +89,7 @@ class MemoryAutoSaveCandidateRepository(
     }
 
     fun getPendingAndFailedCandidates(): List<MemoryAutoSaveCandidate> {
+        quarantineLegacyUnscopedCandidates()
         recoverStaleProcessing()
         return candidateBox
             .query(
@@ -120,6 +131,20 @@ class MemoryAutoSaveCandidateRepository(
         }
         candidateBox.put(stale)
         return stale.size
+    }
+
+    fun quarantineLegacyUnscopedCandidates(nowMs: Long = System.currentTimeMillis()): Int {
+        val legacyCandidates = candidateBox.all.filter(::shouldQuarantineLegacyMemoryCandidate)
+        if (legacyCandidates.isEmpty()) return 0
+        val now = Date(nowMs)
+        legacyCandidates.forEach { candidate ->
+            candidate.status = MemoryAutoSaveCandidate.STATUS_SKIPPED_LEGACY_UNSCOPED
+            candidate.updatedAt = now
+            candidate.nextAttemptAtMs = 0L
+            candidate.lastError = "Legacy candidate has no companion target snapshot"
+        }
+        candidateBox.put(legacyCandidates)
+        return legacyCandidates.size
     }
 
     fun countPendingAndFailedChats(): Int {

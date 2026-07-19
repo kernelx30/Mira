@@ -242,7 +242,8 @@ interface MessageDao {
             waitDurationMs,
             completedAt,
             displayMode,
-            isFavorite
+            isFavorite,
+            speechDirectionJson
         )
         SELECT
             :targetChatId,
@@ -262,7 +263,8 @@ interface MessageDao {
             waitDurationMs,
             completedAt,
             displayMode,
-            isFavorite
+            isFavorite,
+            speechDirectionJson
         FROM messages
         WHERE chatId = :sourceChatId
             AND (:upToTimestampInclusive IS NULL OR timestamp <= :upToTimestampInclusive)
@@ -293,6 +295,9 @@ interface MessageDao {
     /** 根据时间戳查找消息 */
     @Query("SELECT * FROM messages WHERE chatId = :chatId AND timestamp = :timestamp LIMIT 1")
     suspend fun getMessageByTimestamp(chatId: String, timestamp: Long): MessageEntity?
+
+    @Query("SELECT * FROM messages WHERE messageId IN (:messageIds)")
+    suspend fun getMessagesByIds(messageIds: List<Long>): List<MessageEntity>
 
     /** 删除指定聊天中从某个时间戳开始的所有消息 */
     @Query("DELETE FROM messages WHERE chatId = :chatId AND timestamp >= :timestamp")

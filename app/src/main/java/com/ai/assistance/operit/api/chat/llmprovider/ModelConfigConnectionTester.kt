@@ -15,6 +15,7 @@ import com.ai.assistance.operit.util.AssetCopyUtils
 import com.ai.assistance.operit.util.ChatMarkupRegex
 import com.ai.assistance.operit.util.ImagePoolManager
 import com.ai.assistance.operit.util.MediaPoolManager
+import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.CancellationException
 
 enum class ModelConnectionTestType {
@@ -41,7 +42,7 @@ data class ModelConnectionTestReport(
     val items: List<ModelConnectionTestItem>
 ) {
     val success: Boolean
-        get() = items.all { it.success }
+        get() = items.isNotEmpty() && items.all { it.success }
 }
 
 object ModelConfigConnectionTester {
@@ -57,15 +58,15 @@ object ModelConfigConnectionTester {
         val configForTest = config.copy(modelName = testedModelName)
         val items = mutableListOf<ModelConnectionTestItem>()
 
-        val service =
-            AIServiceFactory.createService(
-                config = configForTest,
-                modelConfigManager = modelConfigManager,
-                context = context
-            )
-        onActiveServiceChanged(service)
-
+        var service: AIService? = null
         try {
+            service =
+                AIServiceFactory.createService(
+                    config = configForTest,
+                    modelConfigManager = modelConfigManager,
+                    context = context
+                )
+            onActiveServiceChanged(service)
             val parameters = modelConfigManager.getModelParametersForConfig(configForTest.id)
 
             suspend fun runCase(type: ModelConnectionTestType, block: suspend () -> Unit) {
@@ -88,13 +89,23 @@ object ModelConfigConnectionTester {
             }
 
             runCase(ModelConnectionTestType.CHAT) {
-                service.sendMessage(
+                var hasResponseContent = false
+                service!!.sendMessage(
                     context,
                     listOf(PromptTurn(kind = PromptTurnKind.USER, content = "Hi")),
                     parameters,
                     stream = false,
                     enableRetry = false
-                ).collect { }
+                ).collect { chunk ->
+                    if (chunk.isNotBlank()) {
+                        hasResponseContent = true
+                    }
+                }
+                if (!hasResponseContent) {
+                    throw IllegalStateException(
+                        context.getString(R.string.provider_error_response_empty)
+                    )
+                }
             }
 
             if (configForTest.enableToolCall) {
@@ -128,7 +139,7 @@ object ModelConfigConnectionTester {
                             "user" to
                                 "<$toolResultTagName name=\"$toolName\" status=\"success\"><content>pong</content></$toolResultTagName>"
                         )
-                        service.sendMessage(
+                        service!!.sendMessage(
                             context,
                             testHistory.toPromptTurns(),
                             parameters,
@@ -156,7 +167,7 @@ object ModelConfigConnectionTester {
                                 append("\n")
                                 append(context.getString(R.string.conversation_analyze_image_prompt))
                             }
-                        service.sendMessage(
+                        service!!.sendMessage(
                             context,
                             listOf(PromptTurn(kind = PromptTurnKind.USER, content = prompt)),
                             parameters,
@@ -184,7 +195,7 @@ object ModelConfigConnectionTester {
                                 append("\n")
                                 append(context.getString(R.string.conversation_analyze_audio_prompt))
                             }
-                        service.sendMessage(
+                        service!!.sendMessage(
                             context,
                             listOf(PromptTurn(kind = PromptTurnKind.USER, content = prompt)),
                             parameters,
@@ -212,7 +223,7 @@ object ModelConfigConnectionTester {
                                 append("\n")
                                 append(context.getString(R.string.conversation_analyze_video_prompt))
                             }
-                        service.sendMessage(
+                        service!!.sendMessage(
                             context,
                             listOf(PromptTurn(kind = PromptTurnKind.USER, content = prompt)),
                             parameters,
@@ -226,7 +237,7 @@ object ModelConfigConnectionTester {
                 }
             }
         } catch (e: CancellationException) {
-            runCatching { service.cancelStreaming() }
+            runCatching { service?.cancelStreaming() }
             throw e
         } catch (e: Exception) {
             if (items.none { it.type == ModelConnectionTestType.CHAT }) {
@@ -239,8 +250,13 @@ object ModelConfigConnectionTester {
                 )
             }
         } finally {
-            onActiveServiceChanged(null)
-            service.release()
+            runCatching { onActiveServiceChanged(null) }
+                .onFailure { error ->
+                    // A destroyed/recomposed screen must not turn a completed test report
+                    // into an uncaught exception while clearing the temporary service.
+                    AppLogger.w("ModelConfigConnectionTester", "清理测试服务回调失败", error)
+                }
+            runCatching { service?.release() }
         }
 
         return ModelConnectionTestReport(

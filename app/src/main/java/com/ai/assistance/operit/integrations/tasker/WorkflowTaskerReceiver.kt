@@ -20,6 +20,10 @@ class WorkflowTaskerReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "WorkflowTaskerReceiver"
         const val ACTION_TRIGGER_WORKFLOW = "com.ai.assistance.operit.TRIGGER_WORKFLOW"
+        const val EXTRA_CONFIRMED = "confirmed"
+        private const val MAX_EXTRA_COUNT = 32
+        private const val MAX_EXTRA_VALUE_LENGTH = 4096
+        private val EXTRA_KEY_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
         
         /**
          * Creates an intent to trigger workflows based on intent data.
@@ -29,17 +33,22 @@ class WorkflowTaskerReceiver : BroadcastReceiver() {
             return Intent(ACTION_TRIGGER_WORKFLOW).apply {
                 setPackage(context.packageName)
                 extras?.let { putExtras(it) }
+                putExtra(EXTRA_CONFIRMED, true)
             }
         }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val action = intent.action
-        if (action.isNullOrBlank()) {
+        if (intent.action != ACTION_TRIGGER_WORKFLOW) {
             return
         }
+        if (!intent.getBooleanExtra(EXTRA_CONFIRMED, false)) {
+            AppLogger.w(TAG, "Rejected workflow trigger without explicit confirmation")
+            return
+        }
+        val sanitizedIntent = sanitizeTriggerIntent(context, intent) ?: return
 
-        AppLogger.d(TAG, "Received workflow trigger broadcast for action: $action. Checking for matching workflows.")
+        AppLogger.d(TAG, "Received authenticated workflow trigger broadcast")
 
         // Use goAsync to allow async work
         val pendingResult = goAsync()
@@ -48,7 +57,7 @@ class WorkflowTaskerReceiver : BroadcastReceiver() {
             try {
                 val repository = WorkflowRepository(context.applicationContext)
                 // New method to find and trigger workflows based on the intent's content (action, extras, etc.)
-                repository.triggerWorkflowsByIntentEvent(intent)
+                repository.triggerWorkflowsByIntentEvent(sanitizedIntent)
                 AppLogger.d(TAG, "Finished processing intent trigger.")
             } catch (e: Exception) {
                 AppLogger.e(TAG, "Error processing intent trigger for workflows", e)
@@ -56,6 +65,39 @@ class WorkflowTaskerReceiver : BroadcastReceiver() {
                 pendingResult.finish()
             }
         }
+    }
+
+    private fun sanitizeTriggerIntent(context: Context, source: Intent): Intent? {
+        val sourceExtras = source.extras
+        if (sourceExtras != null && sourceExtras.size() > MAX_EXTRA_COUNT) {
+            AppLogger.w(TAG, "Rejected workflow trigger with too many extras")
+            return null
+        }
+        val sanitized = Bundle()
+        sourceExtras?.keySet().orEmpty().forEach { key ->
+            if (key == EXTRA_CONFIRMED) return@forEach
+            if (!EXTRA_KEY_PATTERN.matches(key)) {
+                AppLogger.w(TAG, "Rejected workflow trigger extra key: $key")
+                return null
+            }
+            val value = sourceExtras?.get(key)
+            val normalized =
+                when (value) {
+                    null -> ""
+                    is String, is Boolean, is Byte, is Short, is Int, is Long, is Float, is Double ->
+                        value.toString()
+                    else -> {
+                        AppLogger.w(TAG, "Rejected workflow trigger extra type for key=$key")
+                        return null
+                    }
+                }
+            if (normalized.length > MAX_EXTRA_VALUE_LENGTH) {
+                AppLogger.w(TAG, "Rejected oversized workflow trigger extra: $key")
+                return null
+            }
+            sanitized.putString(key, normalized)
+        }
+        return Intent(ACTION_TRIGGER_WORKFLOW).setPackage(context.packageName).putExtras(sanitized)
     }
 }
 
@@ -99,4 +141,3 @@ class WorkflowBootReceiver : BroadcastReceiver() {
         }
     }
 }
-

@@ -63,8 +63,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupProperties
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.speech.SpeechServiceFactory
 import com.ai.assistance.operit.api.voice.HttpTtsResponsePipelineStep
@@ -1311,6 +1313,7 @@ fun SpeechServicesSettingsScreen(
                                     label = { Text(stringResource(R.string.speech_services_doubao_token)) },
                                     placeholder = { Text(stringResource(R.string.speech_services_doubao_token_placeholder)) },
                                     modifier = Modifier.fillMaxWidth(),
+                                    visualTransformation = PasswordVisualTransformation(),
                                     singleLine = true
                                 )
 
@@ -1345,13 +1348,14 @@ fun SpeechServicesSettingsScreen(
                                         },
                                         modifier = Modifier.menuAnchor().fillMaxWidth()
                                     )
-                                    ExposedDropdownMenu(
+                                    DropdownMenu(
                                         expanded = doubaoVoiceDropdownExpanded,
                                         onDismissRequest = {
                                             doubaoVoiceDropdownExpanded = false
                                             doubaoVoiceQuery = ""
                                         },
-                                        modifier = Modifier.heightIn(max = 520.dp),
+                                        modifier = Modifier.exposedDropdownSize().heightIn(max = 520.dp),
+                                        properties = PopupProperties(focusable = true),
                                     ) {
                                         OutlinedTextField(
                                             value = doubaoVoiceQuery,

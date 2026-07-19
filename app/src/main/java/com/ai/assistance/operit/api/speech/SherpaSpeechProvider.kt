@@ -245,6 +245,7 @@ class SherpaSpeechProvider(private val context: Context) : SpeechService {
             clearAndReleaseAudioRecord()
 
             _recognitionState.value = SpeechService.RecognitionState.PREPARING
+            _recognitionError.value = SpeechService.RecognitionError(0, "")
             // 清空上一轮的识别结果，避免新的订阅者立刻收到旧的 StateFlow 值
             _recognitionResult.value = SpeechService.RecognitionResult(text = "", isFinal = false, confidence = 0f)
             recognizer?.reset(false) // 使用SherpaNcnn中的reset方法，参数为false不重新创建识别器

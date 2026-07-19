@@ -22,6 +22,7 @@ import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.ui.features.settings.components.ColorPickerDialog
 import com.ai.assistance.operit.ui.features.settings.sections.ThemeSettingsAvatarSection
+import com.ai.assistance.operit.ui.features.settings.sections.ThemeSettingsBubblePersonalizationSection
 import com.ai.assistance.operit.ui.features.settings.sections.ThemeSettingsChatStyleSection
 import com.ai.assistance.operit.ui.features.settings.sections.ThemeSettingsDisplayOptionsSection
 import com.ai.assistance.operit.ui.features.settings.sections.SaveThemeSettingsAction
@@ -608,6 +609,12 @@ internal fun ThemeSettingsChatTab(
     )
     val bubbleUserRoundedCornersEnabled by preferencesManager.bubbleUserRoundedCornersEnabled.collectAsState(initial = true)
     val bubbleAiRoundedCornersEnabled by preferencesManager.bubbleAiRoundedCornersEnabled.collectAsState(initial = true)
+    val bubbleUserCornerRadius by preferencesManager.bubbleUserCornerRadius.collectAsState(initial = 16f)
+    val bubbleAiCornerRadius by preferencesManager.bubbleAiCornerRadius.collectAsState(initial = 16f)
+    val bubbleUserMaxWidthRatio by preferencesManager.bubbleUserMaxWidthRatio.collectAsState(initial = 0.78f)
+    val bubbleAiMaxWidthRatio by preferencesManager.bubbleAiMaxWidthRatio.collectAsState(initial = 0.84f)
+    val bubbleMessageVerticalPadding by preferencesManager.bubbleMessageVerticalPadding.collectAsState(initial = 4f)
+    val bubbleShadowElevation by preferencesManager.bubbleShadowElevation.collectAsState(initial = 0f)
     val bubbleUserContentPaddingLeft by preferencesManager.bubbleUserContentPaddingLeft.collectAsState(initial = 12f)
     val bubbleUserContentPaddingRight by preferencesManager.bubbleUserContentPaddingRight.collectAsState(initial = 12f)
     val bubbleAiContentPaddingLeft by preferencesManager.bubbleAiContentPaddingLeft.collectAsState(initial = 12f)
@@ -690,6 +697,12 @@ internal fun ThemeSettingsChatTab(
     var bubbleImageRenderModeInput by remember { mutableStateOf(bubbleImageRenderMode) }
     var bubbleUserRoundedCornersEnabledInput by remember { mutableStateOf(bubbleUserRoundedCornersEnabled) }
     var bubbleAiRoundedCornersEnabledInput by remember { mutableStateOf(bubbleAiRoundedCornersEnabled) }
+    var bubbleUserCornerRadiusInput by remember { mutableStateOf(bubbleUserCornerRadius) }
+    var bubbleAiCornerRadiusInput by remember { mutableStateOf(bubbleAiCornerRadius) }
+    var bubbleUserMaxWidthRatioInput by remember { mutableStateOf(bubbleUserMaxWidthRatio) }
+    var bubbleAiMaxWidthRatioInput by remember { mutableStateOf(bubbleAiMaxWidthRatio) }
+    var bubbleMessageVerticalPaddingInput by remember { mutableStateOf(bubbleMessageVerticalPadding) }
+    var bubbleShadowElevationInput by remember { mutableStateOf(bubbleShadowElevation) }
     var bubbleUserContentPaddingLeftInput by remember { mutableStateOf(bubbleUserContentPaddingLeft) }
     var bubbleUserContentPaddingRightInput by remember { mutableStateOf(bubbleUserContentPaddingRight) }
     var bubbleAiContentPaddingLeftInput by remember { mutableStateOf(bubbleAiContentPaddingLeft) }
@@ -762,6 +775,12 @@ internal fun ThemeSettingsChatTab(
         bubbleImageRenderMode,
         bubbleUserRoundedCornersEnabled,
         bubbleAiRoundedCornersEnabled,
+        bubbleUserCornerRadius,
+        bubbleAiCornerRadius,
+        bubbleUserMaxWidthRatio,
+        bubbleAiMaxWidthRatio,
+        bubbleMessageVerticalPadding,
+        bubbleShadowElevation,
         bubbleUserContentPaddingLeft,
         bubbleUserContentPaddingRight,
         bubbleAiContentPaddingLeft,
@@ -833,6 +852,12 @@ internal fun ThemeSettingsChatTab(
         bubbleImageRenderModeInput = bubbleImageRenderMode
         bubbleUserRoundedCornersEnabledInput = bubbleUserRoundedCornersEnabled
         bubbleAiRoundedCornersEnabledInput = bubbleAiRoundedCornersEnabled
+        bubbleUserCornerRadiusInput = bubbleUserCornerRadius
+        bubbleAiCornerRadiusInput = bubbleAiCornerRadius
+        bubbleUserMaxWidthRatioInput = bubbleUserMaxWidthRatio
+        bubbleAiMaxWidthRatioInput = bubbleAiMaxWidthRatio
+        bubbleMessageVerticalPaddingInput = bubbleMessageVerticalPadding
+        bubbleShadowElevationInput = bubbleShadowElevation
         bubbleUserContentPaddingLeftInput = bubbleUserContentPaddingLeft
         bubbleUserContentPaddingRightInput = bubbleUserContentPaddingRight
         bubbleAiContentPaddingLeftInput = bubbleAiContentPaddingLeft
@@ -895,6 +920,119 @@ internal fun ThemeSettingsChatTab(
             onAiAvatarUriInputChange = { aiAvatarUriInput = it },
             onGlobalUserAvatarUriInputChange = { globalUserAvatarUriInput = it },
         ),
+    )
+
+    ThemeSettingsBubblePersonalizationSection(
+        cardColors = cardColors,
+        userBubbleColor = bubbleUserBubbleColorInput,
+        aiBubbleColor = bubbleAiBubbleColorInput,
+        userTextColor = bubbleUserTextColorInput,
+        aiTextColor = bubbleAiTextColorInput,
+        userCornerRadius = bubbleUserCornerRadiusInput,
+        onUserCornerRadiusChange = { bubbleUserCornerRadiusInput = it },
+        onUserCornerRadiusChangeFinished = { value ->
+            shared.saveThemeSettingsWithCharacterCard {
+                preferencesManager.saveThemeSettings(bubbleUserCornerRadius = value)
+            }
+        },
+        aiCornerRadius = bubbleAiCornerRadiusInput,
+        onAiCornerRadiusChange = { bubbleAiCornerRadiusInput = it },
+        onAiCornerRadiusChangeFinished = { value ->
+            shared.saveThemeSettingsWithCharacterCard {
+                preferencesManager.saveThemeSettings(bubbleAiCornerRadius = value)
+            }
+        },
+        userMaxWidthRatio = bubbleUserMaxWidthRatioInput,
+        onUserMaxWidthRatioChange = { bubbleUserMaxWidthRatioInput = it },
+        onUserMaxWidthRatioChangeFinished = { value ->
+            shared.saveThemeSettingsWithCharacterCard {
+                preferencesManager.saveThemeSettings(bubbleUserMaxWidthRatio = value)
+            }
+        },
+        aiMaxWidthRatio = bubbleAiMaxWidthRatioInput,
+        onAiMaxWidthRatioChange = { bubbleAiMaxWidthRatioInput = it },
+        onAiMaxWidthRatioChangeFinished = { value ->
+            shared.saveThemeSettingsWithCharacterCard {
+                preferencesManager.saveThemeSettings(bubbleAiMaxWidthRatio = value)
+            }
+        },
+        messageVerticalPadding = bubbleMessageVerticalPaddingInput,
+        onMessageVerticalPaddingChange = { bubbleMessageVerticalPaddingInput = it },
+        onMessageVerticalPaddingChangeFinished = { value ->
+            shared.saveThemeSettingsWithCharacterCard {
+                preferencesManager.saveThemeSettings(bubbleMessageVerticalPadding = value)
+            }
+        },
+        shadowElevation = bubbleShadowElevationInput,
+        onShadowElevationChange = { bubbleShadowElevationInput = it },
+        onShadowElevationChangeFinished = { value ->
+            shared.saveThemeSettingsWithCharacterCard {
+                preferencesManager.saveThemeSettings(bubbleShadowElevation = value)
+            }
+        },
+        showAvatar = bubbleShowAvatarInput,
+        wideLayout = bubbleWideLayoutEnabledInput,
+        usesCustomSurface =
+            !bubbleUserRoundedCornersEnabledInput ||
+                !bubbleAiRoundedCornersEnabledInput ||
+                bubbleUserUseImageInput ||
+                bubbleAiUseImageInput ||
+                bubbleUserBubbleLiquidGlassInput ||
+                bubbleUserBubbleWaterGlassInput ||
+                bubbleAiBubbleLiquidGlassInput ||
+                bubbleAiBubbleWaterGlassInput,
+        onShowColorPicker = { mode ->
+            currentColorPickerMode = mode
+            showColorPicker = true
+        },
+        onApplyPreset = { preset ->
+            chatStyleInput = UserPreferencesManager.CHAT_STYLE_BUBBLE
+            bubbleShowAvatarInput = preset.showAvatar
+            bubbleWideLayoutEnabledInput = preset.wideLayout
+            bubbleUserBubbleColorInput = preset.userBubbleColor
+            bubbleAiBubbleColorInput = preset.aiBubbleColor
+            bubbleUserTextColorInput = preset.userTextColor
+            bubbleAiTextColorInput = preset.aiTextColor
+            bubbleUserRoundedCornersEnabledInput = true
+            bubbleAiRoundedCornersEnabledInput = true
+            bubbleUserCornerRadiusInput = preset.userCornerRadius
+            bubbleAiCornerRadiusInput = preset.aiCornerRadius
+            bubbleUserMaxWidthRatioInput = preset.userMaxWidthRatio
+            bubbleAiMaxWidthRatioInput = preset.aiMaxWidthRatio
+            bubbleMessageVerticalPaddingInput = preset.messageVerticalPadding
+            bubbleShadowElevationInput = preset.shadowElevation
+            bubbleUserUseImageInput = false
+            bubbleAiUseImageInput = false
+            bubbleUserBubbleLiquidGlassInput = false
+            bubbleUserBubbleWaterGlassInput = false
+            bubbleAiBubbleLiquidGlassInput = false
+            bubbleAiBubbleWaterGlassInput = false
+            shared.saveThemeSettingsWithCharacterCard {
+                preferencesManager.saveThemeSettings(
+                    chatStyle = UserPreferencesManager.CHAT_STYLE_BUBBLE,
+                    bubbleShowAvatar = preset.showAvatar,
+                    bubbleWideLayoutEnabled = preset.wideLayout,
+                    bubbleUserBubbleColor = preset.userBubbleColor,
+                    bubbleAiBubbleColor = preset.aiBubbleColor,
+                    bubbleUserTextColor = preset.userTextColor,
+                    bubbleAiTextColor = preset.aiTextColor,
+                    bubbleUserRoundedCornersEnabled = true,
+                    bubbleAiRoundedCornersEnabled = true,
+                    bubbleUserCornerRadius = preset.userCornerRadius,
+                    bubbleAiCornerRadius = preset.aiCornerRadius,
+                    bubbleUserMaxWidthRatio = preset.userMaxWidthRatio,
+                    bubbleAiMaxWidthRatio = preset.aiMaxWidthRatio,
+                    bubbleMessageVerticalPadding = preset.messageVerticalPadding,
+                    bubbleShadowElevation = preset.shadowElevation,
+                    bubbleUserUseImage = false,
+                    bubbleAiUseImage = false,
+                    bubbleUserBubbleLiquidGlass = false,
+                    bubbleUserBubbleWaterGlass = false,
+                    bubbleAiBubbleLiquidGlass = false,
+                    bubbleAiBubbleWaterGlass = false,
+                )
+            }
+        },
     )
 
     ThemeSettingsChatStyleSection(
@@ -1002,6 +1140,12 @@ internal fun ThemeSettingsChatTab(
         onBubbleUserRoundedCornersEnabledInputChange = { bubbleUserRoundedCornersEnabledInput = it },
         bubbleAiRoundedCornersEnabledInput = bubbleAiRoundedCornersEnabledInput,
         onBubbleAiRoundedCornersEnabledInputChange = { bubbleAiRoundedCornersEnabledInput = it },
+        bubbleUserCornerRadiusInput = bubbleUserCornerRadiusInput,
+        bubbleAiCornerRadiusInput = bubbleAiCornerRadiusInput,
+        bubbleUserMaxWidthRatioInput = bubbleUserMaxWidthRatioInput,
+        bubbleAiMaxWidthRatioInput = bubbleAiMaxWidthRatioInput,
+        bubbleMessageVerticalPaddingInput = bubbleMessageVerticalPaddingInput,
+        bubbleShadowElevationInput = bubbleShadowElevationInput,
         bubbleUserContentPaddingLeftInput = bubbleUserContentPaddingLeftInput,
         onBubbleUserContentPaddingLeftInputChange = { bubbleUserContentPaddingLeftInput = it },
         bubbleUserContentPaddingRightInput = bubbleUserContentPaddingRightInput,
@@ -1082,6 +1226,13 @@ internal fun ThemeSettingsChatTab(
             bubbleAiTextColorInput = bubbleAiTextColorInput,
             recentColors = recentColors,
             onColorSelected = { _, _, _, _, _, _, _, _, cursorUser, bubbleUser, bubbleAi, userText, aiText ->
+                when (currentColorPickerMode) {
+                    "cursorUserBubble" -> cursorUser?.let { cursorUserBubbleColorInput = it }
+                    "bubbleUserBubble" -> bubbleUser?.let { bubbleUserBubbleColorInput = it }
+                    "bubbleAiBubble" -> bubbleAi?.let { bubbleAiBubbleColorInput = it }
+                    "bubbleUserText" -> userText?.let { bubbleUserTextColorInput = it }
+                    "bubbleAiText" -> aiText?.let { bubbleAiTextColorInput = it }
+                }
                 saveSelectedChatColor(
                     shared = shared,
                     currentColorPickerMode = currentColorPickerMode,

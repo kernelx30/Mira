@@ -10,8 +10,8 @@ import android.os.LocaleList
 import com.ai.assistance.operit.util.AppLogger
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,13 +53,12 @@ import com.ai.assistance.operit.util.AnrMonitor
 import com.ai.assistance.operit.util.LocaleUtils
 import java.util.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import android.content.Intent
 import android.net.Uri
-import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
-import com.ai.assistance.operit.ui.features.github.GitHubOAuthCoordinator
 import com.ai.assistance.operit.widget.ToolPkgDesktopWidgetHost
 import org.json.JSONObject
 
@@ -70,6 +69,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val TAG = "MainActivity"
+    private val mainNavigationViewModel by viewModels<MainNavigationViewModel>()
 
     // ======== 屏幕方向变更状态 ========
     private var lastOrientation: Int? = null
@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
 
     // ======== 导航状态 ========
     private var showPreferencesGuide by mutableStateOf(false)
+    private var agreementAccepted by mutableStateOf(false)
 
     // ======== MCP插件状态 ========
     private val pluginLoadingState = PluginLoadingState()
@@ -102,13 +103,12 @@ class MainActivity : ComponentActivity() {
     private var pendingSharedFileUris: List<Uri>? = null
 
     private var pendingSharedText: String? = null
-    private var pendingGitHubAuthUri: Uri? = null
-    private var pendingShortcutNavItem: NavItem? = null
-    private var pendingShortcutRequestId: Long = 0L
+    private var pendingShortcutNavItem by mutableStateOf<NavItem?>(null)
+    private var pendingShortcutRequestId by mutableStateOf(0L)
     private var currentMainNavItem: NavItem = NavItem.AiChat
-    private var pendingRouteId: String? = null
-    private var pendingRouteArgs: Map<String, Any?> = emptyMap()
-    private var pendingRouteRequestId: Long = 0L
+    private var pendingRouteId by mutableStateOf<String?>(null)
+    private var pendingRouteArgs by mutableStateOf<Map<String, Any?>>(emptyMap())
+    private var pendingRouteRequestId by mutableStateOf(0L)
 
     private fun processPendingSharedText() {
         if (pendingSharedFileUris != null) {
@@ -205,7 +205,6 @@ class MainActivity : ComponentActivity() {
 
         // 设置初始界面
         setAppContent()
-        processPendingGitHubAuth()
 
         // 初始化并设置更新管理器
         setupUpdateManager()
@@ -216,8 +215,6 @@ class MainActivity : ComponentActivity() {
             performInitialChecks()
         }
 
-        // 设置双击返回退出
-        setupBackPressHandler()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -233,8 +230,6 @@ class MainActivity : ComponentActivity() {
         val handledShortcutIntent = handleIntent(intent)
 
         if (handledShortcutIntent) {
-            processPendingGitHubAuth()
-            setAppContent()
             return
         }
         
@@ -280,13 +275,6 @@ class MainActivity : ComponentActivity() {
             return true
         }
 
-        val intentUri = intent?.data
-        if (GitHubAuthPreferences.isOAuthRedirectUri(intentUri)) {
-            pendingGitHubAuthUri = intentUri
-            AppLogger.d(TAG, "Received GitHub OAuth redirect: $intentUri")
-            return true
-        }
-        
         // Handle opened and shared files
         when (intent?.action) {
             Intent.ACTION_VIEW -> {
@@ -344,49 +332,19 @@ class MainActivity : ComponentActivity() {
 
     private fun restoreCompanionKeepAliveIfEnabled() {
         lifecycleScope.launch {
-            val enabled =
-                CompanionReminderPreferences.getInstance(applicationContext)
-                    .keepAliveEnabledFlow
-                    .first()
-            if (enabled) {
-                MiraCompanionService.startKeepAlive(applicationContext)
-            }
-        }
-    }
-
-    private fun processPendingGitHubAuth() {
-        val authUri = pendingGitHubAuthUri ?: return
-        pendingGitHubAuthUri = null
-
-        lifecycleScope.launch {
-            val coordinator = GitHubOAuthCoordinator(this@MainActivity)
-            val result = coordinator.completeExternalLogin(authUri)
-            result.fold(
-                onSuccess = { user ->
-                    Toast.makeText(
-                        this@MainActivity,
-                        getString(R.string.main_github_login_success, user.login),
-                        Toast.LENGTH_LONG
-                    ).show()
-                },
-                onFailure = { error ->
-                    val message = error.message.orEmpty()
-                    if (authUri.getQueryParameter("error") == "access_denied") {
-                        Toast.makeText(
-                            this@MainActivity,
-                            getString(R.string.github_login_external_cancelled),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        Toast.makeText(
-                            this@MainActivity,
-                            getString(R.string.main_github_login_failed, message),
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                    AppLogger.e(TAG, "Failed to complete external GitHub login", error)
+            try {
+                val enabled =
+                    CompanionReminderPreferences.getInstance(applicationContext)
+                        .keepAliveEnabledFlow
+                        .first()
+                if (enabled) {
+                    MiraCompanionService.startKeepAlive(applicationContext)
                 }
-            )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLogger.e(TAG, "恢复主动陪伴后台服务失败", error)
+            }
         }
     }
 
@@ -494,25 +452,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 配置双击返回退出的处理器
-    private fun setupBackPressHandler() {
-        onBackPressedDispatcher.addCallback(
+    private fun handleChatRootBack() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - backPressedTime > backPressedInterval) {
+            backPressedTime = currentTime
+            Toast.makeText(
                 this,
-                object : OnBackPressedCallback(true) {
-                    override fun handleOnBackPressed() {
-                        val currentTime = System.currentTimeMillis()
-
-                        if (currentTime - backPressedTime > backPressedInterval) {
-                            // 第一次点击，显示提示
-                            backPressedTime = currentTime
-                            Toast.makeText(this@MainActivity, getString(R.string.press_back_again_to_exit), Toast.LENGTH_SHORT).show()
-                        } else {
-                            // 第二次点击，退出应用
-                            finish()
-                        }
-                    }
-                }
-        )
+                getString(R.string.press_back_again_to_exit),
+                Toast.LENGTH_SHORT,
+            ).show()
+        } else {
+            finish()
+        }
     }
 
 
@@ -574,6 +525,7 @@ class MainActivity : ComponentActivity() {
 
         // 初始化协议偏好管理器
         agreementPreferences = AgreementPreferences(this)
+        agreementAccepted = agreementPreferences.isAgreementAccepted()
 
     }
 
@@ -593,14 +545,19 @@ class MainActivity : ComponentActivity() {
     private fun setupPreferencesListener() {
         // 监听偏好变化
         lifecycleScope.launch {
-            preferencesManager.getUserPreferencesFlow().collect { profile ->
-                // 只有当状态变化时才更新UI
-                val newValue = !profile.isInitialized
-                if (showPreferencesGuide != newValue) {
-                    AppLogger.d(TAG, "偏好变更: 从 $showPreferencesGuide 变为 $newValue")
-                    showPreferencesGuide = newValue
-                    setAppContent()
+            try {
+                preferencesManager.getUserPreferencesFlow().collect { profile ->
+                    // 只有当状态变化时才更新UI
+                    val newValue = !profile.isInitialized
+                    if (showPreferencesGuide != newValue) {
+                        AppLogger.d(TAG, "偏好变更: 从 $showPreferencesGuide 变为 $newValue")
+                        showPreferencesGuide = newValue
+                    }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                AppLogger.e(TAG, "用户偏好监听异常，保留当前界面状态", error)
             }
         }
     }
@@ -650,10 +607,11 @@ class MainActivity : ComponentActivity() {
             OperitTheme {
                 Box {
                     // 检查是否需要显示用户协议
-                        if (!agreementPreferences.isAgreementAccepted()) {
+                        if (!agreementAccepted) {
                             AgreementScreen(
                                     onAgreementAccepted = {
                                         agreementPreferences.setAgreementAccepted(true)
+                                        agreementAccepted = true
                                         // 协议接受后，检查权限级别设置
                                         lifecycleScope.launch {
                                             // 确保使用非阻塞方式更新UI
@@ -662,8 +620,6 @@ class MainActivity : ComponentActivity() {
                                             if (!showPermissionGuide) {
                                                 startPluginLoading()
                                             }
-                                            // 重新设置应用内容
-                                            setAppContent()
                                         }
                                     }
                             )
@@ -675,7 +631,6 @@ class MainActivity : ComponentActivity() {
                                         showPermissionGuide = false
                                         // 权限设置完成后，启动插件加载并更新内容
                                         startPluginLoading()
-                                        setAppContent()
                                     }
                             )
                         }
@@ -701,6 +656,7 @@ class MainActivity : ComponentActivity() {
                                 // 主应用界面 (始终存在于底层)
                                 OperitApp(
                                         initialNavItem = initialNavItem,
+                                        routerStateFactory = mainNavigationViewModel::getOrCreateRouterState,
                                         toolHandler = toolHandler,
                                         shortcutNavRequest = shortcutNavItem,
                                         shortcutNavRequestId = shortcutNavRequestId,
@@ -722,7 +678,8 @@ class MainActivity : ComponentActivity() {
                                                 pendingRouteArgs = emptyMap()
                                                 pendingRouteRequestId = 0L
                                             }
-                                        }
+                                        },
+                                        onChatRootBack = ::handleChatRootBack,
                                 )
                             }
                         }

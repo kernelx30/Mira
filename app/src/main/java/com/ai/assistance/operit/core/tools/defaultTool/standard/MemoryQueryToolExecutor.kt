@@ -8,6 +8,8 @@ import com.ai.assistance.operit.core.tools.MemoryLinkResultData
 import com.ai.assistance.operit.core.tools.MemoryLinkQueryResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.ToolExecutor
+import com.ai.assistance.operit.core.chat.CompanionMemoryTargetResolver
+import com.ai.assistance.operit.core.chat.CompanionMemoryQueryMatcher
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ActivePrompt
 import com.ai.assistance.operit.data.model.CharacterCardMemoryProfileBindingMode
@@ -21,6 +23,10 @@ import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.CharacterGroupCardManager
 import com.ai.assistance.operit.data.preferences.MemorySearchSettingsPreferences
 import com.ai.assistance.operit.data.repository.MemoryRepository
+import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
+import com.ai.assistance.operit.data.repository.decodedLabel
+import com.ai.assistance.operit.data.repository.decodedValue
+import com.ai.assistance.operit.data.model.structuredCompanionId
 import kotlinx.coroutines.flow.first
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
@@ -29,6 +35,25 @@ import com.ai.assistance.operit.data.preferences.preferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+
+internal data class MemoryQueryResultSelection<Structured, Legacy>(
+    val structured: List<Structured>,
+    val legacy: List<Legacy>,
+)
+
+internal fun <Structured, Legacy> selectMemoryQueryResults(
+    structuredCandidates: List<Structured>,
+    legacyCandidates: List<Legacy>,
+    limit: Int,
+): MemoryQueryResultSelection<Structured, Legacy> {
+    val boundedLimit = limit.coerceAtLeast(0)
+    val structured = structuredCandidates.take(boundedLimit)
+    val legacy = legacyCandidates.take((boundedLimit - structured.size).coerceAtLeast(0))
+    return MemoryQueryResultSelection(structured = structured, legacy = legacy)
+}
+
+internal fun shouldQueryStructuredCompanionMemory(folderPath: String?): Boolean =
+    folderPath.isNullOrBlank()
 
 /**
  * Executes queries against the AI's memory graph and manages user preferences.
@@ -43,6 +68,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         private data class QuerySnapshotState(
             val id: String,
             val seenMemoryIds: MutableSet<Long> = ConcurrentHashMap.newKeySet<Long>(),
+            val seenCompanionMemoryIds: MutableSet<String> = ConcurrentHashMap.newKeySet<String>(),
             val lock: Any = Any(),
             @Volatile var lastAccessAtMs: Long = System.currentTimeMillis()
         )
@@ -53,6 +79,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
     private val memoryRepositories = ConcurrentHashMap<String, MemoryRepository>()
     private val settingsRepositories = ConcurrentHashMap<String, MemorySearchSettingsPreferences>()
+    private val companionMemoryRepository by lazy { CompanionMemoryRepository(context.applicationContext) }
 
     private fun resolveGlobalActiveProfileId(): String {
         return kotlinx.coroutines.runBlocking { preferencesManager.activeProfileIdFlow.first() }
@@ -315,7 +342,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
         AppLogger.d(
             TAG,
-            "Executing memory query: '$query' in folder: '${folderPath ?: "All"}', snapshot_id=${snapshotState.id}, snapshot_created=$snapshotCreated, start_time: ${startTimeMs ?: "null"}, end_time: ${endTimeMs ?: "null"}, limit: $validLimit, threshold=${threshold ?: DEFAULT_RELEVANCE_THRESHOLD}, mode=${settings.scoreMode}, keywordWeight=${settings.keywordWeight}, tagWeight=${settings.tagWeight}, vectorWeight=${settings.vectorWeight}, edgeWeight=${settings.edgeWeight}"
+            "Executing memory query: queryLength=${query.length}, folderScoped=${!folderPath.isNullOrBlank()}, snapshot_id=${snapshotState.id}, snapshot_created=$snapshotCreated, start_time_set=${startTimeMs != null}, end_time_set=${endTimeMs != null}, limit=$validLimit, threshold=${threshold ?: DEFAULT_RELEVANCE_THRESHOLD}, mode=${settings.scoreMode}"
         )
 
         return try {
@@ -339,17 +366,75 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                     )
                 }
 
+            val runtimeContext = ToolExecutionManager.currentToolRuntimeContext()
+            val conversationId = runtimeContext?.callerChatId.orEmpty()
+            val structuredCompanionId =
+                runtimeContext
+                    ?.callerChatId
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { CompanionMemoryTargetResolver.resolve(context.applicationContext, it) }
+                    .orEmpty()
+                    .ifBlank { companionTarget.structuredCompanionId() }
+            val structuredRecords =
+                if (structuredCompanionId.isBlank() || !shouldQueryStructuredCompanionMemory(folderPath)) {
+                    emptyList()
+                } else if (isWildcardQuery) {
+                    companionMemoryRepository.accessibleRecords(
+                        profileId = profileId,
+                        companionId = structuredCompanionId,
+                        conversationId = conversationId,
+                        limit = validLimit,
+                        includeReview = false,
+                    ).filter { record ->
+                        (startTimeMs == null || record.createdAt >= startTimeMs) &&
+                            (endTimeMs == null || record.createdAt <= endTimeMs)
+                    }
+                } else {
+                    val candidates =
+                        companionMemoryRepository.accessibleRecords(
+                            profileId = profileId,
+                            companionId = structuredCompanionId,
+                            conversationId = conversationId,
+                            limit = 300,
+                            includeReview = false,
+                        ).filter { record ->
+                            (startTimeMs == null || record.createdAt >= startTimeMs) &&
+                                (endTimeMs == null || record.createdAt <= endTimeMs)
+                        }
+                    CompanionMemoryQueryMatcher.rank(candidates, query, validLimit).map { it.record }
+                }
+
             // Keep de-duplication stable even when multiple calls share the same snapshot in parallel.
-            val (excludedBySnapshotCount, returnedMemories) = synchronized(snapshotState.lock) {
-                val excludedCount = results.count { it.id in snapshotState.seenMemoryIds }
-                val unseenResults = results.filterNot { it.id in snapshotState.seenMemoryIds }
-                val selectedResults = unseenResults.take(validLimit)
-                if (selectedResults.isNotEmpty()) {
-                    snapshotState.seenMemoryIds.addAll(selectedResults.map { it.id })
+            val snapshotSelection = synchronized(snapshotState.lock) {
+                val excludedStructuredCount =
+                    structuredRecords.count { it.id in snapshotState.seenCompanionMemoryIds }
+                val excludedLegacyCount = results.count { it.id in snapshotState.seenMemoryIds }
+                val selected =
+                    selectMemoryQueryResults(
+                        structuredCandidates =
+                            structuredRecords.filterNot {
+                                it.id in snapshotState.seenCompanionMemoryIds
+                            },
+                        legacyCandidates = results.filterNot { it.id in snapshotState.seenMemoryIds },
+                        limit = validLimit,
+                    )
+                if (selected.structured.isNotEmpty()) {
+                    snapshotState.seenCompanionMemoryIds.addAll(selected.structured.map { it.id })
+                }
+                if (selected.legacy.isNotEmpty()) {
+                    snapshotState.seenMemoryIds.addAll(selected.legacy.map { it.id })
                 }
                 snapshotState.lastAccessAtMs = System.currentTimeMillis()
-                excludedCount to selectedResults
+                Triple(
+                    excludedStructuredCount + excludedLegacyCount,
+                    selected.structured,
+                    selected.legacy,
+                )
             }
+            val excludedBySnapshotCount = snapshotSelection.first
+            val returnedStructuredRecords = snapshotSelection.second
+            val returnedMemories = snapshotSelection.third
 
             val formattedResult = buildResultData(
                 memoryRepository = memoryRepository,
@@ -358,9 +443,13 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                 limit = validLimit,
                 snapshotId = snapshotState.id,
                 snapshotCreated = snapshotCreated,
-                excludedBySnapshotCount = excludedBySnapshotCount
+                excludedBySnapshotCount = excludedBySnapshotCount,
+                companionRecords = returnedStructuredRecords,
             )
-            AppLogger.d(TAG, "Memory query result for '$query':\n$formattedResult")
+            AppLogger.d(
+                TAG,
+                "Memory query completed: structured=${returnedStructuredRecords.size}, legacy=${returnedMemories.size}, excluded=$excludedBySnapshotCount",
+            )
             ToolResult(toolName = tool.name, success = true, result = formattedResult)
         } catch (e: Exception) {
             AppLogger.e(TAG, "Memory query failed", e)
@@ -388,7 +477,10 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         val queryParam = tool.parameters.find { it.name == "query" }?.value
         val chunkLimitParam = tool.parameters.find { it.name == "limit" }?.value
 
-        AppLogger.d(TAG, "Getting memory by title: $title, chunk_index: $chunkIndexParam, chunk_range: $chunkRangeParam, query: $queryParam, limit: $chunkLimitParam")
+        AppLogger.d(
+            TAG,
+            "Getting memory by title: titleLength=${title.length}, chunk_index_set=${chunkIndexParam != null}, chunk_range_set=${chunkRangeParam != null}, queryLength=${queryParam?.length ?: 0}, limit_set=${chunkLimitParam != null}",
+        )
 
         return try {
             val memory =
@@ -423,7 +515,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
             // 默认行为：返回完整记忆
             val formattedResult = buildResultData(memoryRepository, listOf(memory), title, 1)
-            AppLogger.d(TAG, "Found memory by title '$title':\n$formattedResult")
+            AppLogger.d(TAG, "Memory lookup completed")
             ToolResult(
                 toolName = tool.name,
                 success = true,
@@ -457,7 +549,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             val chunks = when {
                 // 模糊搜索分块
                 !queryParam.isNullOrBlank() -> {
-                    AppLogger.d(TAG, "Searching chunks in document '${memory.title}' with query: '$queryParam', limit: $validLimit")
+                    AppLogger.d(TAG, "Searching document chunks: queryLength=${queryParam.length}, limit=$validLimit")
                     memoryRepository.searchChunksInDocument(memory.id, queryParam, validLimit)
                 }
                 // 范围查询
@@ -483,7 +575,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                             error = "Chunk range out of bounds. Document has $totalChunks chunks. Valid range: 1-$totalChunks"
                         )
                     }
-                    AppLogger.d(TAG, "Retrieving chunk range ${startIndex + 1}-${endIndex + 1} from document '${memory.title}'")
+                    AppLogger.d(TAG, "Retrieving document chunk range ${startIndex + 1}-${endIndex + 1}")
                     memoryRepository.getChunksByRange(memory.id, startIndex, endIndex)
                 }
                 // 单个分块
@@ -498,7 +590,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                             error = "Chunk index out of bounds. Document has $totalChunks chunks. Valid range: 1-$totalChunks"
                         )
                     }
-                    AppLogger.d(TAG, "Retrieving chunk ${chunkIndex + 1} from document '${memory.title}'")
+                    AppLogger.d(TAG, "Retrieving document chunk ${chunkIndex + 1}")
                     val chunk = memoryRepository.getChunkByIndex(memory.id, chunkIndex)
                     listOfNotNull(chunk)
                 }
@@ -527,7 +619,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                 "Chunks ${chunks.map { it.chunkIndex + 1 }.joinToString(", ")}/$totalChunks"
             }
 
-            AppLogger.d(TAG, "Retrieved ${chunks.size} chunks from document '${memory.title}': $chunkInfo")
+            AppLogger.d(TAG, "Retrieved ${chunks.size} document chunks: $chunkInfo")
             
             ToolResult(
                 toolName = toolName,
@@ -566,7 +658,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             )
         }
 
-        AppLogger.d(TAG, "Creating memory: $title")
+        AppLogger.d(TAG, "Creating memory: titleLength=${title.length}, contentLength=${content.length}")
 
         return try {
             val contentType = tool.parameters.find { it.name == "content_type" }?.value ?: "text/plain"
@@ -590,7 +682,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             
             if (memory != null) {
                 val message = "Successfully created memory: '$title' (UUID: ${memory.uuid})"
-                AppLogger.d(TAG, message)
+                AppLogger.d(TAG, "Memory create completed")
                 ToolResult(
                     toolName = tool.name,
                     success = true,
@@ -628,7 +720,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             )
         }
 
-        AppLogger.d(TAG, "Updating memory with title: $oldTitle")
+        AppLogger.d(TAG, "Updating memory: titleLength=${oldTitle.length}")
 
         return try {
             val memory = memoryRepository.findMemoryByTitle(oldTitle)
@@ -666,7 +758,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             
             if (updatedMemory != null) {
                 val message = "Successfully updated memory from '$oldTitle' to '$newTitle'"
-                AppLogger.d(TAG, message)
+                AppLogger.d(TAG, "Memory update completed")
                 ToolResult(
                     toolName = tool.name,
                     success = true,
@@ -704,7 +796,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             )
         }
 
-        AppLogger.d(TAG, "Deleting memory with title: $title")
+        AppLogger.d(TAG, "Deleting memory: titleLength=${title.length}")
 
         return try {
             val memory = memoryRepository.findMemoryByTitle(title)
@@ -721,7 +813,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             
             if (deleted) {
                 val message = "Successfully deleted memory: '$title'"
-                AppLogger.d(TAG, message)
+                AppLogger.d(TAG, "Memory deletion completed")
                 ToolResult(
                     toolName = tool.name,
                     success = true,
@@ -824,7 +916,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             )
         }
 
-        AppLogger.d(TAG, "Linking memories: '$sourceTitle' -> '$targetTitle'")
+        AppLogger.d(TAG, "Linking memories")
 
         return try {
             // 提取可选参数
@@ -873,7 +965,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
                 description = description
             )
             
-            AppLogger.d(TAG, "Successfully linked memories: '$sourceTitle' -> '$targetTitle' (type: $linkType, weight: $validWeight)")
+            AppLogger.d(TAG, "Memory link completed: type=$linkType, weight=$validWeight")
             
             ToolResult(
                 toolName = tool.name,
@@ -1014,7 +1106,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
 
         AppLogger.d(
             TAG,
-            "Moving memories. target_folder_path='$targetFolderPath', source_folder_path='${sourceFolderPath ?: ""}', has_source_folder_param=$hasSourceFolderParam, titles_count=${titles.size}"
+            "Moving memories: target_folder_set=true, source_folder_set=$hasSourceFolderParam, titles_count=${titles.size}"
         )
 
         return try {
@@ -1298,7 +1390,8 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         limit: Int,
         snapshotId: String? = null,
         snapshotCreated: Boolean = false,
-        excludedBySnapshotCount: Int = 0
+        excludedBySnapshotCount: Int = 0,
+        companionRecords: List<com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity> = emptyList(),
     ): MemoryQueryResultData = withContext(Dispatchers.IO) {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
         val isWildcardQuery = query.trim() == "*"
@@ -1310,7 +1403,7 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
             
             if (memory.isDocumentNode) {
                 // 对于文档节点，执行"二次探查"，获取匹配的区块内容
-                AppLogger.d(TAG, "Memory result is a document ('${memory.title}'). Fetching specific matching chunks for query: '$query'")
+                AppLogger.d(TAG, "Memory result is a document; fetching matching chunks")
                 val matchingChunks = memoryRepository.searchChunksInDocument(memory.id, query, limit)
                 val totalChunks = memoryRepository.getTotalChunkCount(memory.id)
 
@@ -1370,6 +1463,19 @@ class MemoryQueryToolExecutor(private val context: Context) : ToolExecutor {
         }
         MemoryQueryResultData(
             memories = memoryInfos,
+            companionMemories = companionRecords.map { record ->
+                MemoryQueryResultData.CompanionMemoryInfo(
+                    id = record.id,
+                    label = record.decodedLabel() ?: record.predicate,
+                    content = record.decodedValue(),
+                    scope = record.scope,
+                    type = record.type,
+                    status = record.status,
+                    confidence = record.confidence,
+                    importance = record.importance,
+                    createdAt = sdf.format(Date(record.createdAt)),
+                )
+            },
             snapshotId = snapshotId,
             snapshotCreated = snapshotCreated,
             excludedBySnapshotCount = excludedBySnapshotCount

@@ -3,6 +3,10 @@ package com.ai.assistance.operit.ui.features.packages.market
 import java.io.File
 import kotlinx.serialization.Serializable
 
+const val MIRA_MARKET_OWNER = "kernelx30"
+const val MIRA_FORGE_REPO_NAME = "MiraForge"
+
+// Kept as wire-level compatibility identifiers for existing Operit artifacts.
 const val OPERIT_MARKET_OWNER = "AAswordman"
 const val OPERIT_FORGE_REPO_NAME = "OperitForge"
 
@@ -32,21 +36,21 @@ enum class PublishArtifactType(
 ) {
     SCRIPT(
         wireValue = "script",
-        marketRepo = "OperitScriptMarket",
+        marketRepo = "MiraScriptMarket",
         releaseTagPrefix = "script",
         titleLabel = "Script",
         marketLabel = SCRIPT_MARKET_LABEL,
         marketLabelColor = "0e8a16",
-        marketLabelDescription = "Published script artifacts managed by Operit."
+        marketLabelDescription = "Published script artifacts managed by Mira."
     ),
     PACKAGE(
         wireValue = "package",
-        marketRepo = "OperitPackageMarket",
+        marketRepo = "MiraPackageMarket",
         releaseTagPrefix = "package",
         titleLabel = "Package",
         marketLabel = PACKAGE_MARKET_LABEL,
         marketLabelColor = "1d76db",
-        marketLabelDescription = "Published package artifacts managed by Operit."
+        marketLabelDescription = "Published package artifacts managed by Mira."
     );
 
     companion object {
@@ -113,7 +117,8 @@ data class ArtifactPublishClusterContext(
     val lockedDisplayName: String,
     val projectDisplayName: String,
     val projectDescription: String,
-    val categoryId: String = ""
+    val categoryId: String = "",
+    val preferredForgeRepo: String? = null
 )
 
 data class PublishArtifactDescriptor(
@@ -355,7 +360,7 @@ fun buildPublishReleaseDescriptor(
         releaseName = "${descriptor.displayName} v${descriptor.version}",
         releaseBody =
             buildString {
-                appendLine("${descriptor.type.titleLabel} artifact published by OperitForge.")
+                appendLine("${descriptor.type.titleLabel} artifact published by MiraForge.")
                 appendLine()
                 appendLine("Project ID: ${descriptor.projectId}")
                 appendLine("Runtime package ID: ${descriptor.runtimePackageId}")

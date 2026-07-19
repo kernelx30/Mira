@@ -277,7 +277,11 @@ private fun RecentChatSelectorOverlay(
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(items) { history ->
+                    items(
+                        items = items,
+                        key = { it.id },
+                        contentType = { "chat_history" },
+                    ) { history ->
                         val isActive = history.id == currentChatId
                         val avatarUri = avatarUriMap[history.id]
                         val groupText = history.group?.takeIf { it.isNotBlank() } ?: ungroupedText

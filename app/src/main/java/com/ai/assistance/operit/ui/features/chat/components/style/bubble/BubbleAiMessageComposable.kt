@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -108,6 +109,10 @@ fun BubbleAiMessageComposable(
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val bubbleShowAvatar by preferencesManager.bubbleShowAvatar.collectAsState(initial = true)
     val bubbleWideLayoutEnabled by preferencesManager.bubbleWideLayoutEnabled.collectAsState(initial = false)
+    val bubbleAiCornerRadius by preferencesManager.bubbleAiCornerRadius.collectAsState(initial = 16f)
+    val bubbleAiMaxWidthRatio by preferencesManager.bubbleAiMaxWidthRatio.collectAsState(initial = 0.84f)
+    val bubbleMessageVerticalPadding by preferencesManager.bubbleMessageVerticalPadding.collectAsState(initial = 4f)
+    val bubbleShadowElevation by preferencesManager.bubbleShadowElevation.collectAsState(initial = 0f)
     val showThinkingProcess by preferencesManager.showThinkingProcess.collectAsState(initial = true)
     val showStatusTags by preferencesManager.showStatusTags.collectAsState(initial = true)
     val effectiveShowThinkingProcess = if (forceShowThinkingProcess) true else showThinkingProcess
@@ -298,9 +303,9 @@ fun BubbleAiMessageComposable(
                 .fillMaxWidth()
                 .padding(
                     start = if (bubbleShowAvatar) 0.dp else 8.dp,
-                    top = if (isVisualGroupStart) 4.dp else 0.dp,
+                    top = if (isVisualGroupStart) bubbleMessageVerticalPadding.coerceIn(0f, 10f).dp else 0.dp,
                     end = 0.dp,
-                    bottom = if (isVisualGroupEnd) 4.dp else 0.dp,
+                    bottom = if (isVisualGroupEnd) bubbleMessageVerticalPadding.coerceIn(0f, 10f).dp else 0.dp,
                 )
                 .then(sizeTrackingModifier)
                 .alpha(alpha)
@@ -359,7 +364,7 @@ fun BubbleAiMessageComposable(
             }
 
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val maxBubbleWidth = maxWidth * 0.84f
+                val maxBubbleWidth = maxWidth * bubbleAiMaxWidthRatio.coerceIn(0.6f, 0.96f)
                 if (companionEmoji != null) {
                     CompanionEmojiImage(
                         content = companionEmoji,
@@ -369,6 +374,7 @@ fun BubbleAiMessageComposable(
                     val bubbleShape =
                         aiBubbleShape(
                             roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                            cornerRadius = bubbleAiCornerRadius,
                             isVisualGroupStart = isVisualGroupStart,
                             isVisualGroupEnd = isVisualGroupEnd,
                         )
@@ -440,7 +446,11 @@ fun BubbleAiMessageComposable(
                         BubbleImageBackgroundSurface(
                             imageStyle = effectiveBubbleImageStyle,
                             shape = bubbleShape,
-                            modifier = bubbleModifier,
+                            modifier =
+                                bubbleModifier.shadow(
+                                    elevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
+                                    shape = bubbleShape,
+                                ),
                             contentPadding = PaddingValues(0.dp),
                         ) {
                             renderContent()
@@ -482,6 +492,12 @@ fun BubbleAiMessageComposable(
                                     Color.Transparent
                                 } else {
                                     backgroundColor
+                                },
+                            shadowElevation =
+                                if (liquidGlassEnabled || waterGlassEnabled) {
+                                    0.dp
+                                } else {
+                                    bubbleShadowElevation.coerceIn(0f, 8f).dp
                                 },
                             tonalElevation =
                                 if (liquidGlassEnabled || waterGlassEnabled) {
@@ -590,7 +606,7 @@ fun BubbleAiMessageComposable(
             }
             
             BoxWithConstraints {
-                val maxBubbleWidth = maxWidth * 0.84f
+                val maxBubbleWidth = maxWidth * bubbleAiMaxWidthRatio.coerceIn(0.6f, 0.96f)
                 if (companionEmoji != null) {
                     CompanionEmojiImage(
                         content = companionEmoji,
@@ -601,6 +617,7 @@ fun BubbleAiMessageComposable(
                     val bubbleShape =
                         aiBubbleShape(
                             roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                            cornerRadius = bubbleAiCornerRadius,
                             isVisualGroupStart = isVisualGroupStart,
                             isVisualGroupEnd = isVisualGroupEnd,
                         )
@@ -676,7 +693,11 @@ fun BubbleAiMessageComposable(
                         BubbleImageBackgroundSurface(
                             imageStyle = effectiveBubbleImageStyle,
                             shape = bubbleShape,
-                            modifier = bubbleModifier,
+                            modifier =
+                                bubbleModifier.shadow(
+                                    elevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
+                                    shape = bubbleShape,
+                                ),
                             contentPadding = PaddingValues(0.dp),
                         ) {
                             renderContent()
@@ -719,6 +740,12 @@ fun BubbleAiMessageComposable(
                                 } else {
                                     backgroundColor
                                 },
+                            shadowElevation =
+                                if (liquidGlassEnabled || waterGlassEnabled) {
+                                    0.dp
+                                } else {
+                                    bubbleShadowElevation.coerceIn(0f, 8f).dp
+                                },
                             tonalElevation = 0.dp,
                         ) {
                             renderContent()
@@ -746,15 +773,18 @@ fun BubbleAiMessageComposable(
 
 private fun aiBubbleShape(
     roundedCornersEnabled: Boolean,
+    cornerRadius: Float,
     isVisualGroupStart: Boolean,
     isVisualGroupEnd: Boolean,
 ): RoundedCornerShape {
     if (!roundedCornersEnabled) return RoundedCornerShape(0.dp)
 
+    val radius = cornerRadius.coerceIn(4f, 28f)
+    val connectedRadius = (radius * 0.5f).coerceAtMost(8f)
     return RoundedCornerShape(
-        topStart = if (isVisualGroupStart) 4.dp else 8.dp,
-        topEnd = 16.dp,
-        bottomEnd = 16.dp,
-        bottomStart = if (isVisualGroupEnd) 16.dp else 8.dp,
+        topStart = if (isVisualGroupStart) minOf(4f, radius).dp else connectedRadius.dp,
+        topEnd = radius.dp,
+        bottomEnd = radius.dp,
+        bottomStart = if (isVisualGroupEnd) radius.dp else connectedRadius.dp,
     )
 }

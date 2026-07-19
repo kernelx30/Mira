@@ -664,7 +664,7 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "delete_memory",
-                            description = "Deletes a memory node from the library by title. Use with caution as this operation is irreversible.",
+                            description = "Deletes a legacy library or document memory node by exact title. For structured facts remembered about the user, companion, relationship, or conversation, use delete_companion_memory instead.",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "title", type = "string", description = "required, string to identify the memory", required = true)
                             )
@@ -3661,7 +3661,7 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "delete_memory",
-                            description = "通过标题从记忆库中删除记忆节点。谨慎使用，此操作不可逆。",
+                            description = "仅通过精确标题删除旧记忆库或文档记忆节点。删除关于用户、角色、双方关系或会话的结构化事实时，请使用 delete_companion_memory。",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "title", type = "string", description = "必需, 字符串，用于识别记忆", required = true)
                             )

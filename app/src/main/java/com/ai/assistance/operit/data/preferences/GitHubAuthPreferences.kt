@@ -1,7 +1,6 @@
 package com.ai.assistance.operit.data.preferences
 
 import android.content.Context
-import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -43,12 +42,8 @@ class GitHubAuthPreferences(private val context: Context) {
     companion object {
         // GitHub OAuth相关配置
         val GITHUB_CLIENT_ID = BuildConfig.GITHUB_CLIENT_ID
-        val GITHUB_CLIENT_SECRET = BuildConfig.GITHUB_CLIENT_SECRET
-        const val GITHUB_SCOPE = "notifications,public_repo,user:email,read:user"
-        private const val REQUIRED_AUTH_VERSION = 2
-        private const val GITHUB_REDIRECT_SCHEME = "operit"
-        private const val GITHUB_REDIRECT_HOST = "github-oauth-callback"
-        const val GITHUB_REDIRECT_URI = "$GITHUB_REDIRECT_SCHEME://$GITHUB_REDIRECT_HOST"
+        const val GITHUB_SCOPE = "public_repo read:user"
+        private const val REQUIRED_AUTH_VERSION = 3
         
         // 认证相关键
         private val IS_LOGGED_IN = booleanPreferencesKey("is_logged_in")
@@ -60,7 +55,6 @@ class GitHubAuthPreferences(private val context: Context) {
         private val LAST_LOGIN_TIME = longPreferencesKey("last_login_time")
         private val AUTH_VERSION = longPreferencesKey("auth_version")
         private val GRANTED_SCOPE = stringPreferencesKey("granted_scope")
-        private val PENDING_OAUTH_STATE = stringPreferencesKey("pending_oauth_state")
         
         @Volatile
         private var INSTANCE: GitHubAuthPreferences? = null
@@ -71,16 +65,6 @@ class GitHubAuthPreferences(private val context: Context) {
             }
         }
 
-        fun createOAuthState(): String {
-            val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-            return (1..32)
-                .map { chars.random() }
-                .joinToString("")
-        }
-
-        fun isOAuthRedirectUri(uri: Uri?): Boolean {
-            return uri?.scheme == GITHUB_REDIRECT_SCHEME && uri.host == GITHUB_REDIRECT_HOST
-        }
     }
 
     private val json = Json { 
@@ -89,14 +73,14 @@ class GitHubAuthPreferences(private val context: Context) {
     }
 
     private val requiredScopes: Set<String> =
-        GITHUB_SCOPE.split(",")
+        GITHUB_SCOPE.split(Regex("[,\\s]+"))
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() }
             .toSet()
 
     private fun parseScopeSet(scope: String?): Set<String> {
         return scope
-            ?.split(",")
+            ?.split(Regex("[,\\s]+"))
             ?.map { it.trim().lowercase() }
             ?.filter { it.isNotEmpty() }
             ?.toSet()
@@ -104,10 +88,11 @@ class GitHubAuthPreferences(private val context: Context) {
     }
 
     private fun isAuthSessionCurrent(preferences: Preferences): Boolean {
-        val grantedScopes = parseScopeSet(preferences[GRANTED_SCOPE])
         val authVersion = preferences[AUTH_VERSION] ?: 0L
-        return authVersion >= REQUIRED_AUTH_VERSION && grantedScopes.containsAll(requiredScopes)
+        return authVersion >= REQUIRED_AUTH_VERSION && hasRequiredScopes(preferences[GRANTED_SCOPE])
     }
+
+    fun hasRequiredScopes(scope: String?): Boolean = parseScopeSet(scope).containsAll(requiredScopes)
 
     // 登录状态Flow
     val isLoggedInFlow: Flow<Boolean> = context.githubAuthDataStore.data.map { preferences ->
@@ -163,11 +148,11 @@ class GitHubAuthPreferences(private val context: Context) {
             
             expiresIn?.let {
                 preferences[TOKEN_EXPIRES_AT] = System.currentTimeMillis() + (it * 1000)
-            }
+            } ?: preferences.remove(TOKEN_EXPIRES_AT)
             
             refreshToken?.let {
                 preferences[REFRESH_TOKEN] = it
-            }
+            } ?: preferences.remove(REFRESH_TOKEN)
         }
     }
 
@@ -177,27 +162,6 @@ class GitHubAuthPreferences(private val context: Context) {
     suspend fun updateUserInfo(userInfo: GitHubUser) {
         context.githubAuthDataStore.edit { preferences ->
             preferences[USER_INFO] = json.encodeToString(userInfo)
-        }
-    }
-
-    /**
-     * 更新访问令牌
-     */
-    suspend fun updateAccessToken(
-        accessToken: String,
-        tokenType: String = "bearer",
-        expiresIn: Long? = null,
-        grantedScope: String? = null
-    ) {
-        context.githubAuthDataStore.edit { preferences ->
-            preferences[ACCESS_TOKEN] = accessToken
-            preferences[TOKEN_TYPE] = tokenType
-            preferences[AUTH_VERSION] = REQUIRED_AUTH_VERSION.toLong()
-            preferences[GRANTED_SCOPE] = grantedScope.orEmpty()
-            
-            expiresIn?.let {
-                preferences[TOKEN_EXPIRES_AT] = System.currentTimeMillis() + (it * 1000)
-            }
         }
     }
 
@@ -256,35 +220,6 @@ class GitHubAuthPreferences(private val context: Context) {
         context.githubAuthDataStore.edit { preferences ->
             preferences.clear()
         }
-    }
-
-    suspend fun setPendingOAuthState(state: String) {
-        context.githubAuthDataStore.edit { preferences ->
-            preferences[PENDING_OAUTH_STATE] = state
-        }
-    }
-
-    suspend fun consumePendingOAuthState(): String? {
-        val preferences = context.githubAuthDataStore.data.first()
-        val state = preferences[PENDING_OAUTH_STATE]
-        context.githubAuthDataStore.edit { mutablePreferences ->
-            mutablePreferences.remove(PENDING_OAUTH_STATE)
-        }
-        return state
-    }
-
-    /**
-     * 生成GitHub OAuth授权URL
-     */
-    fun getAuthorizationUrl(state: String = createOAuthState()): String {
-        return Uri.parse("https://github.com/login/oauth/authorize")
-            .buildUpon()
-            .appendQueryParameter("client_id", GITHUB_CLIENT_ID)
-            .appendQueryParameter("redirect_uri", GITHUB_REDIRECT_URI)
-            .appendQueryParameter("scope", GITHUB_SCOPE)
-            .appendQueryParameter("state", state)
-            .build()
-            .toString()
     }
 
     /**

@@ -3,6 +3,8 @@ package com.ai.assistance.operit.services.core
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.data.model.InputProcessingState
+import com.ai.assistance.operit.core.chat.SpeechContentMetadata
+import com.ai.assistance.operit.util.ConversationContentVisibility
 import com.ai.assistance.operit.util.stream.streamOf
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -72,6 +74,30 @@ class AssistantResponseContentTest {
     }
 
     @Test
+    fun internalMarkupDoesNotCountAsVisibleAssistantContent() {
+        listOf(
+            "<think>internal reasoning</think>",
+            "<tool name=\"lookup\"></tool>",
+            "<speech emotion=\"neutral\"></speech>",
+            "<attachment id=\"file-1\" filename=\"note.txt\" type=\"text/plain\">content</attachment>",
+            "<workspace_attachment path=\"/tmp/note.txt\">content</workspace_attachment>",
+        ).forEach { raw ->
+            val prepared = SpeechContentMetadata.prepare(raw)
+            assertFalse(ConversationContentVisibility.hasRenderableAssistantContent(prepared.visibleText))
+            assertFalse(hasAssistantResponseContent(raw, emptyList()))
+        }
+    }
+
+    @Test
+    fun visibleTextStillSurvivesInternalMarkupFiltering() {
+        val raw = "<think>internal reasoning</think>实际回复"
+        val prepared = SpeechContentMetadata.prepare(raw)
+
+        assertTrue(ConversationContentVisibility.hasRenderableAssistantContent(prepared.visibleText))
+        assertTrue(hasAssistantResponseContent(raw, emptyList()))
+    }
+
+    @Test
     fun waifuSegmentCountsAsResponse() {
         assertTrue(hasAssistantResponseContent("", listOf("reply")))
     }
@@ -119,5 +145,11 @@ class AssistantResponseContentTest {
         assertTrue(isCancellationResponseCandidate(immersive, snapshotSentAt = 42L))
         assertFalse(isCancellationResponseCandidate(stale, snapshotSentAt = 42L))
         assertFalse(isCancellationResponseCandidate(user, snapshotSentAt = 42L))
+    }
+
+    @Test
+    fun revisableResponsesDelayIrreversibleSpeechAndImmersiveSegments() {
+        assertFalse(shouldStreamProvisionalAssistantOutput(hasRevisionEvents = true))
+        assertTrue(shouldStreamProvisionalAssistantOutput(hasRevisionEvents = false))
     }
 }

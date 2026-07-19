@@ -39,6 +39,7 @@ import com.ai.assistance.operit.ui.main.navigation.AppRouteCatalog
 import com.ai.assistance.operit.ui.main.screens.Screen
 import com.ai.assistance.operit.ui.main.navigation.AppRouterGateway
 import com.ai.assistance.operit.ui.main.navigation.AppRouterState
+import com.ai.assistance.operit.ui.main.navigation.RouteEntry
 import com.ai.assistance.operit.ui.main.navigation.AppRouteDiscoveryGateway
 import com.ai.assistance.operit.ui.main.navigation.NavigationEntrySpec
 import com.ai.assistance.operit.ui.main.navigation.NavigationSurface
@@ -82,6 +83,7 @@ private data class NetworkStateSnapshot(
 @Composable
 fun OperitApp(
     initialNavItem: NavItem = NavItem.AiChat,
+    routerStateFactory: (RouteEntry) -> AppRouterState = { AppRouterState(it) },
     toolHandler: AIToolHandler? = null,
     shortcutNavRequest: NavItem? = null,
     shortcutNavRequestId: Long = 0L,
@@ -90,7 +92,8 @@ fun OperitApp(
     routeNavRequestId: Long = 0L,
     onShortcutNavHandled: (Long) -> Unit = {},
     onCurrentNavItemChanged: (NavItem) -> Unit = {},
-    onRouteNavHandled: (Long) -> Unit = {}
+    onRouteNavHandled: (Long) -> Unit = {},
+    onChatRootBack: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -108,7 +111,7 @@ fun OperitApp(
     val navigationModel = remember(context, configuration, navigationRevision) { AppRouteCatalog.build(context) }
 
     val routerState = remember {
-        AppRouterState(AppRouteCatalog.initialEntry(initialNavItem))
+        routerStateFactory(AppRouteCatalog.initialEntry(initialNavItem))
     }
     val currentRouteEntry = routerState.currentEntry
     val currentScreen = AppRouteCatalog.resolveScreen(navigationModel, currentRouteEntry) ?: Screen.AiChat
@@ -278,7 +281,13 @@ fun OperitApp(
         navigateTo(Screen.TokenConfig)
     }
 
+    // 子页面返回只弹出 Mira 的路由栈；只有聊天根页面才交给宿主处理退出确认。
+    // 这样设置、记忆、工具等页面不会被 Activity 的“再按一次退出”逻辑截走。
     BackHandler(enabled = currentScreen !is Screen.AiChat, onBack = { goBack() })
+    BackHandler(
+        enabled = currentScreen is Screen.AiChat,
+        onBack = onChatRootBack,
+    )
 
     val canGoBack = routerState.canPop
 

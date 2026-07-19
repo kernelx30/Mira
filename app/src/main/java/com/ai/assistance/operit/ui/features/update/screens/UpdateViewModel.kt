@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.data.api.GitHubApiService
 import com.ai.assistance.operit.data.api.GitHubRelease
+import com.ai.assistance.operit.data.updates.apkBrowserDownloadUrlOrNull
 import com.ai.assistance.operit.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,9 +68,9 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
             val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
             val outputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val parsedDate = inputFormat.parse(release.published_at)
-            parsedDate?.let { outputFormat.format(it) } ?: release.published_at.substring(0, 10)
+            parsedDate?.let { outputFormat.format(it) } ?: release.published_at.take(10)
         } catch (e: Exception) {
-            release.published_at.substring(0, 10)
+            release.published_at.take(10)
         }
         
         // 解析release body
@@ -78,8 +79,8 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
         // 提取标题（使用release name或第一行）
         val title = release.name?.takeIf { it.isNotBlank() } ?: context.getString(R.string.update_version_title)
         
-        // 获取下载链接
-        val downloadUrl = release.html_url
+        // Only expose an actual APK asset as an install action. A GitHub release page is not an APK.
+        val downloadUrl = selectReleaseApkDownloadUrl(release)
         
         return UpdateInfo(
             version = release.tag_name,
@@ -93,6 +94,10 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
             releaseUrl = release.html_url
         )
     }
+}
+
+internal fun selectReleaseApkDownloadUrl(release: GitHubRelease): String {
+    return release.apkBrowserDownloadUrlOrNull().orEmpty()
 }
 
 /**

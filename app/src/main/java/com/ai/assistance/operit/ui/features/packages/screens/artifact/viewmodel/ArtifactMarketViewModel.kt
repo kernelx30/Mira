@@ -1,8 +1,6 @@
 package com.ai.assistance.operit.ui.features.packages.screens.artifact.viewmodel
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -33,7 +31,6 @@ import com.ai.assistance.operit.ui.features.packages.market.toMarketStatsType
 import com.ai.assistance.operit.ui.features.packages.market.toRankMetric
 import com.ai.assistance.operit.ui.features.packages.market.validateStandaloneArtifactRuntimePackageId
 import com.ai.assistance.operit.ui.features.packages.market.validateSupportedAppVersions
-import com.ai.assistance.operit.ui.features.github.GitHubOAuthCoordinator
 import com.ai.assistance.operit.util.AppLogger
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -92,20 +89,6 @@ class ArtifactMarketViewModel(
 
     init {
         refreshPublishableArtifacts()
-    }
-
-    fun initiateGitHubLogin(context: Context) {
-        viewModelScope.launch {
-            try {
-                val authUrl = GitHubOAuthCoordinator(context).createExternalAuthorizationUrl()
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "Failed to open GitHub login"
-                AppLogger.e(TAG, "Failed to initiate GitHub login", e)
-            }
-        }
     }
 
     fun logoutFromGitHub() {

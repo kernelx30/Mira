@@ -47,7 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.api.MarketV2Entry
 import com.ai.assistance.operit.data.api.MarketV2PublisherEntrySummary
-import com.ai.assistance.operit.ui.features.github.GitHubLoginWebViewDialog
+import com.ai.assistance.operit.ui.features.github.GitHubDeviceLoginDialog
 import com.ai.assistance.operit.ui.features.packages.components.MarketManageDangerActionButton
 import com.ai.assistance.operit.ui.features.packages.components.MarketManageDeleteDialog
 import com.ai.assistance.operit.ui.features.packages.components.MarketManageItemCard
@@ -228,7 +228,7 @@ fun UnifiedMarketManageScreen(
     }
 
     if (showGitHubLogin) {
-        GitHubLoginWebViewDialog(
+        GitHubDeviceLoginDialog(
             onDismissRequest = { showGitHubLogin = false }
         )
     }
@@ -615,5 +615,4 @@ private fun MarketV2Entry.marketStatsType(): MarketStatsType? {
 private fun MarketV2PublisherEntrySummary.marketStatsType(): MarketStatsType? {
     return MarketStatsType.entries.firstOrNull { it.wireValue == type.lowercase() }
 }
-
 

@@ -73,6 +73,34 @@ class CompanionMemoryGraphProjectorTest {
         assertEquals(1, graph.nodes.count { it.metadata["kind"] == "record" })
     }
 
+    @Test
+    fun `relationship record without stored relations still projects its hierarchy`() {
+        val relationshipRecord =
+            record("relationship", "RELATIONSHIP", "trusts Mira").copy(
+                scope = "RELATIONSHIP",
+                companionId = "character:mira",
+                ownerScope = "RELATIONSHIP_PAIR",
+                ownerCompanionId = "character:mira",
+                visibility = "PRIVATE",
+            )
+
+        val graph =
+            CompanionMemoryGraphProjector.merge(
+                legacyGraph = Graph(emptyList(), emptyList()),
+                snapshot =
+                    CompanionMemoryGraphSnapshot(
+                        records = listOf(relationshipRecord),
+                        edges = emptyList(),
+                    ),
+                query = "",
+                labels = labels,
+            )
+
+        assertEquals(1, graph.nodes.count { it.metadata["kind"] == "record" })
+        assertEquals(3, graph.nodes.count { it.metadata["kind"] == "hub" })
+        assertEquals(3, graph.edges.size)
+    }
+
     private fun record(id: String, type: String, value: String) =
         CompanionMemoryRecordEntity(
             id = id,

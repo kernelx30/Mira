@@ -51,6 +51,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -85,6 +86,7 @@ import com.ai.assistance.operit.data.model.CompanionRecordStatus
 import com.ai.assistance.operit.data.model.Memory
 import com.ai.assistance.operit.data.model.companionMetadata
 import com.ai.assistance.operit.data.model.companionOwnership
+import com.ai.assistance.operit.data.model.structuredCompanionId
 import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
 import com.ai.assistance.operit.data.repository.CompanionMemoryRelation
 import com.ai.assistance.operit.data.repository.decodedLabel
@@ -269,12 +271,6 @@ private fun structuredEditorRequest(record: CompanionMemoryRecordEntity): Struct
     )
 }
 
-private fun CompanionMemoryTarget.structuredCompanionId(): String =
-    characterGroupId.takeIf { it.isNotBlank() }?.let { "group:$it" }
-        ?: characterId.takeIf { it.isNotBlank() }?.let { "character:$it" }
-        ?: characterName.takeIf { it.isNotBlank() }?.let { "character_name:$it" }
-        .orEmpty()
-
 private fun structuredMemoryMatchesView(
     record: CompanionMemoryRecordEntity,
     view: CompanionMemoryView,
@@ -324,9 +320,13 @@ fun CompanionMemoryArchive(
     val context = LocalContext.current
     val structuredRepository = remember(context) { CompanionMemoryRepository(context) }
     val coroutineScope = rememberCoroutineScope()
+    val activeCompanionId = remember(activeTarget) { activeTarget.structuredCompanionId() }
+    LaunchedEffect(structuredRepository, activeProfileId) {
+        structuredRepository.purgeMalformedExplicitNotes(activeProfileId)
+    }
     val structuredRecords by
-        remember(structuredRepository, activeProfileId) {
-            structuredRepository.observeActiveRecords(activeProfileId)
+        remember(structuredRepository, activeProfileId, activeCompanionId) {
+            structuredRepository.observeAccessibleRecords(activeProfileId, activeCompanionId)
         }.collectAsState(initial = emptyList())
     var selectedViewIndex by rememberSaveable { mutableIntStateOf(0) }
     var editorRequest by remember { mutableStateOf<StructuredMemoryEditorRequest?>(null) }
@@ -339,7 +339,6 @@ fun CompanionMemoryArchive(
         activeTarget.displayName.ifBlank {
             stringResource(R.string.mate_memory_current_character)
         }
-    val activeCompanionId = remember(activeTarget) { activeTarget.structuredCompanionId() }
 
     fun openAddMemory(view: CompanionMemoryView) {
         val request = structuredEditorRequest(view)

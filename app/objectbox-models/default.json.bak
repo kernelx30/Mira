@@ -245,7 +245,7 @@
     },
     {
       "id": "11:3712699051976894545",
-      "lastPropertyId": "9:6465928775145661644",
+      "lastPropertyId": "10:9138683140656902022",
       "name": "MemoryAutoSaveCandidate",
       "properties": [
         {
@@ -295,6 +295,11 @@
           "id": "9:6465928775145661644",
           "name": "sourceType",
           "type": 9
+        },
+        {
+          "id": "10:9138683140656902022",
+          "name": "nextAttemptAtMs",
+          "type": 6
         }
       ],
       "relations": []

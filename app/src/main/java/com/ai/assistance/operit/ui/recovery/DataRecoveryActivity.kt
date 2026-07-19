@@ -1,11 +1,8 @@
 package com.ai.assistance.operit.ui.recovery
 
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Process
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -67,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.util.AppProcessRestarter
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ai.assistance.operit.ui.common.OperitUtilityTheme
 
@@ -388,13 +386,7 @@ private fun ResultRow(values: List<String>, header: Boolean) {
 }
 
 private fun restartMainApp(context: Context) {
-    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-    if (intent == null) {
+    if (!AppProcessRestarter.scheduleAndExit(context, delayMs = 250L)) {
         Toast.makeText(context, "无法启动主应用", Toast.LENGTH_LONG).show()
-        return
     }
-    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-    context.startActivity(intent)
-    (context as? Activity)?.finishAffinity()
-    Process.killProcess(Process.myPid())
 }

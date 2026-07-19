@@ -2,14 +2,22 @@
 # To build the project, copy this file to local.properties (which is gitignored)
 # and fill in your own values.
 
-# You can create your own GitHub OAuth App here:
+# GitHub OAuth Device Flow (optional local override).
+# Mira releases already use the public Client ID registered for kernelx30/Mira.
+# Fork maintainers can register an OAuth App, enable Device Flow, and override it here:
 # https://github.com/settings/developers
+GITHUB_CLIENT_ID=Ov23liKr3DGQsr3PxWg5
 
-# The callback URL should be operit://github-oauth-callback
-GITHUB_CLIENT_ID="YOUR_OWN_GITHUB_CLIENT_ID_HERE"
+# Mira release repository used by the in-app updater.
+UPDATE_REPO_OWNER=kernelx30
+UPDATE_REPO_NAME=Mira
+UPDATE_PATCH_REPO_OWNER=
+UPDATE_PATCH_REPO_NAME=
 
-# Operit Mate release repositories. Leave blank until this fork has its own release channel.
-UPDATE_REPO_OWNER="kernelx30"
-UPDATE_REPO_NAME="Mira"
-UPDATE_PATCH_REPO_OWNER=""
-UPDATE_PATCH_REPO_NAME=""
+# Release signing. Keep the real keystore and passwords out of Git.
+# Every public Mira release must use the same keystore so Android can update in place.
+# Java .properties values do not need quotes; quotes become part of the value.
+RELEASE_STORE_FILE=C:/path/to/mira-release.jks
+RELEASE_STORE_PASSWORD=YOUR_STORE_PASSWORD
+RELEASE_KEY_ALIAS=mira
+RELEASE_KEY_PASSWORD=YOUR_KEY_PASSWORD

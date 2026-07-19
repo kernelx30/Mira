@@ -4,6 +4,7 @@ import android.os.SystemClock
 import com.ai.assistance.operit.core.application.OperitApplication
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.data.preferences.GitHubUser
+import com.ai.assistance.operit.ui.features.packages.market.GitHubMarketRepository
 import com.ai.assistance.operit.ui.features.packages.market.normalizeMarketArtifactId
 import com.ai.assistance.operit.util.AppLogger
 import java.security.MessageDigest
@@ -12,16 +13,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 
 @Serializable
@@ -149,15 +148,6 @@ data class ArtifactProjectDetailResponse(
 )
 
 @Serializable
-data class MarketV2AuthResponse(
-    val ok: Boolean = false,
-    val session: String = "",
-    val githubId: Long = 0,
-    val login: String = "",
-    val avatarUrl: String = ""
-)
-
-@Serializable
 data class MarketV2ListResponse(
     val ok: Boolean = false,
     val marketVersion: Int = 2,
@@ -209,12 +199,6 @@ data class MarketV2EntriesShardResponse(
 )
 
 @Serializable
-data class MarketV2MyEntriesResponse(
-    val ok: Boolean = false,
-    val entries: MarketV2PublisherEntriesResponse = MarketV2PublisherEntriesResponse()
-)
-
-@Serializable
 data class MarketV2PublisherEntriesResponse(
     val ok: Boolean = false,
     val generatedAt: String? = null,
@@ -263,25 +247,9 @@ data class MarketV2CommentsPageResponse(
 )
 
 @Serializable
-data class MarketV2CommentResponse(
-    val ok: Boolean = false,
-    val item: MarketV2Comment? = null,
-    val comment: MarketV2Comment? = null
-)
-
-@Serializable
 data class MarketV2NotificationsResponse(
     val ok: Boolean = false,
     val items: List<MarketV2Notification> = emptyList()
-)
-
-@Serializable
-data class MarketV2PublishResponse(
-    val ok: Boolean = false,
-    val item: MarketV2Entry? = null,
-    val entry: MarketV2Entry? = null,
-    val entryId: String? = null,
-    val versionId: String? = null
 )
 
 @Serializable
@@ -424,14 +392,6 @@ data class MarketV2PublishRequest(
 )
 
 @Serializable
-data class MarketV2NewVersionRequest(
-    val entry: MarketV2EntryUpdateRequest? = null,
-    val version: MarketV2PublishVersion,
-    val repoVersion: MarketV2PublishRepoVersion? = null,
-    val asset: MarketV2PublishAsset? = null
-)
-
-@Serializable
 data class MarketV2EntryUpdateRequest(
     val title: String,
     val description: String,
@@ -475,26 +435,30 @@ data class MarketV2PublishAsset(
     val sha256: String = ""
 )
 
-@Serializable
-private data class MarketV2CommentCreateRequest(
-    val body: String,
-    val parentId: String? = null
-)
+class MiraMarketWriteUnavailableException(operation: String) :
+    IllegalStateException(
+        "The imported Operit market entry is read-only in Mira: $operation"
+    )
 
-@Serializable
-private data class MarketV2PublishProofRequest(
-    val owner: String,
-    val repo: String,
-    val releaseTag: String,
-    val assetName: String,
-    val sha256: String
-)
+/** Network boundary for the release build: public catalog reads and direct artifact URLs only. */
+object MiraMarketNetworkPolicy {
+    const val SUPPORTS_AUTHENTICATED_WRITES: Boolean = true
 
-@Serializable
-private data class MarketV2PublishProofResponse(
-    val ok: Boolean = false,
-    val proof: String = ""
-)
+    fun directArtifactUrl(value: String): String {
+        val url = value.trim().toHttpUrlOrNull()
+            ?: throw IllegalArgumentException("Invalid market artifact URL")
+        require(url.isHttps) { "Market artifact URL must use HTTPS" }
+        require(!url.host.equals(LEGACY_DYNAMIC_HOST, ignoreCase = true)) {
+            "Legacy market download redirects are not accepted"
+        }
+        return url.toString()
+    }
+
+    fun writeUnavailable(operation: String): MiraMarketWriteUnavailableException =
+        MiraMarketWriteUnavailableException(operation)
+
+    private const val LEGACY_DYNAMIC_HOST = "api.operit.app"
+}
 
 class MarketStatsApiService {
     private val json =
@@ -504,8 +468,8 @@ class MarketStatsApiService {
         }
 
     private val staticClient = STATIC_CLIENT
-    private val dynamicClient = DYNAMIC_CLIENT
     private val authPreferences = GitHubAuthPreferences.getInstance(OperitApplication.instance)
+    private val githubMarketRepository = GitHubMarketRepository(OperitApplication.instance)
 
     suspend fun getManifest(): Result<MarketV2ManifestResponse> =
         withContext(Dispatchers.IO) {
@@ -709,7 +673,7 @@ class MarketStatsApiService {
                 releaseTag = "",
                 assetName = asset.assetName.ifBlank { asset.name },
                 assetId = asset.id,
-                downloadUrl = downloadUrlForAsset(asset.id),
+                downloadUrl = MiraMarketNetworkPolicy.directArtifactUrl(asset.url),
                 sha256 = asset.sha256,
                 version = version.version,
                 displayName = entry.title,
@@ -742,100 +706,64 @@ class MarketStatsApiService {
         )
     }
 
-    suspend fun trackDownload(assetId: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val resolvedAssetId = assetId.trim().ifBlank { error("Missing v2 asset id") }
-                requestDynamic(
-                    method = "GET",
-                    pathSegments = listOf("market", "v2", "assets", resolvedAssetId, "download"),
-                    label = "trackDownload assetId=$resolvedAssetId",
-                    includeMarketSession = false,
-                    followRedirects = false
-                ) { _, response ->
-                    if (response.code in 300..399 || response.isSuccessful) Unit else error("Download tracking failed")
-                }
-            }
-        }
-
-    fun downloadUrlForAsset(assetId: String): String {
-        val resolvedAssetId = assetId.trim()
-        if (resolvedAssetId.isBlank()) return ""
-        val urlBuilder = BASE_URL.newBuilder()
-        listOf("market", "v2", "assets", resolvedAssetId, "download").forEach(urlBuilder::addPathSegment)
-        return urlBuilder.build().toString()
-    }
-
     suspend fun getEntry(entryId: String): Result<MarketV2Entry?> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val shard = entryId.marketShard()
-                requestStaticJson(
-                    pathSegments = listOf("market", "v2", "entries", "$shard.json"),
-                    label = "getEntry entryId=$entryId shard=$shard"
-                ) { body ->
-                    json.decodeFromString(MarketV2EntriesShardResponse.serializer(), body)
-                }.entriesById[entryId]
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.getEntry(entryId)
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val shard = entryId.marketShard()
+                    requestStaticJson(
+                        pathSegments = listOf("market", "v2", "entries", "$shard.json"),
+                        label = "getEntry entryId=$entryId shard=$shard"
+                    ) { body ->
+                        json.decodeFromString(MarketV2EntriesShardResponse.serializer(), body)
+                    }.entriesById[entryId]
+                }
             }
         }
 
     suspend fun getComments(entryId: String, page: Int = 1): Result<List<MarketV2Comment>> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                requestStaticJson(
-                    pathSegments = listOf("market", "v2", "comments", entryId, "page-$page.json"),
-                    label = "getComments entryId=$entryId page=$page",
-                    notFoundValue = MarketV2CommentsPageResponse(entryId = entryId, page = page)
-                ) { body ->
-                    json.decodeFromString(MarketV2CommentsPageResponse.serializer(), body)
-                }.items
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.getComments(entryId, page)
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    requestStaticJson(
+                        pathSegments = listOf("market", "v2", "comments", entryId, "page-$page.json"),
+                        label = "getComments entryId=$entryId page=$page",
+                        notFoundValue = MarketV2CommentsPageResponse(entryId = entryId, page = page)
+                    ) { body ->
+                        json.decodeFromString(MarketV2CommentsPageResponse.serializer(), body)
+                    }.items
+                }
             }
         }
 
     suspend fun postComment(entryId: String, body: String, parentId: String? = null): Result<MarketV2Comment> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val requestJson =
-                    json.encodeToString(MarketV2CommentCreateRequest(body = body, parentId = parentId))
-                requestDynamic(
-                    method = "POST",
-                    pathSegments = listOf("market", "v2", "entries", entryId, "comments"),
-                    body = requestJson,
-                    label = "postComment entryId=$entryId"
-                ) { responseBody, _ ->
-                    val response = json.decodeFromString(MarketV2CommentResponse.serializer(), responseBody)
-                    response.item ?: response.comment ?: MarketV2Comment(entryId = entryId, body = body)
-                }
-            }
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.postComment(entryId, body, parentId)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("comments for legacy entries"))
         }
 
     suspend fun addReaction(entryId: String): Result<MarketV2Reaction> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                requestDynamic(
-                    method = "POST",
-                    pathSegments = listOf("market", "v2", "entries", entryId, "reactions"),
-                    label = "addReaction entryId=$entryId"
-                ) { _, _ ->
-                    MarketV2Reaction(reaction = "+1", content = "+1", total = 1)
-                }
-            }
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.addReaction(entryId)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("reactions for legacy entries"))
         }
 
     suspend fun getUserPublishedEntries(type: String? = null): Result<List<MarketV2PublisherEntrySummary>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val response =
-                    requestDynamic(
-                        method = "GET",
-                        pathSegments = listOf("market", "v2", "my", "entries"),
-                        queryParameters =
-                            if (type.isNullOrBlank()) emptyMap() else mapOf("type" to type),
-                        label = "getUserPublishedEntries type=$type"
-                    ) { body, _ ->
-                        json.decodeFromString(MarketV2MyEntriesResponse.serializer(), body)
-                    }
-                response.entries.entries
+                val user = authPreferences.getCurrentUserInfo()
+                    ?: error("GitHub login required")
+                val legacyEntries = getPublisherEntries("gh_${user.id}").getOrThrow()
+                val miraEntries = githubMarketRepository.getCurrentUserEntries(type).getOrThrow()
+                (legacyEntries + miraEntries)
+                    .filter { type.isNullOrBlank() || it.type.equals(type, ignoreCase = true) }
+                    .distinctBy { it.id }
                     .sortedByDescending { it.updatedAt }
             }
         }
@@ -847,129 +775,39 @@ class MarketStatsApiService {
                 val shard = resolvedAuthorId.marketShard()
                 requestStaticJson(
                     pathSegments = listOf("market", "v2", "private", "publishers", "$shard.json"),
-                    label = "getPublisherEntries authorId=$resolvedAuthorId shard=$shard"
+                    label = "getPublisherEntries authorId=$resolvedAuthorId shard=$shard",
+                    notFoundValue = MarketV2PublisherShardResponse(shard = shard)
                 ) { body ->
                     json.decodeFromString(MarketV2PublisherShardResponse.serializer(), body)
-                }.authors.getValue(resolvedAuthorId).entries.sortedByDescending { it.updatedAt }
+                }.authors[resolvedAuthorId]?.entries.orEmpty().sortedByDescending { it.updatedAt }
             }
         }
 
     suspend fun getNotifications(limit: Int = 50, offset: Int = 0): Result<List<MarketV2Notification>> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                requestDynamic(
-                    method = "GET",
-                    pathSegments = listOf("market", "v2", "notifications"),
-                    queryParameters = mapOf("limit" to limit.toString(), "offset" to offset.toString()),
-                    label = "getNotifications limit=$limit offset=$offset"
-                ) { body, _ ->
-                    json.decodeFromString(MarketV2NotificationsResponse.serializer(), body).items
-                }
-            }
-        }
-
-    suspend fun publishProof(
-        owner: String,
-        repo: String,
-        releaseTag: String,
-        assetName: String,
-        sha256: String
-    ): Result<String> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val requestJson =
-                    json.encodeToString(
-                        MarketV2PublishProofRequest(
-                            owner = owner,
-                            repo = repo,
-                            releaseTag = releaseTag,
-                            assetName = assetName,
-                            sha256 = sha256
-                        )
-                    )
-                requestDynamic(
-                    method = "POST",
-                    pathSegments = listOf("market", "v2", "publish", "proof"),
-                    body = requestJson,
-                    label = "publishProof owner=$owner repo=$repo"
-                ) { body, _ ->
-                    val response =
-                        json.decodeFromString(MarketV2PublishProofResponse.serializer(), body)
-                    require(response.ok && response.proof.isNotBlank()) {
-                        "Market proof generation failed"
-                    }
-                    response.proof
-                }
-            }
-        }
+        githubMarketRepository.getNotifications(limit, offset)
 
     suspend fun editComment(commentId: String, body: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val requestJson =
-                    json.encodeToString(MarketV2CommentCreateRequest(body = body))
-                requestDynamic(
-                    method = "PATCH",
-                    pathSegments = listOf("market", "v2", "comments", commentId),
-                    body = requestJson,
-                    label = "editComment commentId=$commentId"
-                ) { _, _ -> Unit }
-            }
+        if (commentId.startsWith("mira-comment-")) {
+            githubMarketRepository.editComment(commentId, body)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("comment editing for legacy entries"))
         }
 
     suspend fun deleteComment(commentId: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                requestDynamic(
-                    method = "DELETE",
-                    pathSegments = listOf("market", "v2", "comments", commentId),
-                    label = "deleteComment commentId=$commentId"
-                ) { _, _ -> Unit }
-            }
+        if (commentId.startsWith("mira-comment-")) {
+            githubMarketRepository.deleteComment(commentId)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("comment deletion for legacy entries"))
         }
 
     suspend fun publish(request: MarketV2PublishRequest): Result<MarketV2Entry> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val requestJson = json.encodeToString(request)
-                requestDynamic(
-                    method = "POST",
-                    pathSegments = listOf("market", "v2", "publish"),
-                    body = requestJson,
-                    label = "publish type=${request.type} title=${request.title}"
-                ) { body, _ ->
-                    val response = json.decodeFromString(MarketV2PublishResponse.serializer(), body)
-                    val item =
-                        response.item ?: response.entry ?: MarketV2Entry(
-                            type = request.type,
-                            id = response.entryId ?: normalizeMarketArtifactId(request.title),
-                            title = request.title,
-                            description = request.description,
-                            detail = request.detail,
-                            stateCode = "pending",
-                            source = request.source?.let { MarketV2Source(kind = it.kind, url = it.url) }
-                        )
-                    item
-                }
-            }
-        }
+        githubMarketRepository.createEntry(request)
 
     suspend fun updateEntry(entryId: String, request: MarketV2EntryUpdateRequest): Result<MarketV2Entry> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                requestDynamic(
-                    method = "PATCH",
-                    pathSegments = listOf("market", "v2", "entries", entryId),
-                    body = json.encodeToString(request),
-                    label = "updateEntry entryId=$entryId"
-                ) { body, _ ->
-                    runCatching {
-                        json.decodeFromString(MarketV2PublishResponse.serializer(), body)
-                    }.getOrNull()?.let { response ->
-                        response.item ?: response.entry
-                    } ?: request.toPendingEntry(entryId)
-                }
-            }
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.updateEntry(entryId, request)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("entry updates for legacy entries"))
         }
 
     suspend fun publishNewVersion(
@@ -977,65 +815,24 @@ class MarketStatsApiService {
         request: MarketV2PublishRequest,
         includeEntryPatch: Boolean = false
     ): Result<MarketV2NewVersionResponse> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val resolvedEntryId = entryId.trim().ifBlank { error("Missing entry id") }
-                requestDynamic(
-                    method = "POST",
-                    pathSegments = listOf("market", "v2", "entries", resolvedEntryId, "versions"),
-                    body =
-                        json.encodeToString(
-                            MarketV2NewVersionRequest(
-                                entry =
-                                    if (includeEntryPatch) {
-                                        MarketV2EntryUpdateRequest(
-                                            title = request.title,
-                                            description = request.description,
-                                            detail = request.detail,
-                                            categoryId = request.categoryId,
-                                            allowPublicUpdates = request.allowPublicUpdates
-                                        )
-                                    } else {
-                                        null
-                                    },
-                                version = request.version,
-                                repoVersion = request.repoVersion,
-                                asset = request.asset
-                            )
-                        ),
-                    label = "publishNewVersion entryId=$resolvedEntryId version=${request.version.version}"
-                ) { body, _ ->
-                    json.decodeFromString(MarketV2NewVersionResponse.serializer(), body)
-                }
-            }
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.publishNewVersion(entryId, request, includeEntryPatch)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("version publication for legacy entries"))
         }
 
     suspend fun withdrawEntry(entryId: String): Result<MarketV2Entry> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                requestDynamic(
-                    method = "DELETE",
-                    pathSegments = listOf("market", "v2", "entries", entryId),
-                    label = "withdrawEntry entryId=$entryId"
-                ) { _, _ ->
-                    (getEntry(entryId).getOrNull() ?: MarketV2Entry(id = entryId, stateCode = "withdrawn"))
-                        .copy(stateCode = "withdrawn")
-                }
-            }
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.setEntryOpen(entryId, open = false)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("entry withdrawal for legacy entries"))
         }
 
     suspend fun resubmitEntry(entryId: String): Result<MarketV2Entry> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                requestDynamic(
-                    method = "POST",
-                    pathSegments = listOf("market", "v2", "entries", entryId, "resubmit"),
-                    label = "resubmitEntry entryId=$entryId"
-                ) { _, _ ->
-                    (getEntry(entryId).getOrNull() ?: MarketV2Entry(id = entryId, stateCode = "pending"))
-                        .copy(stateCode = "pending")
-                }
-            }
+        if (GitHubMarketRepository.isMiraEntryId(entryId)) {
+            githubMarketRepository.setEntryOpen(entryId, open = true)
+        } else {
+            Result.failure(MiraMarketNetworkPolicy.writeUnavailable("entry resubmission for legacy entries"))
         }
 
     private inline fun <T> requestStaticJson(
@@ -1070,101 +867,6 @@ class MarketStatsApiService {
                 error(buildHttpErrorMessage(response, body))
             }
             return decode(body)
-        }
-    }
-
-    private inline fun <T> requestDynamic(
-        method: String,
-        pathSegments: List<String>,
-        label: String,
-        body: String? = null,
-        queryParameters: Map<String, String> = emptyMap(),
-        includeMarketSession: Boolean = true,
-        followRedirects: Boolean = true,
-        decode: (String, Response) -> T
-    ): T {
-        val urlBuilder = BASE_URL.newBuilder()
-        pathSegments.forEach(urlBuilder::addPathSegment)
-        queryParameters.forEach { (key, value) -> urlBuilder.addQueryParameter(key, value) }
-        val url = urlBuilder.build()
-
-        val requestBuilder =
-            Request.Builder()
-                .url(url)
-                .addHeader("User-Agent", USER_AGENT)
-
-        if (includeMarketSession) {
-            requestBuilder.addHeader("Authorization", "Bearer ${ensureMarketSession()}")
-        }
-
-        val requestBody = body?.toRequestBody(JSON_MEDIA_TYPE)
-        when (method.uppercase()) {
-            "GET" -> requestBuilder.get()
-            "POST" -> requestBuilder.post(requestBody ?: ByteArray(0).toRequestBody(JSON_MEDIA_TYPE))
-            "PATCH" -> requestBuilder.patch(requestBody ?: ByteArray(0).toRequestBody(JSON_MEDIA_TYPE))
-            "DELETE" -> requestBuilder.delete(requestBody)
-            else -> error("Unsupported HTTP method: $method")
-        }
-
-        val client = if (followRedirects) dynamicClient else NO_REDIRECT_DYNAMIC_CLIENT
-        val startedAt = SystemClock.elapsedRealtime()
-        AppLogger.d(TAG, "HTTP $method $label url=$url")
-        client.newCall(requestBuilder.build()).execute().use { response ->
-            AppLogger.d(
-                TAG,
-                "HTTP RESP $label code=${response.code} elapsed=${SystemClock.elapsedRealtime() - startedAt}ms url=$url"
-            )
-            val responseBody = response.body?.string().orEmpty()
-            if (!response.isSuccessful && response.code !in 300..399) {
-                error(buildHttpErrorMessage(response, responseBody))
-            }
-            return decode(responseBody, response)
-        }
-    }
-
-    private fun ensureMarketSession(): String {
-        val cached = marketSession
-        if (!cached.isNullOrBlank()) return cached
-
-        return synchronized(MARKET_SESSION_LOCK) {
-            val lockedCached = marketSession
-            if (!lockedCached.isNullOrBlank()) {
-                lockedCached
-            } else {
-                val githubToken =
-                    kotlinx.coroutines.runBlocking {
-                        authPreferences.getCurrentAccessToken()
-                    } ?: error("GitHub login required")
-                val session = requestMarketSession(githubToken)
-                marketSession = session
-                session
-            }
-        }
-    }
-
-    private fun requestMarketSession(githubToken: String): String {
-        val urlBuilder = BASE_URL.newBuilder()
-        listOf("market", "v2", "auth", "github").forEach(urlBuilder::addPathSegment)
-        val request =
-            Request.Builder()
-                .url(urlBuilder.build())
-                .post(ByteArray(0).toRequestBody(JSON_MEDIA_TYPE))
-                .addHeader("User-Agent", USER_AGENT)
-                .addHeader("Authorization", "Bearer $githubToken")
-                .build()
-        val startedAt = SystemClock.elapsedRealtime()
-        AppLogger.d(TAG, "HTTP POST authGithub url=${request.url}")
-        dynamicClient.newCall(request).execute().use { response ->
-            val responseBody = response.body?.string().orEmpty()
-            AppLogger.d(TAG, "HTTP RESP authGithub code=${response.code} elapsed=${SystemClock.elapsedRealtime() - startedAt}ms url=${request.url}")
-            if (!response.isSuccessful) {
-                error(buildHttpErrorMessage(response, responseBody))
-            }
-            val auth = json.decodeFromString(MarketV2AuthResponse.serializer(), responseBody)
-            if (!auth.ok || auth.session.isBlank()) {
-                error("Market authentication failed")
-            }
-            return auth.session
         }
     }
 
@@ -1269,37 +971,11 @@ class MarketStatsApiService {
                     runtimePackageId = version?.runtimePackageId.orEmpty(),
                     sha256 = asset?.sha256.orEmpty(),
                     version = latestVersion?.version.orEmpty(),
-                    downloadUrl = asset?.id?.let(::downloadUrlForAsset).orEmpty(),
+                    downloadUrl = asset?.url?.takeIf(String::isNotBlank)?.let(MiraMarketNetworkPolicy::directArtifactUrl).orEmpty(),
                     state = stateCode.toPublicationState(),
                     publishedAt = publishedAt ?: updatedAt
                 ),
             runtimePackageVersionSha256s = listOf(asset?.sha256.orEmpty()).filter(String::isNotBlank)
-        )
-    }
-
-    private fun MarketV2PublishRequest.toPendingEntry(entryId: String): MarketV2Entry {
-        return MarketV2Entry(
-            type = type,
-            id = entryId,
-            title = title,
-            description = description,
-            detail = detail,
-            categoryId = categoryId,
-            allowPublicUpdates = allowPublicUpdates,
-            stateCode = "pending",
-            source = null
-        )
-    }
-
-    private fun MarketV2EntryUpdateRequest.toPendingEntry(entryId: String): MarketV2Entry {
-        return MarketV2Entry(
-            id = entryId,
-            title = this.title,
-            description = this.description,
-            detail = this.detail,
-            categoryId = this.categoryId,
-            allowPublicUpdates = this.allowPublicUpdates ?: true,
-            stateCode = "pending"
         )
     }
 
@@ -1358,10 +1034,6 @@ class MarketStatsApiService {
         return result and Long.MAX_VALUE
     }
 
-    private fun sha256Hex(bytes: ByteArray): String {
-        return MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-    }
-
     private fun fnv1a32Hex(value: String): String {
         var hash = 0x811c9dc5u
         value.forEach { char ->
@@ -1373,15 +1045,11 @@ class MarketStatsApiService {
 
     companion object {
         private const val TAG = "MarketStatsApiService"
-        private const val USER_AGENT = "Operit-Market-V2"
+        private const val USER_AGENT = "Mira-Market-V2 (Operit-compatible)"
         private const val TIMEOUT_SECONDS = 15L
-        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        private val BASE_URL = "https://api.operit.app".toHttpUrl()
-        private val STATIC_BASE_URL = "https://static.operit.app".toHttpUrl()
-
-        @Volatile
-        private var marketSession: String? = null
-        private val MARKET_SESSION_LOCK = Any()
+        // Mira owns the public static catalog. The dynamic API below remains the
+        // compatibility catalog until GitHub-native entries are indexed.
+        private val STATIC_BASE_URL = "https://kernelx30.github.io/Mira".toHttpUrl()
 
         private val STATIC_CLIENT by lazy {
             OkHttpClient.Builder()
@@ -1393,21 +1061,5 @@ class MarketStatsApiService {
                 .build()
         }
 
-        private val DYNAMIC_CLIENT by lazy {
-            OkHttpClient.Builder()
-                .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .build()
-        }
-
-        private val NO_REDIRECT_DYNAMIC_CLIENT by lazy {
-            DYNAMIC_CLIENT.newBuilder()
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .build()
-        }
     }
 }

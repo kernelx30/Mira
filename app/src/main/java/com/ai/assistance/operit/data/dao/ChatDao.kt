@@ -106,6 +106,24 @@ interface ChatDao {
         timestamp: Long = System.currentTimeMillis(),
     )
 
+    @Query(
+        "UPDATE chats SET autoReadOverride = :autoReadOverride, updatedAt = :timestamp WHERE id = :chatId",
+    )
+    suspend fun updateChatAutoReadOverride(
+        chatId: String,
+        autoReadOverride: Boolean?,
+        timestamp: Long = System.currentTimeMillis(),
+    )
+
+    @Query(
+        "UPDATE chats SET memoryAutoUpdateOverride = :memoryAutoUpdateOverride, updatedAt = :timestamp WHERE id = :chatId",
+    )
+    suspend fun updateChatMemoryAutoUpdateOverride(
+        chatId: String,
+        memoryAutoUpdateOverride: Boolean?,
+        timestamp: Long = System.currentTimeMillis(),
+    )
+
     /** 更新聊天锁定状态 */
     @Query("UPDATE chats SET locked = :locked, updatedAt = :timestamp WHERE id = :chatId")
     suspend fun updateChatLocked(chatId: String, locked: Boolean, timestamp: Long = System.currentTimeMillis())

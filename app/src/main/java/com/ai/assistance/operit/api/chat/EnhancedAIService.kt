@@ -14,11 +14,7 @@ import com.ai.assistance.operit.api.chat.enhance.ToolExecutionManager
 import com.ai.assistance.operit.api.chat.llmprovider.AIService
 import com.ai.assistance.operit.core.chat.logMessageTiming
 import com.ai.assistance.operit.core.chat.messageTimingNow
-import com.ai.assistance.operit.core.chat.CompanionReminderIntentDetector
-import com.ai.assistance.operit.core.chat.CompanionMemoryRuleExtractor
-import com.ai.assistance.operit.core.chat.CompanionMemoryReceiptBus
 import com.ai.assistance.operit.core.chat.CompanionMemoryImportanceDetector
-import com.ai.assistance.operit.core.chat.CompanionMemoryTargetResolver
 import com.ai.assistance.operit.core.chat.hooks.PromptHookContext
 import com.ai.assistance.operit.core.chat.hooks.PromptHookRegistry
 import com.ai.assistance.operit.core.chat.hooks.PromptTurn
@@ -64,6 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -89,7 +86,6 @@ import com.ai.assistance.operit.data.preferences.CharacterCardToolAccessResolver
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.MemoryAutoSaveCandidateRepository
-import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
 import com.ai.assistance.operit.data.model.MemoryAutoSaveCandidate
 import com.ai.assistance.operit.data.skill.SkillRepository
 import com.ai.assistance.operit.data.db.AppDatabase
@@ -352,6 +348,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         var characterName: String? = null,
         var avatarUri: String? = null,
         var roleCardId: String? = null,
+        var memoryCompanionId: String,
         var enableGroupOrchestrationHint: Boolean = false,
         var groupParticipantNamesText: String? = null,
         var proxySenderName: String? = null,
@@ -446,6 +443,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         val conversationHistory: MutableList<PromptTurn>,
         val eventChannel: MutableSharedStream<TextStreamEvent>,
         val allowToolExecution: Boolean = true,
+        val memoryCompanionId: String,
         var modelExecutionSnapshot: ModelExecutionSnapshot? = null
     )
 
@@ -512,7 +510,8 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     // Coroutine management
-    private val toolProcessingScope = CoroutineScope(Dispatchers.IO)
+    // A failed tool must not cancel the long-lived scope used by later turns.
+    private val toolProcessingScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val toolExecutionJobs = ConcurrentHashMap<String, Job>()
     // private val conversationHistory = mutableListOf<Pair<String, String>>() // Moved to MessageExecutionContext
     // private val conversationMutex = Mutex() // Moved to MessageExecutionContext
@@ -1002,6 +1001,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         val characterName = options.characterName
         val avatarUri = options.avatarUri
         val roleCardId = options.roleCardId
+        val memoryCompanionId = options.memoryCompanionId
         val enableGroupOrchestrationHint = options.enableGroupOrchestrationHint
         val groupParticipantNamesText = options.groupParticipantNamesText
         val proxySenderName = options.proxySenderName
@@ -1054,6 +1054,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                     conversationHistory = chatHistory.toMutableList(),
                     eventChannel = eventChannel,
                     allowToolExecution = effectiveToolsEnabled,
+                    memoryCompanionId = memoryCompanionId,
                 )
             registerExecutionContext(execContext)
             var hadFatalError = false
@@ -2136,6 +2137,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                         ?: preferencesManager.activeProfileIdFlow.first()
                 if (currentChatId.isNullOrBlank()) {
                     AppLogger.w(TAG, "自动保存长期记忆入队跳过：chatId为空")
+                } else if (context.memoryCompanionId.isBlank()) {
+                    AppLogger.w(TAG, "自动保存长期记忆入队跳过：本轮没有角色目标快照")
                 } else {
                     val database = AppDatabase.getDatabase(this@EnhancedAIService.context)
                     val recentMessages =
@@ -2145,9 +2148,12 @@ class EnhancedAIService private constructor(private val context: Context) {
                     val latestUserContent = latestUserMessage?.content.orEmpty()
                     val isHighValueMemory =
                         CompanionMemoryImportanceDetector.isHighValue(latestUserContent)
+                    val isExplicitMemoryRequest =
+                        CompanionMemoryImportanceDetector.isExplicitSaveRequest(latestUserContent)
                     MemoryAutoSaveCandidateRepository(this@EnhancedAIService.context, profileId)
                         .enqueue(
                             chatId = currentChatId,
+                            companionId = context.memoryCompanionId,
                             triggerMessageTimestamp =
                                 if (isHighValueMemory) {
                                     latestUserMessage?.timestamp ?: System.currentTimeMillis()
@@ -2157,50 +2163,26 @@ class EnhancedAIService private constructor(private val context: Context) {
                                         ?: System.currentTimeMillis()
                                 },
                             sourceType =
-                                if (isHighValueMemory) {
+                                if (isExplicitMemoryRequest) {
+                                    MemoryAutoSaveCandidate.SOURCE_TYPE_EXPLICIT_USER
+                                } else if (isHighValueMemory) {
                                     MemoryAutoSaveCandidate.SOURCE_TYPE_HIGH_VALUE_AUTO
                                 } else {
                                     MemoryAutoSaveCandidate.SOURCE_TYPE_REPLY_FINALIZED_AUTO
                                 },
                         )
-                    val companionId =
-                        CompanionMemoryTargetResolver.resolve(
+                    // Every completed turn goes through the memory LLM. It decides whether the
+                    // user message contains a durable fact; the extractor still validates exact
+                    // user evidence, sensitive data, confidence, and review thresholds.
+                    val scheduler = MemoryAutoSaveScheduler.getInstance()
+                    if (scheduler != null) {
+                        scheduler.requestImmediateProcessing(profileId, currentChatId)
+                    } else {
+                        MemoryAutoSaveWorkScheduler.requestImmediate(
                             context = this@EnhancedAIService.context,
+                            profileId = profileId,
                             chatId = currentChatId,
                         )
-                    latestUserMessage?.let { message ->
-                        val companionMemoryRepository =
-                            CompanionMemoryRepository(this@EnhancedAIService.context)
-                        CompanionMemoryRuleExtractor.extract(
-                            content = message.content,
-                            conversationId = currentChatId,
-                            messageTimestamp = message.timestamp,
-                            messageId = message.messageId,
-                        ).forEach { proposal ->
-                            val recordId = companionMemoryRepository.applyProposal(
-                                profileId = profileId,
-                                companionId = companionId,
-                                proposal = proposal,
-                            )
-                            if (recordId != null) {
-                                CompanionMemoryReceiptBus.publishConfirmedHighValue(recordId, proposal)
-                            }
-                        }
-                    }
-                    if (
-                        isHighValueMemory ||
-                            CompanionReminderIntentDetector.isTimeSensitive(latestUserContent)
-                    ) {
-                        val scheduler = MemoryAutoSaveScheduler.getInstance()
-                        if (scheduler != null) {
-                            scheduler.requestImmediateProcessing(profileId, currentChatId)
-                        } else {
-                            MemoryAutoSaveWorkScheduler.requestImmediate(
-                                context = this@EnhancedAIService.context,
-                                profileId = profileId,
-                                chatId = currentChatId,
-                            )
-                        }
                     }
                 }
             }.onFailure { e ->
@@ -2269,7 +2251,8 @@ class EnhancedAIService private constructor(private val context: Context) {
             }
         }
 
-        val processToolJob = toolProcessingScope.launch {
+        val invocationId = java.util.UUID.randomUUID().toString()
+        val processToolJob = toolProcessingScope.async(start = CoroutineStart.LAZY) {
             val modelSnapshot = getModelExecutionSnapshot(
                 context,
                 functionType,
@@ -2336,13 +2319,34 @@ class EnhancedAIService private constructor(private val context: Context) {
             )
         }
 
-        val invocationId = java.util.UUID.randomUUID().toString()
         toolExecutionJobs[invocationId] = processToolJob
+        if (!isExecutionContextActive(context)) {
+            toolExecutionJobs.remove(invocationId, processToolJob)
+            processToolJob.cancel()
+            throw CancellationException("Tool execution context was cancelled before start")
+        }
+        processToolJob.start()
 
         try {
-            processToolJob.join()
+            processToolJob.await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "工具执行链异常结束", e)
+            val errorMessage =
+                this@EnhancedAIService.context.getString(
+                    R.string.enhanced_process_tool_result_failed,
+                    e.message ?: ""
+                )
+            if (!isSubTask) {
+                withContext(Dispatchers.Main) {
+                    _inputProcessingState.value = InputProcessingState.Error(errorMessage)
+                }
+            } else {
+                onNonFatalError(errorMessage)
+            }
         } finally {
-            toolExecutionJobs.remove(invocationId)
+            toolExecutionJobs.remove(invocationId, processToolJob)
         }
     }
 
@@ -3004,23 +3008,23 @@ class EnhancedAIService private constructor(private val context: Context) {
     }
 
     /** Cancel the current conversation */
-    fun cancelConversation() {
+    fun cancelConversation(): Job {
         invalidateAllExecutionContexts("cancelConversation")
 
         // Set conversation inactive
         // isConversationActive.set(false) // This is now per-context, can't set a global one
 
-        // Cancel all underlying AIService streaming instances
-        initScope.launch {
+        // Register and cancel tool jobs before starting the asynchronous provider barrier.
+        val toolJobs = cancelAllToolExecutions()
+        val cancellationJob = initScope.launch {
             runCatching {
                 multiServiceManager.cancelAllStreaming()
             }.onFailure { e ->
                 AppLogger.e(TAG, "取消AIService流式输出失败", e)
             }
+            toolJobs.forEach { job -> job.join() }
+            AppLogger.d(TAG, "Conversation cancellation barrier complete")
         }
-
-        // Cancel all tool executions
-        cancelAllToolExecutions()
 
         // Clean up current conversation content
         // roundManager.clearContent() // This is now per-context, can't clear a global one
@@ -3045,12 +3049,18 @@ class EnhancedAIService private constructor(private val context: Context) {
         // 停止AI服务并关闭屏幕常亮
         stopAiService()
 
-        AppLogger.d(TAG, "Conversation cancellation complete")
+        AppLogger.d(TAG, "Conversation cancellation requested")
+        return cancellationJob
     }
 
     /** Cancel all tool executions */
-    private fun cancelAllToolExecutions() {
+    private fun cancelAllToolExecutions(): List<Job> {
+        val scopeChildren =
+            toolProcessingScope.coroutineContext[Job]?.children?.toList().orEmpty()
+        val jobs = (toolExecutionJobs.values + scopeChildren).toSet()
+        jobs.forEach { job -> job.cancel() }
         toolProcessingScope.coroutineContext.cancelChildren()
+        return jobs.toList()
     }
 
     /**

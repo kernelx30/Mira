@@ -86,7 +86,8 @@ class GitHubForgePublishService(
             val forgeRepoResult =
                 ensureForgeRepository(
                     publisherLogin = currentUser.login,
-                    allowCreateForgeRepo = allowCreateForgeRepo
+                    allowCreateForgeRepo = allowCreateForgeRepo,
+                    preferredForgeRepo = request.publishContext?.preferredForgeRepo
                 ).getOrElse { error ->
                     return@withContext Result.failure(error)
                 }
@@ -140,33 +141,6 @@ class GitHubForgePublishService(
             val computedSha256 = sha256Hex(fileBytes)
 
             onProgress(PublishProgressStage.REGISTERING_MARKET)
-            // Obtain proof token from market API (attests ownership of the release)
-            val proofToken =
-                marketStatsApiService.publishProof(
-                    owner = currentUser.login,
-                    repo = forgeRepoResult.repoName,
-                    releaseTag = releaseDescriptor.tagName,
-                    assetName = uploadedAsset.name,
-                    sha256 = computedSha256
-                ).getOrElse { error ->
-                    return@withContext Result.failure(error)
-                }
-
-            // Patch the release body to include the proof marker
-            val proofBody =
-                releaseDescriptor.releaseBody + "\n\n<!-- operit-market-proof $proofToken -->"
-            githubApiService.updateRelease(
-                owner = currentUser.login,
-                repo = forgeRepoResult.repoName,
-                releaseId = release.id,
-                name = releaseDescriptor.releaseName,
-                body = proofBody,
-                draft = false,
-                prerelease = false
-            ).getOrElse { error ->
-                return@withContext Result.failure(error)
-            }
-
             val payload =
                 MarketRegistrationPayload(
                     type = descriptor.type,
@@ -226,41 +200,48 @@ class GitHubForgePublishService(
 
     private suspend fun ensureForgeRepository(
         publisherLogin: String,
-        allowCreateForgeRepo: Boolean
+        allowCreateForgeRepo: Boolean,
+        preferredForgeRepo: String?
     ): Result<ForgeRepoInfo?> {
-        val existingRepo = githubApiService.getRepository(publisherLogin, OPERIT_FORGE_REPO_NAME)
-        val existingRepoValue = existingRepo.getOrNull()
-        if (existingRepoValue != null) {
-            if (existingRepoValue.size == 0) {
-                initializeForgeRepository(
-                    owner = publisherLogin,
-                    repo = existingRepoValue.name
-                ).getOrElse { error ->
-                    return Result.failure(error)
+        val candidateRepos = buildList {
+            preferredForgeRepo?.trim()?.takeIf { it.isNotBlank() }?.let(::add)
+            add(MIRA_FORGE_REPO_NAME)
+        }.distinct()
+        var lastFailure: Throwable? = null
+        for (repoName in candidateRepos) {
+            val existingRepo = githubApiService.getRepository(publisherLogin, repoName)
+            val existingRepoValue = existingRepo.getOrNull()
+            if (existingRepoValue != null) {
+                if (existingRepoValue.size == 0) {
+                    initializeForgeRepository(
+                        owner = publisherLogin,
+                        repo = existingRepoValue.name
+                    ).getOrElse { error ->
+                        return Result.failure(error)
+                    }
                 }
-            }
-            return Result.success(
-                ForgeRepoInfo(
-                    ownerLogin = publisherLogin,
-                    repoName = existingRepoValue.name,
-                    htmlUrl = existingRepoValue.html_url,
-                    existedBefore = true
+                return Result.success(
+                    ForgeRepoInfo(
+                        ownerLogin = publisherLogin,
+                        repoName = existingRepoValue.name,
+                        htmlUrl = existingRepoValue.html_url,
+                        existedBefore = true
+                    )
                 )
-            )
+            }
+            existingRepo.exceptionOrNull()?.let { error ->
+                if (!error.message.orEmpty().contains("HTTP 404")) lastFailure = error
+            }
         }
 
-        val failureMessage = existingRepo.exceptionOrNull()?.message.orEmpty()
-        if (!failureMessage.contains("HTTP 404")) {
-            return Result.failure(existingRepo.exceptionOrNull() ?: Exception("Failed to load OperitForge"))
-        }
-
+        if (lastFailure != null) return Result.failure(lastFailure!!)
         if (!allowCreateForgeRepo) {
             return Result.success(null)
         }
 
         return githubApiService.createRepository(
-            name = OPERIT_FORGE_REPO_NAME,
-            description = "Operit publish-only artifact repository for release assets.",
+            name = MIRA_FORGE_REPO_NAME,
+            description = "Mira publish-only artifact repository for release assets.",
             isPrivate = false,
             autoInit = true
         ).map { repo ->
@@ -281,12 +262,12 @@ class GitHubForgePublishService(
             owner = owner,
             repo = repo,
             path = "README.md",
-            message = "Initialize OperitForge repository",
+            message = "Initialize MiraForge repository",
             textContent =
                 buildString {
-                    appendLine("# OperitForge")
+                    appendLine("# MiraForge")
                     appendLine()
-                    appendLine("This repository stores release assets published from Operit.")
+                    appendLine("This repository stores release assets published from Mira.")
                 }
         )
     }

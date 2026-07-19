@@ -224,6 +224,18 @@ class UserPreferencesManager private constructor(private val context: Context) {
             booleanPreferencesKey("bubble_rounded_corners_enabled")
         private val BUBBLE_AI_ROUNDED_CORNERS_ENABLED =
             booleanPreferencesKey("bubble_ai_rounded_corners_enabled")
+        private val BUBBLE_USER_CORNER_RADIUS =
+            floatPreferencesKey("bubble_user_corner_radius")
+        private val BUBBLE_AI_CORNER_RADIUS =
+            floatPreferencesKey("bubble_ai_corner_radius")
+        private val BUBBLE_USER_MAX_WIDTH_RATIO =
+            floatPreferencesKey("bubble_user_max_width_ratio")
+        private val BUBBLE_AI_MAX_WIDTH_RATIO =
+            floatPreferencesKey("bubble_ai_max_width_ratio")
+        private val BUBBLE_MESSAGE_VERTICAL_PADDING =
+            floatPreferencesKey("bubble_message_vertical_padding")
+        private val BUBBLE_SHADOW_ELEVATION =
+            floatPreferencesKey("bubble_shadow_elevation")
         private val BUBBLE_USER_CONTENT_PADDING_LEFT =
             floatPreferencesKey("bubble_content_padding_left")
         private val BUBBLE_USER_CONTENT_PADDING_RIGHT =
@@ -526,7 +538,7 @@ class UserPreferencesManager private constructor(private val context: Context) {
 
     val chatInputTransparent: Flow<Boolean> =
             context.userPreferencesDataStore.data.map { preferences ->
-                preferences[CHAT_INPUT_TRANSPARENT] ?: false
+                preferences[CHAT_INPUT_TRANSPARENT] ?: true
             }
 
     val chatInputFloating: Flow<Boolean> =
@@ -536,7 +548,7 @@ class UserPreferencesManager private constructor(private val context: Context) {
 
     val chatInputLiquidGlass: Flow<Boolean> =
             context.userPreferencesDataStore.data.map { preferences ->
-                preferences[CHAT_INPUT_LIQUID_GLASS] ?: false
+                preferences[CHAT_INPUT_LIQUID_GLASS] ?: true
             }
 
     val chatInputWaterGlass: Flow<Boolean> =
@@ -827,6 +839,36 @@ class UserPreferencesManager private constructor(private val context: Context) {
     val bubbleAiRoundedCornersEnabled: Flow<Boolean> =
         context.userPreferencesDataStore.data.map { preferences ->
             preferences[BUBBLE_AI_ROUNDED_CORNERS_ENABLED] ?: true
+        }
+
+    val bubbleUserCornerRadius: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[BUBBLE_USER_CORNER_RADIUS] ?: 16f
+        }
+
+    val bubbleAiCornerRadius: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[BUBBLE_AI_CORNER_RADIUS] ?: 16f
+        }
+
+    val bubbleUserMaxWidthRatio: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[BUBBLE_USER_MAX_WIDTH_RATIO] ?: 0.78f
+        }
+
+    val bubbleAiMaxWidthRatio: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[BUBBLE_AI_MAX_WIDTH_RATIO] ?: 0.84f
+        }
+
+    val bubbleMessageVerticalPadding: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[BUBBLE_MESSAGE_VERTICAL_PADDING] ?: 4f
+        }
+
+    val bubbleShadowElevation: Flow<Float> =
+        context.userPreferencesDataStore.data.map { preferences ->
+            preferences[BUBBLE_SHADOW_ELEVATION] ?: 0f
         }
 
     val bubbleUserContentPaddingLeft: Flow<Float> =
@@ -1244,6 +1286,12 @@ class UserPreferencesManager private constructor(private val context: Context) {
             bubbleImageRenderMode: String? = null,
             bubbleUserRoundedCornersEnabled: Boolean? = null,
             bubbleAiRoundedCornersEnabled: Boolean? = null,
+            bubbleUserCornerRadius: Float? = null,
+            bubbleAiCornerRadius: Float? = null,
+            bubbleUserMaxWidthRatio: Float? = null,
+            bubbleAiMaxWidthRatio: Float? = null,
+            bubbleMessageVerticalPadding: Float? = null,
+            bubbleShadowElevation: Float? = null,
             bubbleUserContentPaddingLeft: Float? = null,
             bubbleUserContentPaddingRight: Float? = null,
             bubbleAiContentPaddingLeft: Float? = null,
@@ -1415,6 +1463,12 @@ class UserPreferencesManager private constructor(private val context: Context) {
             bubbleImageRenderMode?.let { preferences[BUBBLE_IMAGE_RENDER_MODE] = it }
             bubbleUserRoundedCornersEnabled?.let { preferences[BUBBLE_USER_ROUNDED_CORNERS_ENABLED] = it }
             bubbleAiRoundedCornersEnabled?.let { preferences[BUBBLE_AI_ROUNDED_CORNERS_ENABLED] = it }
+            bubbleUserCornerRadius?.let { preferences[BUBBLE_USER_CORNER_RADIUS] = it.coerceIn(4f, 28f) }
+            bubbleAiCornerRadius?.let { preferences[BUBBLE_AI_CORNER_RADIUS] = it.coerceIn(4f, 28f) }
+            bubbleUserMaxWidthRatio?.let { preferences[BUBBLE_USER_MAX_WIDTH_RATIO] = it.coerceIn(0.6f, 0.96f) }
+            bubbleAiMaxWidthRatio?.let { preferences[BUBBLE_AI_MAX_WIDTH_RATIO] = it.coerceIn(0.6f, 0.96f) }
+            bubbleMessageVerticalPadding?.let { preferences[BUBBLE_MESSAGE_VERTICAL_PADDING] = it.coerceIn(0f, 10f) }
+            bubbleShadowElevation?.let { preferences[BUBBLE_SHADOW_ELEVATION] = it.coerceIn(0f, 8f) }
             bubbleUserContentPaddingLeft?.let { preferences[BUBBLE_USER_CONTENT_PADDING_LEFT] = it }
             bubbleUserContentPaddingRight?.let { preferences[BUBBLE_USER_CONTENT_PADDING_RIGHT] = it }
             bubbleAiContentPaddingLeft?.let { preferences[BUBBLE_AI_CONTENT_PADDING_LEFT] = it }
@@ -1531,6 +1585,12 @@ class UserPreferencesManager private constructor(private val context: Context) {
             preferences.remove(BUBBLE_IMAGE_RENDER_MODE)
             preferences.remove(BUBBLE_USER_ROUNDED_CORNERS_ENABLED)
             preferences.remove(BUBBLE_AI_ROUNDED_CORNERS_ENABLED)
+            preferences.remove(BUBBLE_USER_CORNER_RADIUS)
+            preferences.remove(BUBBLE_AI_CORNER_RADIUS)
+            preferences.remove(BUBBLE_USER_MAX_WIDTH_RATIO)
+            preferences.remove(BUBBLE_AI_MAX_WIDTH_RATIO)
+            preferences.remove(BUBBLE_MESSAGE_VERTICAL_PADDING)
+            preferences.remove(BUBBLE_SHADOW_ELEVATION)
             preferences.remove(BUBBLE_USER_CONTENT_PADDING_LEFT)
             preferences.remove(BUBBLE_USER_CONTENT_PADDING_RIGHT)
             preferences.remove(BUBBLE_AI_CONTENT_PADDING_LEFT)
@@ -1867,6 +1927,9 @@ class UserPreferencesManager private constructor(private val context: Context) {
             BUBBLE_AI_IMAGE_CROP_LEFT, BUBBLE_AI_IMAGE_CROP_TOP, BUBBLE_AI_IMAGE_CROP_RIGHT,
             BUBBLE_AI_IMAGE_CROP_BOTTOM, BUBBLE_AI_IMAGE_REPEAT_START, BUBBLE_AI_IMAGE_REPEAT_END,
             BUBBLE_AI_IMAGE_REPEAT_Y_START, BUBBLE_AI_IMAGE_REPEAT_Y_END, BUBBLE_AI_IMAGE_SCALE,
+            BUBBLE_USER_CORNER_RADIUS, BUBBLE_AI_CORNER_RADIUS,
+            BUBBLE_USER_MAX_WIDTH_RATIO, BUBBLE_AI_MAX_WIDTH_RATIO,
+            BUBBLE_MESSAGE_VERTICAL_PADDING, BUBBLE_SHADOW_ELEVATION,
             BUBBLE_USER_CONTENT_PADDING_LEFT, BUBBLE_USER_CONTENT_PADDING_RIGHT,
             BUBBLE_AI_CONTENT_PADDING_LEFT, BUBBLE_AI_CONTENT_PADDING_RIGHT
         )
@@ -2130,9 +2193,9 @@ class UserPreferencesManager private constructor(private val context: Context) {
             backgroundImageOpacity = floatValue(BACKGROUND_IMAGE_OPACITY, 0.3f),
             chatHeaderTransparent = booleanValue(CHAT_HEADER_TRANSPARENT, false),
             chatHeaderOverlayMode = booleanValue(CHAT_HEADER_OVERLAY_MODE, false),
-            chatInputTransparent = booleanValue(CHAT_INPUT_TRANSPARENT, false),
+            chatInputTransparent = booleanValue(CHAT_INPUT_TRANSPARENT, true),
             chatInputFloating = booleanValue(CHAT_INPUT_FLOATING, true),
-            chatInputLiquidGlass = booleanValue(CHAT_INPUT_LIQUID_GLASS, false),
+            chatInputLiquidGlass = booleanValue(CHAT_INPUT_LIQUID_GLASS, true),
             chatInputWaterGlass = booleanValue(CHAT_INPUT_WATER_GLASS, false),
             chatStyle = stringValue(CHAT_STYLE, DEFAULT_CHAT_STYLE) ?: DEFAULT_CHAT_STYLE,
             inputStyle = stringValue(INPUT_STYLE, DEFAULT_INPUT_STYLE) ?: DEFAULT_INPUT_STYLE,
@@ -2157,6 +2220,12 @@ class UserPreferencesManager private constructor(private val context: Context) {
                 booleanValue(BUBBLE_USER_ROUNDED_CORNERS_ENABLED, true),
             bubbleAiRoundedCornersEnabled =
                 booleanValue(BUBBLE_AI_ROUNDED_CORNERS_ENABLED, true),
+            bubbleUserCornerRadius = floatValue(BUBBLE_USER_CORNER_RADIUS, 16f),
+            bubbleAiCornerRadius = floatValue(BUBBLE_AI_CORNER_RADIUS, 16f),
+            bubbleUserMaxWidthRatio = floatValue(BUBBLE_USER_MAX_WIDTH_RATIO, 0.78f),
+            bubbleAiMaxWidthRatio = floatValue(BUBBLE_AI_MAX_WIDTH_RATIO, 0.84f),
+            bubbleMessageVerticalPadding = floatValue(BUBBLE_MESSAGE_VERTICAL_PADDING, 4f),
+            bubbleShadowElevation = floatValue(BUBBLE_SHADOW_ELEVATION, 0f),
             bubbleUserContentPaddingLeft = floatValue(BUBBLE_USER_CONTENT_PADDING_LEFT, 12f),
             bubbleUserContentPaddingRight = floatValue(BUBBLE_USER_CONTENT_PADDING_RIGHT, 12f),
             bubbleAiContentPaddingLeft = floatValue(BUBBLE_AI_CONTENT_PADDING_LEFT, 12f),

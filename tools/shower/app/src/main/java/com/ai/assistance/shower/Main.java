@@ -58,8 +58,10 @@ public class Main {
 
     private static final String ACTION_SHOWER_BINDER_READY = "com.ai.assistance.operit.action.SHOWER_BINDER_READY";
     private static final String EXTRA_BINDER_CONTAINER = "binder_container";
+    private static final String EXTRA_HANDSHAKE_TOKEN = "handshake_token";
 
     private static volatile String sTargetPackageName;
+    private static volatile String sHandshakeToken;
 
     private static ArrayList<String> getTargetPackages() {
         ArrayList<String> packages = new ArrayList<>();
@@ -381,6 +383,9 @@ public class Main {
         if (args != null && args.length > 0 && args[0] != null && !args[0].trim().isEmpty()) {
             sTargetPackageName = args[0].trim();
             logToFile("Using target package arg from args: " + sTargetPackageName, null);
+        }
+        if (args != null && args.length > 1 && args[1] != null && !args[1].trim().isEmpty()) {
+            sHandshakeToken = args[1].trim();
         }
         try {
             prepareMainLooper();
@@ -777,6 +782,7 @@ public class Main {
             Intent baseIntent = new Intent(ACTION_SHOWER_BINDER_READY);
             baseIntent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
             baseIntent.putExtra(EXTRA_BINDER_CONTAINER, new ShowerBinderContainer(service.asBinder()));
+            baseIntent.putExtra(EXTRA_HANDSHAKE_TOKEN, sHandshakeToken);
 
             ArrayList<String> targetPackages = getTargetPackages();
             if (targetPackages.isEmpty()) {

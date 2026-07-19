@@ -23,7 +23,7 @@ last_reviewed: 2026-07-14
 - prod、QA、full、lite 没有独立的 Gradle 维度
 - `ScriptExecutionReceiver`、ToolPkg 调试安装、刷新和 DSL dump receiver 位于主 Manifest，并且 `exported=true`
 - 调试 receiver 的实现类和 action 字符串位于 `src/main`，release APK 也会包含这些代码与入口
-- `GITHUB_CLIENT_SECRET` 被写入 BuildConfig
+- OAuth Client Secret 被写入 BuildConfig
 
 ## 预期的新实现情况
 

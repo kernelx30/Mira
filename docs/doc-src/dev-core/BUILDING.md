@@ -1,10 +1,10 @@
-# **Android 项目 Operit 编译指南（Linux/Ubuntu）**
+# **Android 项目 Mira 编译指南（Linux/Ubuntu）**
 
-本指南详细介绍了在 Linux 环境下（推荐 Ubuntu/Debian）编译 Android 项目 **Operit** 所需的全部环境配置和步骤。
+本指南介绍在 Linux 环境下（推荐 Ubuntu/Debian）编译 Android 项目 **Mira** 所需的环境配置和步骤。
 
-## **关于 Operit**
+## **关于 Mira**
 
-**Operit AI** 是移动端首个功能完备的 AI 智能助手应用，它**完全独立运行**于您的 Android 设备上，拥有强大的**工具调用能力**。本项目旨在为开发者提供一个可深度定制和扩展的 AI 助手框架。
+**Mira** 是面向 Android 的本地优先 AI 伴侣，在角色聊天、长期记忆和语音陪伴之外保留完整工具调用能力。项目基于 Operit，并维护独立应用 ID、仓库、发布通道和产品设计。
 
 在开始编译之前，请确保您已了解本项目的功能和目标。更多信息请参考项目主页的 [README.md](../../../README.md)。
 
@@ -140,31 +140,31 @@ org.gradle.parallel=true
 # org.gradle.workers.max=8
 ``` 
 
-## **5. 第五步：配置 GitHub OAuth 应用**
+## **5. 第五步：配置 GitHub OAuth Device Flow**
 
-为了使应用的 GitHub 相关功能（如登录、MCP 包管理）能正常工作，你需要注册自己的 GitHub OAuth Application 并配置 Client ID。
+Mira 的 GitHub 登录、MiraForge 发布、插件市场评论和点赞使用 GitHub OAuth Device Flow。公开 APK 只需要公开 Client ID，不需要 Client Secret，也不使用回调 URL。
 
 1. **创建 GitHub OAuth App:**  
    - 访问你的 GitHub 开发者设置页面：[**GitHub Developer Settings**](https://github.com/settings/developers)
    - 点击 **"New OAuth App"**。
    - 填写以下信息：
-     - **Application name**: `Operit Dev` (或任何你喜欢的名字)
-     - **Homepage URL**: `https://github.com/<你的 GitHub 用户名>/Operit` (使用你 Fork 后的仓库地址)
-     - **Authorization callback URL**: `operit://github-oauth-callback` (**必须完全匹配！**)
+     - **Application name**: `Mira Android`（Fork 维护者可自行命名）
+     - **Homepage URL**: `https://github.com/<你的 GitHub 用户名>/Mira`
+     - **Authorization callback URL**: `https://github.com/<你的 GitHub 用户名>/Mira`
+   - 创建后进入该 OAuth App 设置页，打开 **Enable Device Flow**。
 
 2. **获取 Client ID:**  
-   创建成功后，页面会显示生成的 **Client ID**。复制这个 ID。
+   页面会显示生成的 **Client ID**。Device Flow 的 Android 客户端只使用这个公开 ID。
 
 3. **配置项目:**  
-   - 在项目根目录，找到 `local.properties.example` 文件。
-   - 复制该文件并重命名为 `local.properties`。
-   - 打开 `local.properties` 文件，将 `"YOUR_OWN_GITHUB_CLIENT_ID_HERE"` 替换为你刚刚复制的 Client ID。
+   - 在项目根目录，复制 `local.properties.example` 为 `local.properties`。
+   - Fork 维护者可覆盖 `GITHUB_CLIENT_ID`；直接构建 Mira 主仓库时可保留默认公开 ID。
 
    ```properties
-   # 示例:
-   GITHUB_CLIENT_ID=iv1.1234567890abcdef
+   GITHUB_CLIENT_ID=Ov23liKr3DGQsr3PxWg5
    ```
-   **注意：** `local.properties` 文件已被 Git 忽略，因此你的个人 ID 不会被提交到仓库中，确保了安全。
+
+   `local.properties` 已被 Git 忽略。真实 API Key、签名密码和其他本机配置不要提交到仓库。
 
 ## **6. 第六步：克隆并编译项目**
 
@@ -174,21 +174,22 @@ org.gradle.parallel=true
 请根据需要选择以下两种克隆方式（项目包含 Git 子模块）：
 
 **推荐：先 Fork 后克隆你的仓库**  
-在 GitHub 打开上游仓库并点击 Fork： [AAswordman/Operit](https://github.com/AAswordman/Operit)  
+在 GitHub 打开 Mira 仓库并点击 Fork：[kernelx30/Mira](https://github.com/kernelx30/Mira)
 克隆你的 Fork（注意使用 --recurse-submodules）：
 ```bash
-git clone --recurse-submodules https://github.com/<你的 GitHub 用户名>/Operit.git
-cd Operit
+git clone --recurse-submodules https://github.com/<你的 GitHub 用户名>/Mira.git
+cd Mira
 ```  
 （可选）添加上游仓库以便同步更新：  
 ```bash
-git remote add upstream https://github.com/AAswordman/Operit.git
+git remote add upstream https://github.com/kernelx30/Mira.git
+git remote add operit-upstream https://github.com/AAswordman/Operit.git
 ```  
 
-**备选：不 Fork，直接克隆上游仓库（只读）**  
+**备选：不 Fork，直接克隆 Mira（只读）**
 ```bash
-git clone --recurse-submodules https://github.com/AAswordman/Operit.git
-cd Operit
+git clone --recurse-submodules https://github.com/kernelx30/Mira.git
+cd Mira
 ```  
 
 如果你已克隆但忘记带 --recurse-submodules，可在仓库目录中执行：  

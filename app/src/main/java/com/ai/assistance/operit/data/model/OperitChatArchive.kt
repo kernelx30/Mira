@@ -12,8 +12,9 @@ data class OperitChatArchive(
     val chats: List<OperitArchivedChat>,
 ) {
     companion object {
-        const val ARCHIVE_TYPE = "operit_chat_archive"
-        const val CURRENT_FORMAT_VERSION = 2
+        const val ARCHIVE_TYPE = "mira_chat_archive"
+        const val LEGACY_ARCHIVE_TYPE = "operit_chat_archive"
+        const val CURRENT_FORMAT_VERSION = 3
     }
 }
 
@@ -127,6 +128,7 @@ data class OperitArchivedMessageVariant(
     val outputDurationMs: Long = 0L,
     val waitDurationMs: Long = 0L,
     val completedAt: Long = 0L,
+    val speechDirectionJson: String? = null,
 ) {
     fun toEntity(chatId: String, messageTimestamp: Long): MessageVariantEntity {
         return MessageVariantEntity(
@@ -144,6 +146,7 @@ data class OperitArchivedMessageVariant(
             outputDurationMs = outputDurationMs,
             waitDurationMs = waitDurationMs,
             completedAt = completedAt,
+            speechDirectionJson = speechDirectionJson,
         )
     }
 
@@ -162,6 +165,7 @@ data class OperitArchivedMessageVariant(
                 outputDurationMs = entity.outputDurationMs,
                 waitDurationMs = entity.waitDurationMs,
                 completedAt = entity.completedAt,
+                speechDirectionJson = entity.speechDirectionJson,
             )
         }
     }

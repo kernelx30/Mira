@@ -2,6 +2,8 @@ package com.ai.assistance.operit.data.repository
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.ai.assistance.operit.core.chat.CompanionMemoryManagementMatch
+import com.ai.assistance.operit.core.chat.CompanionMemoryManagementMatcher
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.model.CompanionMemoryEpisodeEntity
 import com.ai.assistance.operit.data.model.CompanionMemoryEdgeEntity
@@ -16,6 +18,14 @@ import com.ai.assistance.operit.data.model.CompanionMemorySourceKind
 import com.ai.assistance.operit.data.model.CompanionMemoryType
 import com.ai.assistance.operit.data.model.CompanionRecordScope
 import com.ai.assistance.operit.data.model.CompanionRecordStatus
+import com.ai.assistance.operit.data.model.MemoryEvidenceKind
+import com.ai.assistance.operit.data.model.MemoryGrantEntity
+import com.ai.assistance.operit.data.model.MemoryGrantPermission
+import com.ai.assistance.operit.data.model.MemoryOwnerScope
+import com.ai.assistance.operit.data.model.MemoryPerspective
+import com.ai.assistance.operit.data.model.MemorySubjectScope
+import com.ai.assistance.operit.data.model.MemoryTriggerKind
+import com.ai.assistance.operit.data.model.MemoryVisibility
 import com.ai.assistance.operit.util.AppLogger
 import java.util.UUID
 import java.util.Locale
@@ -33,6 +43,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import kotlinx.coroutines.flow.map
 
 internal const val COMPANION_MEMORY_FTS_QUERY =
     "SELECT `recordId` FROM `companion_memory_fts` WHERE companion_memory_fts MATCH ? LIMIT 64"
@@ -52,9 +63,14 @@ data class CompanionMemoryGraphSnapshot(
     val edges: List<CompanionMemoryEdgeEntity>,
 )
 
+internal fun CompanionMemoryRecordEntity.isEligibleForRecall(includeReview: Boolean): Boolean =
+    status == CompanionRecordStatus.ACTIVE.name &&
+        (includeReview || (reviewAt == null && !needsReview))
+
 class CompanionMemoryRepository(context: Context) {
     private val database = AppDatabase.getDatabase(context.applicationContext)
     private val dao = database.companionMemoryDao()
+    private val messageDao = database.messageDao()
 
     suspend fun applyProposal(
         profileId: String,
@@ -79,8 +95,7 @@ class CompanionMemoryRepository(context: Context) {
                 )
             return fromMemoryId.takeIf { edgeId != null }
         }
-        val normalizedCompanionId =
-            if (proposal.scope == CompanionRecordScope.USER) "" else companionId.trim()
+        val normalizedCompanionId = companionId.trim()
         if (proposal.scope != CompanionRecordScope.USER && normalizedCompanionId.isBlank()) return null
         val canonicalPredicate = CompanionMemoryPredicate.canonicalize(proposal.predicate)
         if (canonicalPredicate.isBlank()) return null
@@ -89,6 +104,34 @@ class CompanionMemoryRepository(context: Context) {
         if (normalizedValue.isBlank()) return null
 
         return database.withTransaction {
+            val deletionTombstone =
+                listOfNotNull(
+                    dao.findLatestDeletionForValue(
+                        profileId = profileId,
+                        companionId = normalizedCompanionId,
+                        conversationId = proposal.conversationId,
+                        scope = proposal.scope.name,
+                        normalizedValue = normalizedValue,
+                    ),
+                    dao.findLatestDeletionByIdentity(
+                        profileId = profileId,
+                        companionId = normalizedCompanionId,
+                        conversationId = proposal.conversationId,
+                        scope = proposal.scope.name,
+                        subjectKey = proposal.subjectKey,
+                        predicate = canonicalPredicate,
+                    ),
+                ).maxByOrNull { it.updatedAt }
+            if (
+                deletionTombstone != null &&
+                    proposal.messageTimestamp <= deletionTombstone.updatedAt
+            ) {
+                AppLogger.d(
+                    "CompanionMemoryRepository",
+                    "Skipped stale proposal blocked by explicit deletion: recordId=${deletionTombstone.id}",
+                )
+                return@withTransaction null
+            }
             val activeSubjectRecords =
                 (
                     dao.getActiveBySubject(
@@ -141,6 +184,13 @@ class CompanionMemoryRepository(context: Context) {
                         updatedAt = now,
                         lastConfirmedAt = now,
                         sourceKind = preferredSourceKind,
+                        ownerScope = proposal.ownerScope?.name ?: exactExisting.ownerScope,
+                        ownerCompanionId = if (exactExisting.ownerCompanionId.isBlank()) normalizedCompanionId else exactExisting.ownerCompanionId,
+                        visibility = proposal.visibility?.name ?: exactExisting.visibility,
+                        perspective = proposal.perspective?.name ?: exactExisting.perspective,
+                        evidenceKind = (proposal.evidenceKind ?: defaultEvidenceKind(proposal.sourceKind)).name,
+                        triggerKind = (proposal.triggerKind ?: defaultTriggerKind()).name,
+                        needsReview = if (incomingIsConfirmed) false else exactExisting.needsReview,
                         validFrom = proposal.validFrom ?: exactExisting.validFrom,
                         validUntil = proposal.validUntil ?: exactExisting.validUntil,
                         reviewAt =
@@ -212,6 +262,14 @@ class CompanionMemoryRepository(context: Context) {
                         versionOfId = previousConfirmed?.versionOfId ?: previousConfirmed?.id,
                         supersedesId = previousConfirmed?.id,
                         reviewAt = proposal.reviewAt,
+                        subjectScope = proposal.scope.name,
+                        ownerScope = proposal.ownerScope?.name ?: previousConfirmed?.ownerScope ?: defaultOwnerScope(proposal.scope).name,
+                        ownerCompanionId = previousConfirmed?.ownerCompanionId?.ifBlank { normalizedCompanionId } ?: normalizedCompanionId,
+                        visibility = proposal.visibility?.name ?: previousConfirmed?.visibility ?: defaultVisibility(proposal.scope).name,
+                        perspective = proposal.perspective?.name ?: previousConfirmed?.perspective ?: defaultPerspective(proposal.sourceKind).name,
+                        evidenceKind = (proposal.evidenceKind ?: defaultEvidenceKind(proposal.sourceKind)).name,
+                        triggerKind = (proposal.triggerKind ?: defaultTriggerKind()).name,
+                        needsReview = proposal.reviewAt != null,
                     ).also { dao.insertRecord(it) }
                 }
 
@@ -225,6 +283,11 @@ class CompanionMemoryRepository(context: Context) {
                             confidence = record.confidence,
                             strength = 1.0,
                             evidenceMessageIds = encodeEvidenceMessageIds(listOfNotNull(proposal.messageId)),
+                            pendingEvidenceReferencesJson =
+                                encodeEvidenceReferences(
+                                    proposal.conversationId,
+                                    proposal.messageTimestamp,
+                                ),
                             createdAt = now,
                         ),
                     )
@@ -239,6 +302,7 @@ class CompanionMemoryRepository(context: Context) {
                     quote = proposal.evidenceQuote.trim().take(1_000),
                     speaker = proposal.evidenceSpeaker,
                     timestamp = proposal.messageTimestamp,
+                    evidenceKind = (proposal.evidenceKind ?: defaultEvidenceKind(proposal.sourceKind)).name,
                 ),
             )
             record.id
@@ -308,6 +372,8 @@ class CompanionMemoryRepository(context: Context) {
                     messageTimestamp = nowMs,
                     evidenceQuote = cleanValue,
                     evidenceSpeaker = "user_manual",
+                    evidenceKind = MemoryEvidenceKind.USER_DIRECT,
+                    triggerKind = MemoryTriggerKind.USER_SELECTED,
                     validFrom = existingRecord?.validFrom,
                     validUntil = existingRecord?.validUntil,
                     reviewAt = existingRecord?.reviewAt,
@@ -359,6 +425,8 @@ class CompanionMemoryRepository(context: Context) {
                     messageTimestamp = sourceTimestamp,
                     evidenceQuote = cleanValue,
                     evidenceSpeaker = "imported",
+                    evidenceKind = MemoryEvidenceKind.IMPORTED,
+                    triggerKind = MemoryTriggerKind.USER_SELECTED,
                     validFrom = validFrom,
                     reviewAt = System.currentTimeMillis(),
                 ),
@@ -381,6 +449,22 @@ class CompanionMemoryRepository(context: Context) {
             dao.deleteEpisode(episodeIdFor(record))
             true
         }
+    }
+
+    /** Removes malformed records created by the old free-form "remember" matcher. */
+    suspend fun purgeMalformedExplicitNotes(profileId: String): Int {
+        if (profileId.isBlank()) return 0
+        val invalidValues = setOf("了", "吗", "了吗", "吧", "哦", "呀")
+        val records = dao.getActiveGraphRecords(profileId, System.currentTimeMillis())
+        var deletedCount = 0
+        records
+            .filter { record ->
+                record.predicate == "explicit_note" && record.decodedValue().trim() in invalidValues
+            }
+            .forEach { record ->
+                if (deleteRecord(record.id)) deletedCount++
+            }
+        return deletedCount
     }
 
     suspend fun archiveRecord(recordId: String, nowMs: Long = System.currentTimeMillis()): Boolean {
@@ -487,14 +571,7 @@ class CompanionMemoryRepository(context: Context) {
         nowMs: Long = System.currentTimeMillis(),
     ): CompanionMemoryRecallResult {
         if (profileId.isBlank()) return CompanionMemoryRecallResult(emptyList(), emptyList())
-        val candidates =
-            dao.getActiveCandidates(
-                profileId = profileId,
-                companionId = companionId,
-                conversationId = conversationId,
-                nowMs = nowMs,
-                limit = 200,
-            )
+        val candidates = accessibleRecords(profileId, companionId, conversationId, nowMs, 200)
         val ftsMatches = querySearchIndex(query)
         val queryTerms = tokenize(query)
         val scored =
@@ -528,15 +605,215 @@ class CompanionMemoryRepository(context: Context) {
 
     fun observeActiveRecords(profileId: String) = dao.observeActiveRecords(profileId)
 
+    fun observeAccessibleRecords(
+        profileId: String,
+        companionId: String,
+        conversationId: String = "",
+        nowMs: Long = System.currentTimeMillis(),
+    ) = dao.observeAccessibleRecords(profileId, companionId, conversationId, nowMs)
+        .map { records ->
+            records
+                .filter { it.isEligibleForRecall(includeReview = false) }
+                .map { record ->
+                    if (isDirectlyAccessible(record, companionId, conversationId)) record
+                    else record.copy(perspective = MemoryPerspective.USER_SHARED.name)
+                }
+        }
+
+    suspend fun accessibleRecords(
+        profileId: String,
+        companionId: String,
+        conversationId: String,
+        nowMs: Long = System.currentTimeMillis(),
+        limit: Int = 300,
+        includeReview: Boolean = false,
+    ): List<CompanionMemoryRecordEntity> =
+        if (profileId.isBlank()) emptyList()
+        else dao.getAccessibleRecords(
+            profileId = profileId,
+            companionId = companionId,
+            conversationId = conversationId,
+            nowMs = nowMs,
+            limit = limit.coerceAtLeast(0),
+            includeReview = includeReview,
+        )
+            .filter { it.isEligibleForRecall(includeReview) }
+            .map { record ->
+                if (isDirectlyAccessible(record, companionId, conversationId)) record
+                else record.copy(perspective = MemoryPerspective.USER_SHARED.name)
+            }
+
+    suspend fun grantRead(
+        memoryId: String,
+        granteeCompanionId: String,
+        includeSuccessors: Boolean = true,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (memoryId.isBlank() || granteeCompanionId.isBlank()) return false
+        return database.withTransaction {
+            if (dao.getRecordById(memoryId) == null) return@withTransaction false
+            dao.upsertGrant(
+                MemoryGrantEntity(
+                    memoryId = memoryId,
+                    granteeCompanionId = granteeCompanionId,
+                    includeSuccessors = includeSuccessors,
+                    grantedAt = nowMs,
+                ),
+            )
+            true
+        }
+    }
+
+    suspend fun revokeRead(memoryId: String, granteeCompanionId: String, nowMs: Long = System.currentTimeMillis()): Boolean =
+        memoryId.isNotBlank() && granteeCompanionId.isNotBlank() && dao.revokeGrant(memoryId, granteeCompanionId, nowMs) > 0
+
+    suspend fun setPrivateToCompanion(
+        memoryId: String,
+        companionId: String,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (memoryId.isBlank() || companionId.isBlank()) return false
+        return database.withTransaction {
+            val record = dao.getRecordById(memoryId) ?: return@withTransaction false
+            dao.updateRecord(
+                record.copy(
+                    ownerScope = MemoryOwnerScope.RELATIONSHIP_PAIR.name,
+                    ownerCompanionId = companionId,
+                    visibility = MemoryVisibility.PRIVATE.name,
+                    updatedAt = nowMs,
+                ),
+            )
+            dao.getActiveGrants(memoryId).forEach { grant ->
+                dao.revokeGrant(memoryId, grant.granteeCompanionId, nowMs)
+            }
+            true
+        }
+    }
+
+    suspend fun setAllCompanions(
+        memoryId: String,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (memoryId.isBlank()) return false
+        return database.withTransaction {
+            val record = dao.getRecordById(memoryId) ?: return@withTransaction false
+            dao.updateRecord(
+                record.copy(
+                    ownerScope = MemoryOwnerScope.GLOBAL_USER.name,
+                    ownerCompanionId = "",
+                    visibility = MemoryVisibility.ALL_COMPANIONS.name,
+                    needsReview = false,
+                    updatedAt = nowMs,
+                ),
+            )
+            dao.getActiveGrants(memoryId).forEach { grant ->
+                dao.revokeGrant(memoryId, grant.granteeCompanionId, nowMs)
+            }
+            true
+        }
+    }
+
+    suspend fun shareWithCompanions(
+        memoryId: String,
+        granteeCompanionIds: Set<String>,
+        includeSuccessors: Boolean = true,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (memoryId.isBlank()) return false
+        val desired = granteeCompanionIds.map { it.trim() }.filter { it.isNotBlank() }.toSet()
+        return database.withTransaction {
+            val record = dao.getRecordById(memoryId) ?: return@withTransaction false
+            dao.updateRecord(record.copy(visibility = if (desired.isEmpty()) MemoryVisibility.PRIVATE.name else MemoryVisibility.GRANTED.name, updatedAt = nowMs))
+            dao.getActiveGrants(memoryId).filterNot { it.granteeCompanionId in desired }.forEach { grant ->
+                dao.revokeGrant(memoryId, grant.granteeCompanionId, nowMs)
+            }
+            desired.forEach { grantee ->
+                dao.upsertGrant(
+                    MemoryGrantEntity(
+                        memoryId = memoryId,
+                        granteeCompanionId = grantee,
+                        includeSuccessors = includeSuccessors,
+                        grantedAt = nowMs,
+                    ),
+                )
+            }
+            true
+        }
+    }
+
     suspend fun getRecordById(recordId: String): CompanionMemoryRecordEntity? =
         recordId.takeIf { it.isNotBlank() }?.let { dao.getRecordById(it) }
 
+    suspend fun getAccessibleRecordById(
+        recordId: String,
+        profileId: String,
+        companionId: String,
+        conversationId: String,
+    ): CompanionMemoryRecordEntity? {
+        if (recordId.isBlank() || profileId.isBlank()) return null
+        val record = dao.getAccessibleRecordsByIds(listOf(recordId), profileId, companionId, conversationId).firstOrNull()
+            ?: return null
+        return if (isDirectlyAccessible(record, companionId, conversationId)) record
+        else record.copy(perspective = MemoryPerspective.USER_SHARED.name)
+    }
+
+    suspend fun findManagementMatches(
+        profileId: String,
+        companionId: String,
+        conversationId: String,
+        query: String,
+        contextQueries: List<String> = emptyList(),
+        limit: Int = 5,
+        nowMs: Long = System.currentTimeMillis(),
+    ): List<CompanionMemoryManagementMatch> {
+        if (profileId.isBlank() || query.isBlank()) return emptyList()
+        val records =
+            accessibleRecords(
+                profileId = profileId,
+                companionId = companionId,
+                conversationId = conversationId,
+                nowMs = nowMs,
+                limit = 300,
+                includeReview = true,
+            )
+        return (listOf(query) + contextQueries)
+            .asSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .flatMap { candidate ->
+                CompanionMemoryManagementMatcher.rank(records, candidate, limit).asSequence()
+            }
+            .sortedWith(
+                compareByDescending<CompanionMemoryManagementMatch> { it.score }
+                    .thenByDescending { it.record.importance }
+                    .thenByDescending { it.record.updatedAt },
+            )
+            .distinctBy { it.record.id }
+            .take(limit.coerceIn(1, 20))
+            .toList()
+    }
+
+    suspend fun getRecentManagementRecords(
+        profileId: String,
+        companionId: String,
+        conversationId: String,
+        limit: Int = 5,
+        nowMs: Long = System.currentTimeMillis(),
+    ): List<CompanionMemoryRecordEntity> {
+        if (profileId.isBlank()) return emptyList()
+        return accessibleRecords(profileId, companionId, conversationId, nowMs, 300)
+            .sortedByDescending { it.updatedAt }
+            .take(limit.coerceIn(1, 20))
+    }
+
     suspend fun getGraphSnapshot(
         profileId: String,
+        companionId: String = "",
+        conversationId: String = "",
         nowMs: Long = System.currentTimeMillis(),
     ): CompanionMemoryGraphSnapshot {
         if (profileId.isBlank()) return CompanionMemoryGraphSnapshot(emptyList(), emptyList())
-        val records = dao.getActiveGraphRecords(profileId, nowMs)
+        val records = accessibleRecords(profileId, companionId, conversationId, nowMs, 4_000)
         if (records.isEmpty()) return CompanionMemoryGraphSnapshot(emptyList(), emptyList())
         val activeRecordIds = records.mapTo(hashSetOf()) { it.id }
         val edges =
@@ -595,6 +872,7 @@ class CompanionMemoryRepository(context: Context) {
                 return@withTransaction null
             }
             val encodedEvidence = encodeEvidenceMessageIds(evidenceMessageIds)
+            val encodedReferences = encodeEvidenceReferences(evidenceMessageIds)
             val existing = dao.findActiveEdge(fromMemoryId, toMemoryId, type.name)
             if (existing != null) {
                 dao.updateEdge(
@@ -602,6 +880,11 @@ class CompanionMemoryRepository(context: Context) {
                         confidence = max(existing.confidence, confidence.coerceIn(0.0, 1.0)),
                         strength = max(existing.strength, strength.coerceIn(0.0, 1.0)),
                         evidenceMessageIds = mergeEvidenceIds(existing.evidenceMessageIds, encodedEvidence),
+                        pendingEvidenceReferencesJson =
+                            mergeEvidenceReferences(
+                                existing.pendingEvidenceReferencesJson,
+                                encodedReferences,
+                            ),
                         validUntil = validUntil ?: existing.validUntil,
                     ),
                 )
@@ -615,6 +898,7 @@ class CompanionMemoryRepository(context: Context) {
                         confidence = confidence.coerceIn(0.0, 1.0),
                         strength = strength.coerceIn(0.0, 1.0),
                         evidenceMessageIds = encodedEvidence,
+                        pendingEvidenceReferencesJson = encodedReferences,
                         createdAt = nowMs,
                         validUntil = validUntil,
                     )
@@ -628,6 +912,9 @@ class CompanionMemoryRepository(context: Context) {
         memoryId: String,
         limit: Int = 20,
         nowMs: Long = System.currentTimeMillis(),
+        profileId: String = "",
+        companionId: String = "",
+        conversationId: String = "",
     ): List<CompanionMemoryRelation> {
         if (memoryId.isBlank() || limit <= 0) return emptyList()
         val edges = dao.getActiveEdgesForMemory(memoryId, nowMs, limit)
@@ -635,7 +922,17 @@ class CompanionMemoryRepository(context: Context) {
             edges.map { edge ->
                 if (edge.fromMemoryId == memoryId) edge.toMemoryId else edge.fromMemoryId
             }
-        val recordsById = dao.getRecordsByIds(relatedIds.distinct()).associateBy { it.id }
+        val focus = dao.getRecordById(memoryId) ?: return emptyList()
+        val resolvedProfileId = profileId.ifBlank { focus.profileId }
+        val resolvedCompanionId = companionId.ifBlank { focus.ownerCompanionId }
+        val resolvedConversationId = conversationId.ifBlank { focus.conversationId }
+        val recordsById =
+            dao.getAccessibleRecordsByIds(
+                relatedIds.distinct(),
+                resolvedProfileId,
+                resolvedCompanionId,
+                resolvedConversationId,
+            ).associateBy { it.id }
         return edges.mapNotNull { edge ->
             val relatedId = if (edge.fromMemoryId == memoryId) edge.toMemoryId else edge.fromMemoryId
             recordsById[relatedId]?.let { CompanionMemoryRelation(edge, it) }
@@ -679,22 +976,25 @@ class CompanionMemoryRepository(context: Context) {
                     else -> null
                 }
             }.distinct()
-        val relatedById = dao.getRecordsByIds(neighborIds).associateBy { it.id }
+        val relatedById =
+            dao.getAccessibleRecordsByIds(
+                neighborIds,
+                profileId,
+                companionId,
+                conversationId,
+            ).associateBy { it.id }
         val linked =
-            neighborIds.mapNotNull(relatedById::get).filter { record ->
-                record.profileId == profileId &&
-                    record.status == CompanionRecordStatus.ACTIVE.name &&
+            neighborIds.mapNotNull(relatedById::get)
+                .filter { record ->
                     record.reviewAt == null &&
-                    (record.validFrom == null || record.validFrom <= nowMs) &&
-                    (record.validUntil == null || record.validUntil > nowMs) &&
-                    when (record.scope) {
-                        CompanionRecordScope.USER.name -> true
-                        CompanionRecordScope.COMPANION.name -> record.companionId == companionId
-                        CompanionRecordScope.RELATIONSHIP.name -> record.companionId == companionId
-                        CompanionRecordScope.CONVERSATION.name -> record.conversationId == conversationId
-                        else -> false
-                    }
-            }.take(2)
+                        (record.validFrom == null || record.validFrom <= nowMs) &&
+                        (record.validUntil == null || record.validUntil > nowMs)
+                }
+                .map { record ->
+                    if (isDirectlyAccessible(record, companionId, conversationId)) record
+                    else record.copy(perspective = MemoryPerspective.USER_SHARED.name)
+                }
+                .take(2)
         if (linked.isEmpty()) return selected.take(maxRecords)
         val keepSelected = (maxRecords - linked.size).coerceAtLeast(0)
         return (selected.take(keepSelected) + linked).distinctBy { it.id }.take(maxRecords)
@@ -711,6 +1011,62 @@ class CompanionMemoryRepository(context: Context) {
                 Json.parseToJsonElement(value).jsonArray.mapNotNull { it.jsonPrimitive.longOrNull }
             }.getOrDefault(emptyList())
         return encodeEvidenceMessageIds(decode(existing) + decode(incoming))
+    }
+
+    private fun encodeEvidenceReferences(conversationId: String, messageTimestamp: Long): String? {
+        if (conversationId.isBlank() || messageTimestamp <= 0L) return null
+        return buildJsonArray {
+            add(
+                buildJsonObject {
+                    put("conversationId", conversationId)
+                    put("messageTimestamp", messageTimestamp)
+                }
+            )
+        }.toString()
+    }
+
+    private suspend fun encodeEvidenceReferences(messageIds: List<Long>): String? {
+        if (messageIds.isEmpty()) return null
+        val messages =
+            messageIds.distinct().chunked(500).flatMap { ids -> messageDao.getMessagesByIds(ids) }
+        if (messages.isEmpty()) return null
+        return buildJsonArray {
+            messages
+                .distinctBy { it.chatId to it.timestamp }
+                .forEach { message ->
+                    add(
+                        buildJsonObject {
+                            put("conversationId", message.chatId)
+                            put("messageTimestamp", message.timestamp)
+                        }
+                    )
+                }
+        }.toString()
+    }
+
+    private fun mergeEvidenceReferences(existing: String?, incoming: String?): String? {
+        fun decode(value: String?): List<Pair<String, Long>> {
+            if (value.isNullOrBlank()) return emptyList()
+            return Json.parseToJsonElement(value).jsonArray.mapNotNull { element ->
+                val objectValue = element.jsonObject
+                val conversationId = objectValue["conversationId"]?.jsonPrimitive?.content.orEmpty()
+                val timestamp = objectValue["messageTimestamp"]?.jsonPrimitive?.longOrNull
+                if (conversationId.isBlank() || timestamp == null || timestamp <= 0L) null
+                else conversationId to timestamp
+            }
+        }
+        val references = (decode(existing) + decode(incoming)).distinct()
+        if (references.isEmpty()) return null
+        return buildJsonArray {
+            references.forEach { (conversationId, timestamp) ->
+                add(
+                    buildJsonObject {
+                        put("conversationId", conversationId)
+                        put("messageTimestamp", timestamp)
+                    }
+                )
+            }
+        }.toString()
     }
 
     private suspend fun promoteConfirmedRecord(
@@ -743,6 +1099,7 @@ class CompanionMemoryRepository(context: Context) {
             sourceKind = CompanionMemorySourceKind.USER_EXPLICIT.name,
             confidence = 1.0,
             reviewAt = null,
+            needsReview = false,
             updatedAt = nowMs,
             lastConfirmedAt = nowMs,
             versionOfId =
@@ -919,6 +1276,50 @@ class CompanionMemoryRepository(context: Context) {
         }.getOrDefault(emptyMap())
     }
 
+    private fun defaultOwnerScope(scope: CompanionRecordScope): MemoryOwnerScope =
+        when (scope) {
+            CompanionRecordScope.USER -> MemoryOwnerScope.RELATIONSHIP_PAIR
+            CompanionRecordScope.COMPANION -> MemoryOwnerScope.COMPANION_PRIVATE
+            CompanionRecordScope.RELATIONSHIP -> MemoryOwnerScope.RELATIONSHIP_PAIR
+            CompanionRecordScope.CONVERSATION -> MemoryOwnerScope.CONVERSATION
+        }
+
+    private fun isDirectlyAccessible(
+        record: CompanionMemoryRecordEntity,
+        companionId: String,
+        conversationId: String,
+    ): Boolean =
+        when (record.ownerScope) {
+            MemoryOwnerScope.GLOBAL_USER.name -> record.visibility == MemoryVisibility.ALL_COMPANIONS.name
+            MemoryOwnerScope.COMPANION_PRIVATE.name,
+            MemoryOwnerScope.RELATIONSHIP_PAIR.name -> record.ownerCompanionId == companionId
+            MemoryOwnerScope.CONVERSATION.name -> record.conversationId == conversationId
+            else -> false
+        } || (record.visibility == MemoryVisibility.PARTICIPANTS.name && record.conversationId == conversationId)
+
+    private fun defaultVisibility(scope: CompanionRecordScope): MemoryVisibility =
+        when (scope) {
+            CompanionRecordScope.CONVERSATION -> MemoryVisibility.PARTICIPANTS
+            else -> MemoryVisibility.PRIVATE
+        }
+
+    private fun defaultPerspective(source: CompanionMemorySourceKind): MemoryPerspective =
+        when (source) {
+            CompanionMemorySourceKind.IMPORTED -> MemoryPerspective.IMPORTED
+            CompanionMemorySourceKind.USER_EXPLICIT,
+            CompanionMemorySourceKind.USER_IMPLIED -> MemoryPerspective.USER_DISCLOSED
+            CompanionMemorySourceKind.ASSISTANT -> MemoryPerspective.SELF_EXPERIENCED
+        }
+
+    private fun defaultEvidenceKind(source: CompanionMemorySourceKind): MemoryEvidenceKind =
+        when (source) {
+            CompanionMemorySourceKind.IMPORTED -> MemoryEvidenceKind.IMPORTED
+            CompanionMemorySourceKind.USER_IMPLIED -> MemoryEvidenceKind.USER_INFERRED
+            else -> MemoryEvidenceKind.USER_DIRECT
+        }
+
+    private fun defaultTriggerKind(): MemoryTriggerKind = MemoryTriggerKind.AUTO_EXTRACT
+
     companion object {
         private fun sourcePriority(sourceKind: String): Int =
             when (sourceKind) {
@@ -1002,6 +1403,17 @@ class CompanionMemoryRepository(context: Context) {
                         CompanionMemoryType.RELATIONSHIP.name,
                         CompanionMemoryType.COMMITMENT.name,
                     ) || record.scope == CompanionRecordScope.RELATIONSHIP.name
+            }
+            reserve { record ->
+                record.type == CompanionMemoryType.PREFERENCE.name ||
+                    record.type == CompanionMemoryType.ROUTINE.name
+            }
+            reserve { record ->
+                val predicate = CompanionMemoryPredicate.canonicalize(record.predicate)
+                record.scope == CompanionRecordScope.USER.name &&
+                    record.importance >= 0.75 &&
+                    (predicate.startsWith("personality.") ||
+                        predicate in setOf("quirk", "communication_style", "custom_note"))
             }
             reserve { record ->
                 record.type == CompanionMemoryType.EVENT.name && record.importance >= 0.8

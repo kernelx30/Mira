@@ -38,16 +38,21 @@ import com.ai.assistance.operit.data.model.SerializableTypography
 import com.ai.assistance.operit.data.model.toComposeColorScheme
 import com.ai.assistance.operit.data.model.toComposeTypography
 import com.ai.assistance.operit.data.model.PromptFunctionType
+import com.ai.assistance.operit.data.model.ChatTurnOptions
 import com.ai.assistance.operit.services.floating.FloatingWindowCallback
+import com.ai.assistance.operit.services.floating.FloatingAutoReadController
 import com.ai.assistance.operit.services.floating.FloatingWindowManager
 import com.ai.assistance.operit.services.floating.FloatingWindowState
 import com.ai.assistance.operit.services.floating.StatusIndicatorStyle
+import com.ai.assistance.operit.services.floating.resolveFloatingCoreAutoReadOverride
+import com.ai.assistance.operit.services.floating.shouldUseFloatingCoreAutoRead
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.FileUtils
 import com.ai.assistance.operit.util.WaifuMessageProcessor
 import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -81,19 +86,17 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     // 聊天服务核心 - 整合所有业务逻辑
     private lateinit var chatCore: ChatServiceCore
+    private lateinit var floatingAutoReadController: FloatingAutoReadController
 
     private var lastCrashTime = 0L
     private var crashCount = 0
-    private val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
-    private val customExceptionHandler =
-            Thread.UncaughtExceptionHandler { thread, throwable ->
-                handleServiceCrash(thread, throwable)
-            }
-
     private val colorScheme = mutableStateOf<ColorScheme?>(null)
     private val typography = mutableStateOf<Typography?>(null)
     private val gson = Gson()
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val serviceExceptionHandler =
+        CoroutineExceptionHandler { _, throwable -> handleServiceCoroutineFailure(throwable) }
+    private val serviceScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main + serviceExceptionHandler)
     private var hasHandledStartCommand = false
 
     companion object {
@@ -170,31 +173,23 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     override fun onBind(intent: Intent): IBinder = binder
 
-    private fun handleServiceCrash(thread: Thread, throwable: Throwable) {
-        try {
-            AppLogger.e(TAG, "Service crashed: ${throwable.message}", throwable)
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastCrashTime > 60000) {
-                crashCount = 0
-            }
-            lastCrashTime = currentTime
-            crashCount++
+    private fun handleServiceCoroutineFailure(throwable: Throwable) {
+        AppLogger.e(TAG, "Floating service coroutine failed: ${throwable.message}", throwable)
+        val currentTime = System.currentTimeMillis()
+        crashCount =
+            nextFloatingServiceCrashCount(
+                previousCount = crashCount,
+                lastCrashAtMs = lastCrashTime,
+                nowMs = currentTime,
+            )
+        lastCrashTime = currentTime
 
-            if (crashCount > 3) {
-                AppLogger.e(TAG, "Too many crashes in short time, stopping service")
+        if (shouldDisableFloatingServiceAfterFailures(crashCount)) {
+            AppLogger.e(TAG, "Too many floating service failures in a short time; stopping service")
+            if (::prefs.isInitialized) {
                 prefs.edit().putBoolean("service_disabled_due_to_crashes", true).apply()
-                stopSelf()
-                return
             }
-
-            saveState()
-            val intent = Intent(applicationContext, FloatingChatService::class.java)
-            intent.setPackage(packageName)
-            startService(intent)
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Error handling crash", e)
-        } finally {
-            defaultExceptionHandler?.uncaughtException(thread, throwable)
+            stopSelf()
         }
     }
 
@@ -213,8 +208,6 @@ class FloatingChatService : Service(), FloatingWindowCallback {
         } catch (_: Exception) {
         }
 
-        Thread.setDefaultUncaughtExceptionHandler(customExceptionHandler)
-
         prefs = getSharedPreferences("floating_chat_prefs", Context.MODE_PRIVATE)
         if (prefs.getBoolean("service_disabled_due_to_crashes", false)) {
             AppLogger.w(TAG, "Service was disabled due to frequent crashes")
@@ -224,11 +217,21 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
         try {
             acquireWakeLock()
+            windowState = FloatingWindowState(this)
 
             val runtimeHolder = ChatRuntimeHolder.getInstance(applicationContext)
             val mainChatCore = runtimeHolder.getCore(ChatRuntimeSlot.MAIN)
             chatCore = runtimeHolder.getCore(ChatRuntimeSlot.FLOATING)
             chatCore.setUiBridge(EmptyChatServiceUiBridge)
+            floatingAutoReadController =
+                FloatingAutoReadController(
+                    context = applicationContext,
+                    coroutineScope = serviceScope,
+                    shouldSpeak = { shouldUseFloatingCoreAutoRead(windowState.currentMode.value) },
+                )
+            chatCore.setSpeakMessageHandler { text, interrupt ->
+                floatingAutoReadController.speak(text, interrupt)
+            }
             AppLogger.d(TAG, "ChatServiceCore 已初始化")
 
             serviceScope.launch {
@@ -280,23 +283,8 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                 }
             }
             
-            // 设置 EnhancedAIService 就绪回调，以便监听输入处理状态
-            chatCore.setOnEnhancedAiServiceReady { aiService ->
-                AppLogger.d(TAG, "EnhancedAIService 已就绪，开始监听输入处理状态")
-                serviceScope.launch {
-                    try {
-                        aiService.inputProcessingState.collect { _ -> }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        AppLogger.d(TAG, "输入处理状态监听已取消")
-                    } catch (e: Exception) {
-                        AppLogger.e(TAG, "监听输入处理状态失败", e)
-                    }
-                }
-            }
-
             lifecycleOwner = ServiceLifecycleOwner()
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-            windowState = FloatingWindowState(this)
             windowManager =
                     FloatingWindowManager(
                             this,
@@ -406,6 +394,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                 intent?.getStringExtra("INITIAL_MODE")?.let { modeName ->
                     try {
                         val mode = FloatingMode.valueOf(modeName)
+                        onModeWillChange(mode)
                         windowState.currentMode.value = mode
                         AppLogger.d(TAG, "Set mode from intent: $mode")
                     } catch (e: IllegalArgumentException) {
@@ -617,7 +606,12 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
             try {
                 chatCore.setUiBridge(EmptyChatServiceUiBridge)
+                chatCore.setSpeakMessageHandler { _, _ -> }
             } catch (_: Exception) {
+            }
+
+            if (::floatingAutoReadController.isInitialized) {
+                floatingAutoReadController.stop()
             }
 
             try {
@@ -650,7 +644,6 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
             lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
             windowManager.destroy()
-            Thread.setDefaultUncaughtExceptionHandler(defaultExceptionHandler)
             prefs.edit().putInt("view_creation_retry", 0).apply()
         } catch (e: Exception) {
             AppLogger.e(TAG, "Error in onDestroy", e)
@@ -674,7 +667,11 @@ class FloatingChatService : Service(), FloatingWindowCallback {
                 false
             )
             chatCore.cancelCurrentMessage()
+            chatCore.setSpeakMessageHandler { _, _ -> }
         } catch (_: Exception) {
+        }
+        if (::floatingAutoReadController.isInitialized) {
+            floatingAutoReadController.stop()
         }
         try {
             serviceScope.launch(Dispatchers.IO) {
@@ -706,6 +703,15 @@ class FloatingChatService : Service(), FloatingWindowCallback {
         stopSelf()
     }
 
+    override fun onModeWillChange(newMode: FloatingMode) {
+        if (
+            ::floatingAutoReadController.isInitialized &&
+                !shouldUseFloatingCoreAutoRead(newMode)
+        ) {
+            floatingAutoReadController.stop()
+        }
+    }
+
     override fun onSendMessage(message: String, promptType: PromptFunctionType) {
         onSendMessageWithResult(message, promptType) {}
     }
@@ -728,12 +734,28 @@ class FloatingChatService : Service(), FloatingWindowCallback {
             }
         }
         return try {
+            val currentMode = windowState.currentMode.value
+            val currentChatId = chatCore.currentChatId.value
+            val conversationAutoReadOverride =
+                chatCore.chatHistories.value
+                    .firstOrNull { it.id == currentChatId }
+                    ?.autoReadOverride
             val reserved =
                 chatCore.sendUserMessage(
                     promptFunctionType = promptType,
                     messageTextOverride = message,
+                    turnOptions = ChatTurnOptions(
+                        autoReadOverride =
+                            resolveFloatingCoreAutoReadOverride(
+                                mode = currentMode,
+                                conversationOverride = conversationAutoReadOverride,
+                            ),
+                    ),
                     onDispatchResolved = ::resolve,
                 )
+            if (reserved && ::floatingAutoReadController.isInitialized) {
+                floatingAutoReadController.stop()
+            }
             if (!reserved) resolve(false)
             reserved
         } catch (e: Exception) {
@@ -745,7 +767,10 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     override fun onCancelMessage() {
         AppLogger.d(TAG, "onCancelMessage")
-        
+
+        if (::floatingAutoReadController.isInitialized) {
+            floatingAutoReadController.stop()
+        }
         // 直接使用 chatCore 取消消息，不再通过 SharedFlow
         chatCore.cancelCurrentMessage()
     }
@@ -801,6 +826,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     }
 
     fun switchToMode(mode: FloatingMode) {
+        onModeWillChange(mode)
         windowState.currentMode.value = mode
         AppLogger.d(TAG, "Switching to mode: $mode")
     }
@@ -856,3 +882,17 @@ class FloatingChatService : Service(), FloatingWindowCallback {
     fun getChatCore(): ChatServiceCore = chatCore
 
 }
+
+internal fun nextFloatingServiceCrashCount(
+    previousCount: Int,
+    lastCrashAtMs: Long,
+    nowMs: Long,
+    resetWindowMs: Long = 60_000L,
+): Int =
+    if (nowMs - lastCrashAtMs > resetWindowMs) {
+        1
+    } else {
+        previousCount.coerceAtLeast(0) + 1
+    }
+
+internal fun shouldDisableFloatingServiceAfterFailures(crashCount: Int): Boolean = crashCount > 3

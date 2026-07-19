@@ -259,6 +259,7 @@ fun UnifiedMarketDetailScreen(
                     UnifiedMarketDetailCommentCard(
                         comment = comment,
                         isReply = comment.parentId != null,
+                        canReply = comments.canPost,
                         onReply = { comments.onReplyToComment(comment) },
                         onEdit = { comments.onEditComment(comment) },
                         onDelete = { comments.onDeleteComment(comment) },
@@ -1070,6 +1071,7 @@ private fun UnifiedMarketDetailEmptyCommentsCard() {
 private fun UnifiedMarketDetailCommentCard(
     comment: MarketV2Comment,
     isReply: Boolean,
+    canReply: Boolean,
     onReply: () -> Unit,
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
@@ -1095,7 +1097,9 @@ private fun UnifiedMarketDetailCommentCard(
                         .fillMaxWidth()
                         .combinedClickable(
                             onClick = {},
-                            onLongClick = { menuExpanded = true }
+                            onLongClick = {
+                                if (canReply || canEditComment) menuExpanded = true
+                            }
                         )
                         .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1166,13 +1170,15 @@ private fun UnifiedMarketDetailCommentCard(
                 expanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false }
             ) {
-                DropdownMenuItem(
-                    text = { Text(text = stringResource(R.string.reply)) },
-                    onClick = {
-                        menuExpanded = false
-                        onReply()
-                    }
-                )
+                if (canReply) {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.reply)) },
+                        onClick = {
+                            menuExpanded = false
+                            onReply()
+                        }
+                    )
+                }
                 if (canEditComment) {
                     DropdownMenuItem(
                         text = { Text(text = stringResource(R.string.edit)) },

@@ -7,6 +7,28 @@ import org.junit.Test
 
 class CompanionMemoryOwnershipTest {
     @Test
+    fun `structured companion id prefers group then character then character name`() {
+        assertEquals(
+            "group:friends",
+            CompanionMemoryTarget(
+                characterGroupId = "friends",
+                characterId = "mira",
+                characterName = "Mira",
+            ).structuredCompanionId(),
+        )
+        assertEquals(
+            "character:mira",
+            CompanionMemoryTarget(characterId = "mira", characterName = "Mira")
+                .structuredCompanionId(),
+        )
+        assertEquals(
+            "character_name:Mira",
+            CompanionMemoryTarget(characterName = "Mira").structuredCompanionId(),
+        )
+        assertEquals("", CompanionMemoryTarget().structuredCompanionId())
+    }
+
+    @Test
     fun `property values round trip preserves relationship owner`() {
         val ownership =
             CompanionMemoryOwnership.manual(

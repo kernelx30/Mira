@@ -17,8 +17,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val OPERIT_EDITOR_PACKAGE_NAME = "operit_editor"
-private const val SANDBOX_PACKAGE_DEV_INSTALL_SCRIPT_URL =
-    "https://cdn.jsdelivr.net/gh/AAswordman/Operit@main/tools/sandboxpackage_dev_install_or_update.js"
+private val SANDBOX_PACKAGE_DEV_INSTALL_SCRIPT_URLS =
+    listOf(
+        "https://cdn.jsdelivr.net/gh/kernelx30/Mira@main/tools/sandboxpackage_dev_install_or_update.js",
+        "https://cdn.jsdelivr.net/gh/AAswordman/Operit@main/tools/sandboxpackage_dev_install_or_update.js"
+    )
 private const val SANDBOX_PACKAGE_DEV_SCRIPT_RELATIVE_PATH =
     "Download/Operit/skills/SandboxPackage_DEV/scripts/install_or_update.js"
 
@@ -83,31 +86,44 @@ private fun downloadSandboxPackageDevInstallScript(): File {
     val scriptFile = File(rootDir, SANDBOX_PACKAGE_DEV_SCRIPT_RELATIVE_PATH)
     scriptFile.parentFile?.mkdirs()
 
+    var lastError: Throwable? = null
+    SANDBOX_PACKAGE_DEV_INSTALL_SCRIPT_URLS.forEach { sourceUrl ->
+        runCatching { downloadScriptFrom(sourceUrl, scriptFile) }
+            .onSuccess { return scriptFile }
+            .onFailure { error -> lastError = error }
+    }
+    throw IllegalStateException(
+        "Failed to download Mira plugin development support",
+        lastError
+    )
+}
+
+private fun downloadScriptFrom(sourceUrl: String, scriptFile: File) {
     val connection =
-        (URL(SANDBOX_PACKAGE_DEV_INSTALL_SCRIPT_URL).openConnection() as HttpURLConnection).apply {
+        (URL(sourceUrl).openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 30_000
             doInput = true
-            setRequestProperty("User-Agent", "Operit-QuickPluginCreator/1.0")
+            setRequestProperty("User-Agent", "Mira-QuickPluginCreator/1.0")
+        }
+    try {
+        connection.connect()
+        if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+            throw IllegalStateException("HTTP ${connection.responseCode} from $sourceUrl")
         }
 
-    connection.connect()
-    if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-        throw IllegalStateException("HTTP ${connection.responseCode}")
-    }
-
-    BufferedInputStream(connection.inputStream).use { input ->
-        FileOutputStream(scriptFile).use { output ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buffer)
-                if (read <= 0) break
-                output.write(buffer, 0, read)
+        BufferedInputStream(connection.inputStream).use { input ->
+            FileOutputStream(scriptFile).use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                }
+                output.flush()
             }
-            output.flush()
         }
+    } finally {
+        connection.disconnect()
     }
-    connection.disconnect()
-
-    return scriptFile
 }

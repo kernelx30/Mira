@@ -47,7 +47,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,6 +63,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -109,6 +113,7 @@ import com.ai.assistance.operit.services.ChatServiceCore
 import com.ai.assistance.operit.services.ChatServiceUiBridge
 import com.ai.assistance.operit.services.EmptyChatServiceUiBridge
 import com.ai.assistance.operit.core.chat.CompanionMemoryReceiptBus
+import com.ai.assistance.operit.core.chat.CompanionMemoryReceipt
 import com.ai.assistance.operit.core.chat.MiraTurnCapability
 import com.ai.assistance.operit.core.chat.MiraTurnCapabilityResolver
 import com.ai.assistance.operit.core.chat.NextUserMessageSuggestionPolicy
@@ -120,6 +125,15 @@ enum class ChatHistoryDisplayMode {
     BY_FOLDER,
     CURRENT_CHARACTER_ONLY
 }
+
+internal fun shouldInterruptSpeechForUserTurn(
+    playbackJobActive: Boolean,
+    speechSessionActive: Boolean,
+    playing: Boolean,
+    paused: Boolean,
+    hasCurrentSegment: Boolean,
+): Boolean =
+    playbackJobActive || speechSessionActive || playing || paused || hasCurrentSegment
 
 class ChatViewModel(private val context: Context) : ViewModel() {
 
@@ -225,7 +239,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     private val workspaceTerminalSessions = mutableMapOf<String, String>()
     private var workspaceCommandExecutionJob: Job? = null
     private var workspaceOpenJob: Job? = null
-    private var inputProcessingStateListenerJob: Job? = null
 
     private lateinit var mainChatCore: ChatServiceCore
     private lateinit var attachmentDelegate: AttachmentDelegate
@@ -347,6 +360,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val errorMessage: StateFlow<String?> by lazy { uiStateDelegate.errorMessage }
     val popupMessage: StateFlow<String?> by lazy { uiStateDelegate.popupMessage }
     val toastEvent: StateFlow<String?> by lazy { uiStateDelegate.toastEvent }
+    private val companionMemoryReceiptChannel =
+        Channel<CompanionMemoryReceipt>(
+            capacity = 8,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
+    val companionMemoryReceiptEvents: Flow<CompanionMemoryReceipt> =
+        companionMemoryReceiptChannel.receiveAsFlow()
     val masterPermissionLevel: StateFlow<PermissionLevel> by lazy {
         uiStateDelegate.masterPermissionLevel
     }
@@ -569,10 +589,13 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                     override fun getReplyToMessage(): ChatMessage? = replyToMessage.value
                 }
         )
-        mainChatCore.setSpeakMessageHandler(::speakMessageAndWait)
+        // Automatic reading must not hold the response collector open until audio finishes.
+        // The text stream should be rendered and persisted while TTS is queued in order.
+        mainChatCore.setSpeakMessageHandler { text, interrupt ->
+            speakMessage(text, interrupt)
+        }
         mainChatCore.setOnEnhancedAiServiceReady { service ->
             enhancedAiService = service
-            setupInputProcessingStateListener(service)
         }
 
         floatingWindowDelegate =
@@ -638,9 +661,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             CompanionMemoryReceiptBus.events.collect { receipt ->
                 if (receipt.conversationId == currentChatId.value) {
-                    uiStateDelegate.showToast(
-                        context.getString(R.string.mira_memory_saved_receipt, receipt.summary),
-                    )
+                    companionMemoryReceiptChannel.send(receipt)
                 }
             }
         }
@@ -744,54 +765,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
             // 检查历史记录加载后是否需要创建新聊天
             if (chatHistoryDelegate.checkIfShouldCreateNewChat() && isConfigured.value) {
                 chatHistoryDelegate.createNewChat()
-            }
-        }
-    }
-
-    /** 设置服务相关的流收集逻辑 */
-    /**
-     * 设置输入处理状态监听
-     * 当 EnhancedAIService 初始化或更新时调用
-     */
-    private fun setupInputProcessingStateListener(service: EnhancedAIService) {
-        AppLogger.d(TAG, "EnhancedAIService 已就绪，开始监听输入处理状态")
-        inputProcessingStateListenerJob?.cancel()
-        inputProcessingStateListenerJob = viewModelScope.launch {
-            try {
-                service.inputProcessingState.collect { state ->
-                    if (::messageProcessingDelegate.isInitialized && messageProcessingDelegate.isLoading.value) {
-                        return@collect
-                    }
-                    if (state is InputProcessingState.Completed && 
-                        ::messageCoordinationDelegate.isInitialized &&
-                        (messageCoordinationDelegate.isSummarizing.value ||
-                         messageCoordinationDelegate.isSendTriggeredSummarizing.value)
-                    ) {
-                        val targetChatId =
-                            if (messageCoordinationDelegate.isSummarizing.value) {
-                                messageCoordinationDelegate.summarizingChatId.value
-                            } else {
-                                messageCoordinationDelegate.sendTriggeredSummarizingChatId.value
-                            }
-
-                        if (targetChatId != null) {
-                            messageProcessingDelegate.setInputProcessingStateForChat(
-                                targetChatId,
-                                InputProcessingState.Summarizing(context.getString(R.string.chat_summarizing_memory))
-                            )
-                        }
-                    } else if (::messageProcessingDelegate.isInitialized) {
-                        val currentChatId = chatHistoryDelegate.currentChatId.value
-                        if (currentChatId != null) {
-                            messageProcessingDelegate.setInputProcessingStateForChat(currentChatId, state)
-                        }
-                    }
-                }
-            } catch (e: CancellationException) {
-                AppLogger.d(TAG, "输入处理状态监听已取消")
-            } catch (e: Exception) {
-                AppLogger.e(TAG, "输入处理状态收集出错: ${e.message}", e)
-                uiStateDelegate.showErrorMessage(context.getString(R.string.chat_input_processing_collect_failed, e.message ?: ""))
             }
         }
     }
@@ -2958,7 +2931,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        inputProcessingStateListenerJob?.cancel()
         voiceStateCollectionJob?.cancel()
         // 清理悬浮窗资源
         floatingWindowDelegate.cleanup()
@@ -3535,10 +3507,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         )
     }
 
-    private suspend fun speakMessageAndWait(message: String, interrupt: Boolean) {
-        enqueueSpeech(message, interrupt, speechDirectionJson = null).join()
-    }
-
     private fun enqueueSpeech(
         message: String,
         interrupt: Boolean,
@@ -3731,12 +3699,15 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
 
     private fun stopSpeakingForUserTurn() {
-        if (
-            !_isSpeechSessionActive.value &&
-                !_isPlaying.value &&
-                !_isSpeechPaused.value &&
-                _currentSpeechSegment.value == null
-        ) {
+        val shouldInterrupt =
+            shouldInterruptSpeechForUserTurn(
+                playbackJobActive = speechPlaybackJob?.isActive == true,
+                speechSessionActive = _isSpeechSessionActive.value,
+                playing = _isPlaying.value,
+                paused = _isSpeechPaused.value,
+                hasCurrentSegment = _currentSpeechSegment.value != null,
+            )
+        if (!shouldInterrupt) {
             return
         }
         logSpeechState("interruptForUserTurn")

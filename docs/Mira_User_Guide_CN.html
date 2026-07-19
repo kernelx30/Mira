@@ -124,9 +124,12 @@
 
     .guide-flow {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 22px;
+      min-width: 0;
     }
     .guide-step {
+      min-width: 0;
       padding: 20px;
       border: 1px solid var(--line);
       border-radius: 10px;
@@ -440,6 +443,7 @@
     <nav class="toc" aria-label="教程目录">
       <strong>从零开始</strong>
       <a href="#read-first">1. 先弄懂 Mira</a>
+      <a href="#mira-vs-operit">Mira 与 Operit 的区别</a>
       <a href="#field-guide">真机新手流程（从零开始）</a>
       <a href="#install">2. 安装与首次启动</a>
       <a href="#quick-start">3. 五分钟跑通聊天</a>
@@ -469,9 +473,11 @@
         <p class="lead">从安装、接入第一个模型，到长期记忆、情感语音、悬浮陪伴和 Skill。每一章都写清入口、推荐值、验证方法和出错时该查什么。</p>
         <div class="meta">
           <span>适合：第一次使用 AI API 的用户</span>
-          <span>更新：2026-07-18</span>
-          <span>文档版本：1.2</span>
+          <span>更新：2026-07-19</span>
+          <span>文档版本：1.4</span>
+          <span><a href="https://qun.qq.com/universal-share/share?ac=1&amp;authKey=T1QUgCwcBvZgzJ8p%2B1cG723go8dbe8EtOC35wtUQiFkjoyg88AfApHet%2F6VerSL2&amp;busi_data=eyJncm91cENvZGUiOiIxMDcwMTUzODA5IiwidG9rZW4iOiJ3WlBoa3BRNVFxQ3dEVC9ld0JDNTNoY3d1QlNyMnRlR3gvdlhZNEtZbUFrc2UxQ1JUeFZhb1Q2dGFmRUpDY0xYIiwidWluIjoiNDgyNzM0MTE5In0%3D&amp;data=QaDcQk3MDx_wS59qrWDZXsmhCGW7cSQq_JR31WvZfb5cGWQtn1PnwSW3Asblpq4zaqyuUmAh0WiFSHjUVphX2A&amp;svctype=4&amp;tempid=h5_group_info" target="_blank" rel="noopener noreferrer">QQ 交流群：1070153809</a></span>
         </div>
+        <div class="callout good"><b>加入 Mira 小窝</b><a href="https://qun.qq.com/universal-share/share?ac=1&amp;authKey=T1QUgCwcBvZgzJ8p%2B1cG723go8dbe8EtOC35wtUQiFkjoyg88AfApHet%2F6VerSL2&amp;busi_data=eyJncm91cENvZGUiOiIxMDcwMTUzODA5IiwidG9rZW4iOiJ3WlBoa3BRNVFxQ3dEVC9ld0JDNTNoY3d1QlNyMnRlR3gvdlhZNEtZbUFrc2UxQ1JUeFZhb1Q2dGFmRUpDY0xYIiwidWluIjoiNDgyNzM0MTE5In0%3D&amp;data=QaDcQk3MDx_wS59qrWDZXsmhCGW7cSQq_JR31WvZfb5cGWQtn1PnwSW3Asblpq4zaqyuUmAh0WiFSHjUVphX2A&amp;svctype=4&amp;tempid=h5_group_info" target="_blank" rel="noopener noreferrer">点击加入 QQ 群</a>，群号：<code>1070153809</code>。软件内入口：设置 → 社区与项目 → 加入 Mira 小窝。</div>
       </section>
 
       <p id="search-note" class="search-note">没有找到匹配章节。试试“API”“豆包”“悬浮窗”或“备份”。</p>
@@ -705,6 +711,33 @@ pnpm --version。
         </ol>
       </section>
 
+      <section id="mira-vs-operit" class="chapter searchable">
+        <h2>Mira 与 Operit 的区别</h2>
+        <p class="section-intro">Mira 是由 kernelx30 独立维护、独立安装和独立发布的 Android 应用。它不运行在 Operit 平台上，也不要求手机安装 Operit；早期工程来源和协议兼容关系不等于产品隶属或运行依赖。</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>维度</th><th>Operit 基础</th><th>Mira 的处理</th></tr></thead>
+            <tbody>
+              <tr><td>第一入口</td><td>Agent、工作区、工具与自动化</td><td>角色聊天、关系、语音与主动陪伴；工具在任务需要时出现</td></tr>
+              <tr><td>聊天界面</td><td>承载大量能力入口</td><td>顶部只管会话和角色，底部只管输入与本轮能力，复杂设置收进抽屉</td></tr>
+              <tr><td>记忆</td><td>记忆、知识库和图谱基础</td><td>独立的伴侣记忆库，区分用户、角色、关系、会话，并保存证据、版本与冲突历史</td></tr>
+              <tr><td>语音</td><td>多供应商 TTS/STT</td><td>情绪分段、播放队列、当前句高亮、新消息打断，并保证文字先显示</td></tr>
+              <tr><td>主动性</td><td>定时任务和工作流</td><td>结合角色、最近会话、约定与记忆生成主动消息</td></tr>
+              <tr><td>应用设置</td><td>主要在页面中逐项修改</td><td>可在聊天中搜索、读取和修改会话、角色及全局设置，敏感操作仍走专用入口</td></tr>
+              <tr><td>插件</td><td>OperitForge 与现有协议</td><td>新条目走 MiraForge 与 Mira GitHub Issue 登记；旧条目通过 Pages 镜像只读兼容</td></tr>
+              <tr><td>备份迁移</td><td>聊天、配置和数据库备份基础</td><td>统一记忆包、定时 Room 备份、原始数据快照，以及 Operit 聊天备份识别导入</td></tr>
+              <tr><td>发布</td><td>Operit 包名、仓库和更新源</td><td>独立应用 ID、Mira 图标、Mira GitHub Releases 更新源</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout good">
+          <b>独立产品与兼容关系可以同时成立</b>
+          Mira 的早期工程源自 Operit 开源项目，并继续兼容旧插件、Skill、ToolPkg 和部分稳定协议标识，避免破坏数据库迁移和已安装扩展。Mira 不是 Operit 内的角色配置、插件或换皮界面；源码、包名、数据、Issue、Release、更新通道与产品路线均由 Mira 自己维护。
+        </div>
+      </section>
+
       <section id="install" class="chapter searchable">
         <h2>2. 安装与首次启动</h2>
 
@@ -732,6 +765,10 @@ pnpm --version。
           </table>
         </div>
         <div class="callout good"><b>最省事的首启选择</b>先开“通知”和你马上要用的“麦克风”。悬浮窗、Shizuku 和无障碍等到真正需要时再配置。</div>
+
+        <h3>检查新版本</h3>
+        <div class="path"><span>会话抽屉</span><span>设置</span><span>社区与项目</span><span>检查更新</span></div>
+        <p>这里会显示当前版本，并从 <code>kernelx30/Mira</code> 的 GitHub Releases 检测更新。只安装该页面或项目 Releases 提供的固定签名 APK；签名不同的安装包不能直接覆盖升级。</p>
       </section>
 
       <section id="quick-start" class="chapter searchable">
@@ -758,7 +795,7 @@ pnpm --version。
         <h2>4. 主界面地图</h2>
         <p class="section-intro">手机聊天页没有常驻底部导航。顶部管理会话和角色，中间只放消息，底部只保留会话控制条和输入框；记忆、设置从左上角会话抽屉进入。平板和大屏可常驻会话侧栏，但聊天正文仍限制最大宽度。</p>
         <div class="figure">
-          <img src="assets/README_examples/mira/chat-home.png" alt="聊天首页结构示意">
+          <img src="assets/guide/beginner/18-first-deepseek-reply.png" alt="聊天首页结构示意">
           <ol class="legend">
             <li><b>左上菜单</b>：打开会话列表，搜索、切换或管理历史对话。</li>
             <li><b>角色区域</b>：显示当前角色；点击可切换角色或群组。</li>
@@ -784,11 +821,17 @@ pnpm --version。
           <li><b>会话能力</b>：默认允许模型按需调用工具；附件和设备协助按当前权限生效。</li>
           <li><b>灰色接话建议</b>：输入框为空时，功能模型根据上一轮对话生成的候选回复；点击输入框开始打字时会消失。</li>
         </ul>
+
+        <h3>直接在对话中修改设置</h3>
+        <p>常用设置不必离开聊天页。可以直接说“打开自动朗读”“关闭沉浸对话”“把情感朗读设为鲜明”“改成深色主题”或“让她偶尔主动找我”。Mira 会通过设置工具读取真实当前值、执行校验并返回修改前后的状态。</p>
+        <div class="callout"><b>会话、角色和全局设置彼此独立</b>直接说“打开自动朗读”或“打开自动记忆”只修改当前会话；明确说“当前角色自动朗读”会保存到角色或群组；明确说“全局自动朗读”或“全局自动记忆”才会修改新会话继承的默认值。沉浸对话、主动陪伴和外观会跟随当前角色保存。</div>
+        <div class="callout warn"><b>系统权限与敏感操作仍使用专用入口</b>API Key、清空重置、导入覆盖、通知权限、悬浮窗权限和 Shizuku 不通过通用设置工具处理，避免普通一句话产生不可逆影响。</div>
       </section>
 
       <section id="model" class="chapter searchable">
         <h2>5. AI 模型配置</h2>
         <p class="section-intro">模型配置决定“请求发到哪里、用哪个模型、允许生成多长”。API Key 像密码，Endpoint 像地址，模型名称像收件人。</p>
+        <div class="callout good"><b>推荐 API 中转：<a href="https://hackerx30.com" target="_blank" rel="noopener noreferrer">HackerX30</a></b>想让日常聊天、记忆提炼和接话建议用上更强模型，可以试试 GPT-5.6 超低倍率接入。注册后把平台提供的 API Key、Endpoint 和模型 ID 填入 Mira 即可。</div>
         <div class="path"><span>会话抽屉</span><span>设置</span><span>模型与 API</span><span>模型参数</span></div>
 
         <h3>四个必懂字段</h3>
@@ -862,6 +905,7 @@ pnpm --version。
           <li>每个会话可绑定自己的角色、模型、思考档位和上下文设置。</li>
           <li>删除前先确认是否需要导出；删除操作通常不可撤销。</li>
         </ul>
+        <div class="callout good"><b>聊天里可以直接导出</b>说“导出聊天记录”会把当前会话保存为 Markdown；也可以明确说“导出当前对话为 TXT / HTML / JSON”。只有说“导出全部聊天记录”时才会导出所有会话。完成后执行结果会显示真实文件路径。</div>
 
         <h3>发送附件</h3>
         <p>点会话控制条左侧加号，从轻量附件菜单选择相机、照片、文件或引用记忆。文件和图片是否能被理解，取决于对应功能模型和能力开关。</p>
@@ -910,6 +954,20 @@ pnpm --version。
         <p class="section-intro">聊天记录是“发生过什么”，长期记忆是“以后回答时值得继续带上的事实”。两者分开保存，避免每次把全部聊天原文塞给模型。</p>
         <div class="path"><span>会话抽屉</span><span>记忆</span></div>
 
+        <h3>四种记忆范围</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>范围</th><th>保存什么</th><th>默认谁能读取</th></tr></thead>
+            <tbody>
+              <tr><td><code>USER</code></td><td>用户稳定身份、全局偏好和通用边界</td><td>所有角色</td></tr>
+              <tr><td><code>COMPANION</code></td><td>角色自身设定和角色私有认知</td><td>仅该角色</td></tr>
+              <tr><td><code>RELATIONSHIP</code></td><td>双方称呼、共同经历、约定和关系状态</td><td>仅这一对用户与角色</td></tr>
+              <tr><td><code>CONVERSATION</code></td><td>会话摘要、章节、当前话题和未完事项</td><td>仅当前会话参与者</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>用户资料与角色共同经历不是一回事：前者可以全局使用，后者默认不跨角色。底层支持给其他角色授予或撤销单条记忆的读取权限；普通用户界面仍在完善时，以默认隔离规则为准。</p>
+
         <h3>Mira 会记哪些内容</h3>
         <div class="three-col">
           <div class="panel"><b>身份与事实</b><p>名字、职业、家庭情况、稳定背景。</p></div>
@@ -922,12 +980,22 @@ pnpm --version。
 
         <h3>自动记忆的流程</h3>
         <ol>
-          <li>聊天中出现重要信息。</li>
-          <li>记忆功能模型提取候选事实，附带来源、范围、置信度和重要度。</li>
-          <li>候选进入本地记忆库；需要确认的内容显示为“待确认”。</li>
-          <li>后续回答前，系统按角色、会话和主题自动召回相关记忆。</li>
-          <li>你纠正内容时会创建新版本，旧版本保留为已覆盖记录，避免悄悄改历史。</li>
+          <li>回复完成后，原始消息先保存，本轮再进入记忆候选队列。</li>
+          <li>记忆功能模型提出 <code>CREATE / UPDATE / SUPERSEDE / LINK / IGNORE</code>，并附带真实消息证据。</li>
+          <li>本地规则校验主体、范围、证据、重复、冲突和敏感内容，再决定写入或忽略。</li>
+          <li>写入后同步更新 Room 数据、全文索引和关系边；需要确认的内容进入“待确认”。</li>
+          <li>后续回答前，系统按角色、会话、相关性和 Token 预算召回当前有效记忆。</li>
         </ol>
+        <div class="callout good"><b>每轮判断，不等于每句话永久保存</b>每个完成轮次都会进入候选处理，但闲聊、重复信息和低价值内容可以返回 <code>IGNORE</code>。明确说“请记住”会提高处理优先级。</div>
+        <div class="callout"><b>自动记忆默认静默</b>普通聊天中识别出的稳定信息会在后台处理，不打断当前对话。只有你明确要求“记住、记下来、别忘了”并由保存工具确认成功时，聊天页才显示“已记住”回执。</div>
+
+        <h3>证据、冲突与历史版本</h3>
+        <ul>
+          <li>每条记忆可追溯到来源会话、消息、说话人、原始引用和时间。</li>
+          <li>状态包含 <code>ACTIVE</code>、<code>ARCHIVED</code>、<code>SUPERSEDED</code> 和 <code>DELETED</code>。</li>
+          <li>新事实替代旧事实时创建新版本，并用 <code>SUPERSEDES</code> 关系连接旧记录，不静默覆盖历史。</li>
+          <li>默认回答只使用当前有效事实；查看历史或讨论过去时期时仍可追溯旧记录。</li>
+        </ul>
 
         <h3>手动新增、确认和纠正</h3>
         <ul>
@@ -936,7 +1004,15 @@ pnpm --version。
           <li><b>纠正</b>：不要重复新建冲突事实，打开原记录点“纠正”。</li>
           <li><b>删除</b>：会同时删除该记忆的证据、关联和检索索引。</li>
         </ul>
+        <h3>用聊天删除记忆</h3>
+        <p>直接说“删除我的籍贯记忆”“忘掉我不吃香菜这件事”即可。Mira 会从原话匹配当前角色可访问的相关记忆并一次完成，不要求你挑编号或输入内部记录 ID。</p>
+        <div class="callout warn"><b>清空全部记忆需要二次确认</b>说“清空全部记忆”后，Mira 会先告知待清空数量；十分钟内再发送“确认清空全部记忆”才会执行。实际删除范围固定为第一次请求时的记忆快照，确认前新产生的记忆不会被带上。</div>
         <div class="callout warn"><b>归属选错会导致“她明明记住却不提”</b>“当前会话”只在这一段聊天召回；“当前角色”跟着角色；“关于用户”的全局事实可跨角色使用。保存前先看归属。</div>
+
+        <h3>用聊天导出记忆</h3>
+        <p>直接说“把我的记忆导出来”或“备份记忆”。Mira 会把当前记忆档案导出成一个可迁移 JSON 包，包含结构化伴侣记忆、证据、关系边、授权、事件章节和兼容旧版的文档记忆，并在回复中给出文件路径和数量统计。</p>
+        <div class="path"><span>下载</span><span>Mira</span><span>backup</span><span>memory</span></div>
+        <div class="callout warn"><b>记忆包是明文备份</b>文件可能包含个人事实、对话原句和角色关系信息。分享或上传前先确认接收方与用途。</div>
 
         <h3>关系档案与思维记忆网</h3>
         <p>默认“关系档案”适合普通用户，按关于我、关于角色、共同经历等方式浏览；“高级图谱”显示记忆节点和类别、范围、记忆域之间的关联，用于检查为什么某条记忆会被召回。</p>
@@ -1072,6 +1148,31 @@ pnpm --version。
           </table>
         </div>
 
+        <h3>Mira 市场与 Operit 兼容</h3>
+        <p>Mira 默认读取自己的静态市场入口 <code>https://kernelx30.github.io/Mira/market/v2/</code>。新条目先上传到发布者自己的 <code>MiraForge</code>，再通过 <code>kernelx30/Mira</code> 的 GitHub Issue 登记，条目标识为 <code>mira-&lt;issueNumber&gt;</code>。已有 Operit 市场条目通过 Mira Pages 镜像只读展示，并继续按作者原仓库或 Release 下载。</p>
+        <div class="callout warn"><b>兼容不等于自动信任</b>市场元数据来自 Mira，插件代码仍可能来自作者仓库或第三方服务。安装前检查作者、源码、Release、权限和网络端点。</div>
+        <p><a class="command" href="Mira_Plugin_Development_CN.html">打开 Mira 插件开发文档</a></p>
+
+        <h3>登录 GitHub 并发布</h3>
+        <ol>
+          <li>进入 GitHub 账号设置，选择登录。Mira 会显示 GitHub 验证地址和一次性 user code。</li>
+          <li>在系统浏览器打开验证页，登录自己的 GitHub 账号并输入 user code。</li>
+          <li>授权完成后回到 Mira；应用通过 GitHub Device Flow 获取状态，不需要回调 WebView。</li>
+          <li>首次发布时确认在自己的账号下创建公开 <code>MiraForge</code> 仓库。</li>
+          <li>发布文件后，Mira 在 <code>kernelx30/Mira</code> 创建登记 Issue；评论和点赞对应 GitHub Comment 与 Reaction。</li>
+        </ol>
+        <div class="callout good"><b>登录数据只走 GitHub</b>公开 APK 只包含公开 Client ID，不包含 Client Secret。授权 Token 只发往 <code>github.com</code> 或 <code>api.github.com</code>，不会发送给旧 Operit 市场服务。旧市场条目只读，不能用 Mira 账号在那里发布或管理。</div>
+
+        <h3>扩展从安装到可调用</h3>
+        <ol>
+          <li>从 Mira 市场、Git 仓库或本地文件安装脚本、ToolPkg、Skill 或 MCP。</li>
+          <li>回到扩展管理器启用对应项目；ToolPkg 还要进入详情启用实际子包。</li>
+          <li>在当前角色的工具访问中授权目标扩展和需要的内建能力。</li>
+          <li>新建会话刷新工具快照，再用符合工具描述的请求测试。</li>
+          <li>排错时查看来源仓库、当前版本、容器状态、子包状态和原始 Tool Call 轨迹。</li>
+        </ol>
+        <div class="callout"><b>扩展管理器不是单纯下载页</b>下载、容器启用、子包启用和角色授权是不同状态。市场显示“已安装”只代表文件已经进入本机，不代表当前角色已经可以调用。</div>
+
         <h3>安装一个 Skill</h3>
         <ol>
           <li>打开“高级功能 → Skill 市场”，或进入 Skill 管理器。</li>
@@ -1136,7 +1237,45 @@ pnpm --version。
           <li>模型配置名称和参数；导出前确认是否包含 API Key。</li>
           <li>Skill、MCP、工作流和自定义提示词。</li>
         </ul>
-        <p>聊天备份默认保存在 <code>下载/Mira/backup</code>。具体可导出内容以当前备份页面为准。</p>
+        <p>备份默认保存在 <code>下载/Mira/backup</code>。聊天记录位于 <code>chat</code>，统一记忆包位于 <code>memory</code>，Room 数据库备份位于 <code>room_db</code>，完整应用快照位于 <code>raw_snapshot</code>。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>备份类型</th><th>包含内容</th><th>用途</th></tr></thead>
+            <tbody>
+              <tr><td>聊天 JSON</td><td>会话、消息、回复版本、角色与模型信息、情感朗读方向</td><td>聊天迁移与重新导入</td></tr>
+              <tr><td>Mira 记忆包</td><td>旧记忆、新版角色记忆、普通证据、事件、关系边、关系证据和角色授权</td><td>跨配置、跨设备迁移记忆</td></tr>
+              <tr><td>Room 数据库备份</td><td>聊天和新版结构化记忆数据库</td><td>低层完整恢复</td></tr>
+              <tr><td>原始数据快照</td><td>数据库、设置、DataStore 和应用文件</td><td>整机迁移与完整恢复</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout"><b>聊天和记忆的导入顺序不限</b>记忆包使用会话 ID 与消息时间戳保存证据引用。先导记忆时，暂时找不到的普通证据和关系证据会保留；聊天导入后会自动重新绑定。</div>
+        <div class="callout warn"><b>聊天 JSON 不包含附件二进制</b>附件名称、类型、消息内标签和当时的文件引用会保留，但图片、音频、视频和文档原文件需要单独复制。应用管理目录里的文件可随原始数据快照迁移；来自相册、下载目录、SAF 或工作区的原文件也要保留原目录或另行备份。</div>
+
+        <h3>从 Operit 导入聊天</h3>
+        <ol>
+          <li>先在 Operit 的聊天备份页面导出原生 JSON 备份。</li>
+          <li>把文件保留在原备份目录，或复制到手机上容易选择的位置。</li>
+          <li>在 Mira 的“数据备份与恢复”中选择“从 Operit 导入聊天”。</li>
+          <li>Mira 会先识别本机最新的受支持备份；没有识别到时，使用文件选择器手动选取 JSON。</li>
+          <li>导入完成后随机打开几个旧会话，核对角色、消息顺序和时间；再单独导入或重建需要的伴侣记忆。</li>
+        </ol>
+        <div class="callout warn"><b>导入聊天不等于复制整套应用</b>Operit 的 API Key、系统权限、后台授权和应用私有目录不会作为聊天 JSON 的一部分迁移，应在 Mira 中重新配置。</div>
+
+        <h3>哪些内容会离开手机</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>功能</th><th>可能发送的内容</th><th>接收方</th></tr></thead>
+            <tbody>
+              <tr><td>云端大模型</td><td>当前消息、系统提示、选中的历史、相关记忆、附件和工具结果</td><td>你配置的模型 Endpoint</td></tr>
+              <tr><td>云端 TTS / STT</td><td>待朗读文本、音色参数，或录音片段</td><td>对应语音服务商</td></tr>
+              <tr><td>搜索、MCP 与插件</td><td>查询词、工具参数、选定文件或任务上下文</td><td>对应网站、服务或插件端点</td></tr>
+              <tr><td>本地模型与本地语音</td><td>推理本身可留在设备；联网工具仍按自身配置发送</td><td>设备本地或工具配置的端点</td></tr>
+              <tr><td>GitHub 登录与市场互动</td><td>Device Flow 登录、MiraForge 文件、登记 Issue、评论与 Reaction</td><td><code>github.com</code> / <code>api.github.com</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn"><b>备份离开应用沙箱后按敏感文件处理</b>当前导出备份不要当作自动加密文件。它可能包含聊天、记忆、角色资料、Endpoint、Header 或 API Key；上传网盘、发给别人或附到 Issue 前先检查内容。</div>
 
         <h3>换手机的稳妥流程</h3>
         <ol>
@@ -1375,7 +1514,7 @@ pnpm --version。
       </section>
 
       <footer>
-        本教程依据 2026-07-18 的 Mira 当前源码与界面文案编写。项目仍在快速迭代，具体选项名称以你安装版本为准。源码与更新：<a href="https://github.com/kernelx30/Mira">github.com/kernelx30/Mira</a>。
+        本教程依据 2026-07-19 的 Mira 当前源码与界面文案编写。项目仍在快速迭代，具体选项名称以你安装版本为准。源码与更新：<a href="https://github.com/kernelx30/Mira">github.com/kernelx30/Mira</a>。
       </footer>
     </main>
   </div>

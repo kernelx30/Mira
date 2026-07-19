@@ -7,6 +7,7 @@ object ConversationContentVisibility {
         Regex(
             pattern =
                 "<(?:status|think(?:ing)?|search|meta|emotion|memory|" +
+                    "workspace_attachment|attachment|" +
                     ChatMarkupRegex.TOOL_RESULT_TAG_NAME_REGEX_SOURCE +
                     "|" +
                     ChatMarkupRegex.TOOL_TAG_NAME_REGEX_SOURCE +
@@ -60,6 +61,9 @@ object ConversationContentVisibility {
                 .replace(ChatMarkupRegex.memoryTag, "")
                 .replace(ChatMarkupRegex.emotionTag, "")
                 .replace(ChatMarkupRegex.proxySenderTag, "")
+                .replace(ChatMarkupRegex.workspaceAttachmentTag, "")
+                .replace(ChatMarkupRegex.attachmentTag, "")
+                .replace(ChatMarkupRegex.attachmentSelfClosingTag, "")
         val trailingInternalBlock = trailingInternalBlockStart.find(withoutClosedInternalBlocks)
         return if (trailingInternalBlock == null) {
             withoutClosedInternalBlocks.trim()

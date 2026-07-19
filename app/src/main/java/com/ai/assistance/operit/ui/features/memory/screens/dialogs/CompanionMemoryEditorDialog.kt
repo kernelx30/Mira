@@ -52,6 +52,7 @@ fun CompanionMemoryEditorDialog(
     activeTargetName: String,
     isSaving: Boolean,
     errorMessage: String?,
+    evidenceQuote: String? = null,
     onDismiss: () -> Unit,
     onSave: (CompanionMemoryType, String, String) -> Unit,
 ) {
@@ -122,6 +123,27 @@ fun CompanionMemoryEditorDialog(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+
+                        evidenceQuote?.trim()?.takeIf { it.isNotBlank() }?.let { quote ->
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = stringResource(R.string.mira_memory_receipt_evidence_title),
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                            ) {
+                                Text(
+                                    text = quote,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp),
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(18.dp))
                         Text(

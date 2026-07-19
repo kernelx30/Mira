@@ -228,6 +228,12 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
             viewModel.handleRecognitionResult(result.text, result.isFinal)
         }
     }
+
+    LaunchedEffect(Unit) {
+        viewModel.recognitionErrorFlow.collectLatest { error ->
+            viewModel.handleRecognitionError(error.code, error.message)
+        }
+    }
     
     // 初始化
     LaunchedEffect(Unit) {
@@ -247,9 +253,22 @@ fun FloatingFullscreenMode(floatContext: FloatContext) {
 
     // 监听最新的AI消息
     LaunchedEffect(latestMessage?.timestamp) {
+        val chatCore = service?.getChatCore()
+        val effectiveAutoReadEnabled =
+            if (chatCore == null) {
+                false
+            } else {
+                val currentChatId = chatCore.currentChatId.value
+                val conversationOverride =
+                    chatCore.chatHistories.value
+                        .firstOrNull { history -> history.id == currentChatId }
+                        ?.autoReadOverride
+                conversationOverride ?: chatCore.enableAutoRead.value
+            }
         viewModel.processAndSpeakAiMessage(
             latestMessage,
-            ttsCleanerRegexs
+            ttsCleanerRegexs,
+            effectiveAutoReadEnabled,
         )
     }
 

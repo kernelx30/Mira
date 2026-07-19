@@ -16,6 +16,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -45,10 +46,17 @@ object RawSnapshotBackupManager {
     private const val ENTRY_DATASTORE = "payload/datastore/"
     private const val ENTRY_DATABASES = "payload/databases/"
 
+    private const val MAX_EXTRACTED_PAYLOAD_FILES = 100_000
+    private const val MAX_EXTRACTED_ENTRY_BYTES = 4L * 1024 * 1024 * 1024
+    private const val MAX_EXTRACTED_TOTAL_BYTES = 32L * 1024 * 1024 * 1024
+    private const val RESTORE_FREE_SPACE_RESERVE_BYTES = 256L * 1024 * 1024
+
     private val terminalTopLevelDirNames = setOf("usr", "tmp", "bin")
 
     private val mutex = Mutex()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        Handler(Looper.getMainLooper())
+    }
 
     @Serializable
     data class Manifest(
@@ -264,10 +272,15 @@ object RawSnapshotBackupManager {
     ) = withContext(Dispatchers.IO) {
         mutex.withLock {
             val cacheZip = File.createTempFile("raw_snapshot_restore_", ".zip", context.cacheDir)
-            val workDir = File(context.cacheDir, "raw_snapshot_restore_work").apply {
-                if (exists()) deleteRecursively()
-                mkdirs()
-            }
+            val workDir =
+                File(
+                    context.cacheDir,
+                    "raw_snapshot_restore_work_${System.currentTimeMillis()}_${UUID.randomUUID()}",
+                ).apply {
+                    check(mkdirs()) { "Failed to create restore work directory" }
+                }
+            var restoreTransaction: SnapshotRestoreTransaction? = null
+            var preserveWorkDir = false
 
             try {
                 AppLogger.i(TAG, "restore start uri=$uri")
@@ -275,16 +288,20 @@ object RawSnapshotBackupManager {
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.READING_ZIP) }
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     FileOutputStream(cacheZip).use { output ->
-                        input.copyTo(output)
+                        AtomicRestoreFileOps.copyStreamWithLimit(
+                            input = input,
+                            output = output,
+                            maxBytes =
+                                minOf(
+                                    MAX_EXTRACTED_TOTAL_BYTES,
+                                    (context.cacheDir.usableSpace - RESTORE_FREE_SPACE_RESERVE_BYTES)
+                                        .coerceAtLeast(0L),
+                                ),
+                        )
                     }
                 } ?: throw IllegalStateException("Failed to open uri")
 
                 AppLogger.i(TAG, "restore cached zip: ${cacheZip.absolutePath} (${cacheZip.length()} bytes)")
-
-                AppDatabase.closeDatabase()
-                ObjectBoxManager.closeAll()
-
-                AppLogger.i(TAG, "restore closed databases (room + objectbox)")
 
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.EXTRACTING) }
                 val manifest = extractZipToWorkDir(cacheZip, workDir, expectedPackageName = context.packageName)
@@ -306,27 +323,67 @@ object RawSnapshotBackupManager {
                     "restore manifest ok (formatVersion=${manifest.formatVersion}, includeTerminalData=${manifest.includeTerminalData})"
                 )
 
+                AppDatabase.closeDatabase()
+                ObjectBoxManager.closeAll()
+                AppLogger.i(TAG, "restore closed databases (room + objectbox)")
+
                 AppLogger.i(TAG, "restore replace dirs (preserveTerminalTopLevel=${preservedNames.isNotEmpty()})")
+                val transaction =
+                    SnapshotRestoreTransaction(File(workDir, ".rollback")).also {
+                        restoreTransaction = it
+                    }
 
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.REPLACING_FILES) }
-                replaceDirContents(File(payloadDir, "files"), context.filesDir, preservedTopLevelDirNames = preservedNames)
+                replaceDirContents(
+                    File(payloadDir, "files"),
+                    context.filesDir,
+                    preservedTopLevelDirNames = preservedNames,
+                    transaction = transaction,
+                )
                 if (externalFilesPayloadDir.exists()) {
                     val externalFilesDir = requireNotNull(context.getExternalFilesDir(null)) {
                         "External files dir is unavailable"
                     }
                     withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.REPLACING_EXTERNAL_FILES) }
-                    replaceDirContents(externalFilesPayloadDir, externalFilesDir)
+                    replaceDirContents(externalFilesPayloadDir, externalFilesDir, transaction = transaction)
                 }
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.REPLACING_SHARED_PREFS) }
-                replaceDirContents(File(payloadDir, "shared_prefs"), File(context.dataDir, "shared_prefs"))
+                replaceDirContents(
+                    File(payloadDir, "shared_prefs"),
+                    File(context.dataDir, "shared_prefs"),
+                    transaction = transaction,
+                )
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.REPLACING_DATASTORE) }
-                replaceDirContents(File(payloadDir, "datastore"), File(context.dataDir, "datastore"))
+                replaceDirContents(
+                    File(payloadDir, "datastore"),
+                    File(context.dataDir, "datastore"),
+                    transaction = transaction,
+                )
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.REPLACING_DATABASES) }
-                replaceDirContents(File(payloadDir, "databases"), File(context.dataDir, "databases"))
+                removeStaleSqliteSidecars(
+                    File(payloadDir, "databases"),
+                    File(context.dataDir, "databases"),
+                    transaction,
+                )
+                replaceDirContents(
+                    File(payloadDir, "databases"),
+                    File(context.dataDir, "databases"),
+                    transaction = transaction,
+                )
 
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.FINALIZING) }
+                transaction.commit()
                 AppLogger.i(TAG, "restore done: ${manifest.packageName}")
             } catch (e: Exception) {
+                val rollbackFailures = restoreTransaction?.rollback().orEmpty()
+                rollbackFailures.forEach(e::addSuppressed)
+                preserveWorkDir = rollbackFailures.isNotEmpty()
+                if (preserveWorkDir) {
+                    AppLogger.e(
+                        TAG,
+                        "restore rollback incomplete; preserved recovery files at ${workDir.absolutePath}",
+                    )
+                }
                 AppLogger.e(TAG, "restore failed", e)
                 throw e
             } finally {
@@ -334,9 +391,11 @@ object RawSnapshotBackupManager {
                     cacheZip.delete()
                 } catch (_: Exception) {
                 }
-                try {
-                    workDir.deleteRecursively()
-                } catch (_: Exception) {
+                if (!preserveWorkDir) {
+                    try {
+                        workDir.deleteRecursively()
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -348,6 +407,18 @@ object RawSnapshotBackupManager {
 
         var manifestText: String? = null
         var extractedPayloadFiles = 0
+        val maxExtractedBytes =
+            minOf(
+                MAX_EXTRACTED_TOTAL_BYTES,
+                (workDir.usableSpace - RESTORE_FREE_SPACE_RESERVE_BYTES).coerceAtLeast(0L),
+            )
+        val extractionBudget =
+            RestoreExtractionBudget(
+                maxEntries = MAX_EXTRACTED_PAYLOAD_FILES,
+                maxTotalBytes = maxExtractedBytes,
+                maxEntryBytes = MAX_EXTRACTED_ENTRY_BYTES,
+            )
+        val extractedEntryNames = HashSet<String>()
 
         val buffer = ByteArray(64 * 1024)
         val extractMs = measureTimeMillis {
@@ -373,6 +444,13 @@ object RawSnapshotBackupManager {
                         continue
                     }
 
+                    if (!extractedEntryNames.add(name)) {
+                        zis.closeEntry()
+                        throw IllegalArgumentException("Duplicate zip entry: $name")
+                    }
+
+                    extractionBudget.beginEntry(name, entry.size)
+
                     val target = File(workDir, name)
                     val workCanonical = workDir.canonicalFile
                     val targetCanonical = target.canonicalFile
@@ -386,6 +464,7 @@ object RawSnapshotBackupManager {
                         while (true) {
                             val read = zis.read(buffer)
                             if (read <= 0) break
+                            extractionBudget.recordBytes(name, read)
                             output.write(buffer, 0, read)
                         }
                     }
@@ -572,7 +651,8 @@ object RawSnapshotBackupManager {
     private fun replaceDirContents(
         fromDir: File,
         toDir: File,
-        preservedTopLevelDirNames: Set<String> = emptySet()
+        preservedTopLevelDirNames: Set<String> = emptySet(),
+        transaction: SnapshotRestoreTransaction,
     ) {
         if (!toDir.exists()) {
             toDir.mkdirs()
@@ -582,13 +662,36 @@ object RawSnapshotBackupManager {
 
         // Non-destructive restore: only overwrite files present in the backup.
         // Files not present in the backup are preserved.
-        copyDir(fromDir, toDir, preservedTopLevelDirNames)
+        copyDir(fromDir, toDir, preservedTopLevelDirNames, transaction)
+    }
+
+    internal fun removeStaleSqliteSidecars(
+        fromDir: File,
+        toDir: File,
+        transaction: SnapshotRestoreTransaction,
+    ) {
+        if (!fromDir.isDirectory || !toDir.isDirectory) return
+        fromDir.listFiles().orEmpty()
+            .filter { source ->
+                source.isFile &&
+                    !source.name.endsWith("-wal") &&
+                    !source.name.endsWith("-shm")
+            }
+            .forEach { sourceDatabase ->
+                listOf("-wal", "-shm").forEach { suffix ->
+                    val sourceSidecar = File(fromDir, sourceDatabase.name + suffix)
+                    if (!sourceSidecar.isFile) {
+                        transaction.delete(File(toDir, sourceDatabase.name + suffix))
+                    }
+                }
+            }
     }
 
     private fun copyDir(
         fromDir: File,
         toDir: File,
-        preservedTopLevelDirNames: Set<String>
+        preservedTopLevelDirNames: Set<String>,
+        transaction: SnapshotRestoreTransaction,
     ) {
         val baseCanonical = fromDir.canonicalFile
         fromDir.walkTopDown().forEach { f ->
@@ -613,11 +716,7 @@ object RawSnapshotBackupManager {
                 target.mkdirs()
             } else if (canonical.isFile) {
                 target.parentFile?.mkdirs()
-                canonical.inputStream().use { input ->
-                    target.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
+                transaction.replace(canonical, target)
             }
         }
     }

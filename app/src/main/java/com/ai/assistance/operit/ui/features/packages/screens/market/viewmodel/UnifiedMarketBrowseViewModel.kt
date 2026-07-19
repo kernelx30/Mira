@@ -15,6 +15,10 @@ import com.ai.assistance.operit.ui.features.packages.market.MarketInstallProgres
 import com.ai.assistance.operit.ui.features.packages.market.MarketInstallStateStore
 import com.ai.assistance.operit.ui.features.packages.market.MarketLocalInstallState
 import com.ai.assistance.operit.ui.features.packages.market.MarketSortOption
+import com.ai.assistance.operit.ui.features.packages.market.SourcedArtifactMarketEntry
+import com.ai.assistance.operit.ui.features.packages.market.inferArtifactMarketOrigin
+import com.ai.assistance.operit.ui.features.packages.market.installedMarketEntryIds
+import com.ai.assistance.operit.ui.features.packages.market.mergeCompatibleMarketEntries
 import com.ai.assistance.operit.ui.features.packages.market.resolveMarketLocalInstallStates
 import com.ai.assistance.operit.ui.features.packages.market.toRankMetric
 import com.ai.assistance.operit.util.AppLogger
@@ -179,11 +183,18 @@ class UnifiedMarketBrowseViewModel(
             totalPages = 1
 
             try {
+                val installedEntryIds =
+                    withContext(Dispatchers.IO) {
+                        installedMarketEntryIds(context.applicationContext, packageManager)
+                    }
                 loadPage(page = 1).fold(
                     onSuccess = { page ->
                         currentPage = page.page
                         totalPages = page.totalPages.coerceAtLeast(1)
-                        val loadedEntries = page.items.map { it.entry }.orderedForCurrentSort()
+                        val loadedEntries =
+                            page.items.map { it.entry }
+                                .mergeCompatibleEntries(installedEntryIds)
+                                .orderedForCurrentSort()
                         _entries.value = loadedEntries
                         refreshLocalInstallStates(loadedEntries)
                         _hasMore.value = currentPage < totalPages
@@ -220,13 +231,17 @@ class UnifiedMarketBrowseViewModel(
         viewModelScope.launch {
             _isLoadingMore.value = true
             try {
+                val installedEntryIds =
+                    withContext(Dispatchers.IO) {
+                        installedMarketEntryIds(context.applicationContext, packageManager)
+                    }
                 loadPage(page = currentPage + 1).fold(
                     onSuccess = { page ->
                         currentPage = page.page
                         totalPages = page.totalPages.coerceAtLeast(1)
                         val loadedEntries =
                             (_entries.value + page.items.map { it.entry })
-                                .distinctBy { it.id }
+                                .mergeCompatibleEntries(installedEntryIds)
                                 .orderedForCurrentSort()
                         _entries.value = loadedEntries
                         refreshLocalInstallStates(loadedEntries)
@@ -353,6 +368,20 @@ class UnifiedMarketBrowseViewModel(
             MarketSortOption.DOWNLOADS -> sortedByDescending { it.stats?.downloads ?: it.downloadCount.takeIf { count -> count > 0 } ?: it.downloads }
             MarketSortOption.LIKES -> sortedByDescending { it.likeCount() }
         }
+    }
+
+    private fun List<MarketV2Entry>.mergeCompatibleEntries(
+        installedEntryIds: Set<String>
+    ): List<MarketV2Entry> {
+        return mergeCompatibleMarketEntries(
+            entries = map { entry ->
+                SourcedArtifactMarketEntry(
+                    entry = entry,
+                    origin = inferArtifactMarketOrigin(entry)
+                )
+            },
+            installedEntryIds = installedEntryIds
+        ).map { it.entry }
     }
 }
 

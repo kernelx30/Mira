@@ -7,6 +7,7 @@ import com.ai.assistance.operit.api.chat.ChatRuntimeHolder
 import com.ai.assistance.operit.api.chat.ChatRuntimeSlot
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.api.voice.VoiceServiceFactory
+import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.CharacterCardChatModelBindingMode
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
@@ -48,6 +49,12 @@ sealed interface MiraCompanionDeliveryResult {
     data object Retry : MiraCompanionDeliveryResult
 }
 
+internal fun resolveProactiveAutoReadEnabled(
+    globalEnabled: Boolean,
+    roleOverride: AutoReadOverride,
+    conversationOverride: Boolean?,
+): Boolean = conversationOverride ?: resolveAutoReadEnabled(globalEnabled, roleOverride)
+
 object MiraCompanionDelivery {
     private val deliveryMutex = Mutex()
 
@@ -85,6 +92,9 @@ object MiraCompanionDelivery {
         val chatId = metadata.chatId.takeIf { it.isNotBlank() } ?: return MiraCompanionDeliveryResult.Paused
         val chatHistoryManager = ChatHistoryManager.getInstance(context)
         if (!chatHistoryManager.chatExists(chatId)) return MiraCompanionDeliveryResult.Paused
+        // Capture the effective setting before generation so navigation or settings changes do not
+        // change whether this already-started delivery speaks after it completes.
+        val autoReadEnabled = resolveAutoReadEnabledForDelivery(context, metadata, chatId)
 
         recoverGeneratedReply(chatHistoryManager, chatId, memoryUuid)?.let { recovered ->
             completeDelivery(
@@ -96,6 +106,7 @@ object MiraCompanionDelivery {
                 reply = recovered,
                 triggerTimestamp = recovered.triggerTimestamp,
                 nowMs = nowMs,
+                autoReadEnabled = autoReadEnabled,
             )
             return MiraCompanionDeliveryResult.Delivered
         }
@@ -188,6 +199,7 @@ object MiraCompanionDelivery {
                     reply = generated,
                     triggerTimestamp = generated.triggerTimestamp,
                     nowMs = System.currentTimeMillis(),
+                    autoReadEnabled = autoReadEnabled,
                 )
                 return MiraCompanionDeliveryResult.Delivered
             }
@@ -219,6 +231,7 @@ object MiraCompanionDelivery {
         reply: MiraRecoveredReply,
         triggerTimestamp: Long?,
         nowMs: Long,
+        autoReadEnabled: Boolean,
     ) {
         val memory = repository.findMemoryByUuid(memoryUuid) ?: return
         val latestMetadata = memory.companionMetadata() ?: metadata
@@ -247,7 +260,9 @@ object MiraCompanionDelivery {
         if (latestMetadata.kind != CompanionEventKind.REMINDER) {
             CompanionReminderPreferences.getInstance(context).recordNotificationSent(target, nowMs)
         }
-        autoReadIfEnabled(context, latestMetadata, notificationBody)
+        if (autoReadEnabled) {
+            autoRead(context, notificationBody)
+        }
 
         triggerTimestamp?.let { timestamp ->
             runCatching {
@@ -404,11 +419,11 @@ object MiraCompanionDelivery {
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    private suspend fun autoReadIfEnabled(
+    private suspend fun resolveAutoReadEnabledForDelivery(
         context: Context,
         metadata: CompanionMemoryMetadata,
-        text: String,
-    ) {
+        chatId: String,
+    ): Boolean {
         val apiPreferences = ApiPreferences.getInstance(context)
         val globalEnabled = apiPreferences.enableAutoReadFlow.first()
         val waifuPreferences = WaifuPreferences.getInstance(context)
@@ -420,8 +435,19 @@ object MiraCompanionDelivery {
                     waifuPreferences.getAutoReadOverrideForCharacterCard(metadata.characterId)
                 else -> AutoReadOverride.INHERIT
             }
-        if (!resolveAutoReadEnabled(globalEnabled, roleOverride)) return
+        val conversationOverride =
+            AppDatabase.getDatabase(context.applicationContext)
+                .chatDao()
+                .getChatById(chatId)
+                ?.autoReadOverride
+        return resolveProactiveAutoReadEnabled(
+            globalEnabled = globalEnabled,
+            roleOverride = roleOverride,
+            conversationOverride = conversationOverride,
+        )
+    }
 
+    private suspend fun autoRead(context: Context, text: String) {
         runCatching {
             val service = VoiceServiceFactory.getInstance(context)
             if (!service.isInitialized && !service.initialize()) return

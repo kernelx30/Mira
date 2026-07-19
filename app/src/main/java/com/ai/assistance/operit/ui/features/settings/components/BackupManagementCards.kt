@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
@@ -136,6 +137,7 @@ fun DataManagementCard(
     operationMessage: String,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    onImportFromOperit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val chatTitle = stringResource(R.string.backup_chat_history)
@@ -182,6 +184,13 @@ fun DataManagementCard(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+
+            ManagementButton(
+                text = stringResource(R.string.backup_import_from_operit),
+                icon = Icons.Default.FileOpen,
+                onClick = onImportFromOperit,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             AnimatedVisibility(visible = operationState != ChatHistoryOperation.IDLE) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

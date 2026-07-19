@@ -192,7 +192,7 @@ class StandardSoftwareSettingsModifyTools(private val context: Context) {
                 result =
                     SandboxPackagesResultData(
                         externalPackagesPath = externalPackagesPath,
-                        scriptDevGuide = "https://github.com/AAswordman/Operit/blob/main/docs/SCRIPT_DEV_SKILL.md",
+                        scriptDevGuide = "https://github.com/kernelx30/Mira/blob/main/docs/SCRIPT_DEV_SKILL.md",
                         totalCount = availablePackages.size,
                         builtInCount = availablePackages.values.count { it.isBuiltIn },
                         externalCount = availablePackages.values.count { !it.isBuiltIn },
@@ -209,7 +209,7 @@ class StandardSoftwareSettingsModifyTools(private val context: Context) {
                 result =
                     SandboxPackagesResultData(
                         externalPackagesPath = "",
-                        scriptDevGuide = "https://github.com/AAswordman/Operit/blob/main/docs/SCRIPT_DEV_SKILL.md",
+                        scriptDevGuide = "https://github.com/kernelx30/Mira/blob/main/docs/SCRIPT_DEV_SKILL.md",
                         totalCount = 0,
                         builtInCount = 0,
                         externalCount = 0,

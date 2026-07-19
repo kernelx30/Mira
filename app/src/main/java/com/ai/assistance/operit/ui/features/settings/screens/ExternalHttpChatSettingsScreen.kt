@@ -120,10 +120,12 @@ curl -X POST "$sampleBaseUrl/api/external-chat" \
             EXTERNAL_CHAT_RESULT_ACTION
         )
     }
-    val intentAdbExample = remember {
+    val intentAdbExample = remember(curlToken) {
         """
 adb shell am broadcast \
   -a $EXTERNAL_CHAT_INTENT_ACTION \
+  --es auth_token "$curlToken" \
+  --ez confirm_sensitive true \
   --es request_id "req-001" \
   --es message "你好" \
   --ez show_floating true \

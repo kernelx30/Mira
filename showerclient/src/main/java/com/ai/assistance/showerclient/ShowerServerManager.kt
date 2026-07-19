@@ -6,6 +6,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
+import java.util.UUID
 
 /**
  * Helper to manage the lifecycle of the Shower server (shower-server.jar) on the device.
@@ -23,6 +25,25 @@ object ShowerServerManager {
 
     @Volatile
     var additionalTargetPackages: Set<String> = emptySet()
+
+    @Volatile
+    private var expectedHandshakeToken: String? = null
+
+    fun consumeExpectedHandshakeToken(candidate: String?): Boolean {
+        if (candidate.isNullOrBlank()) return false
+        return synchronized(this) {
+            val expected = expectedHandshakeToken ?: return@synchronized false
+            val matches =
+                MessageDigest.isEqual(
+                    candidate.toByteArray(Charsets.UTF_8),
+                    expected.toByteArray(Charsets.UTF_8),
+                )
+            if (matches) {
+                expectedHandshakeToken = null
+            }
+            matches
+        }
+    }
 
     /**
      * Ensure the Shower server is started in the background.
@@ -82,11 +103,19 @@ object ShowerServerManager {
         }
 
         // 4) Start app_process with CLASSPATH pointing to /data/local/tmp/shower-server.jar, in background.
-        val targetPackagesArg = appContext.packageName
-        val startCmd = "CLASSPATH=$remoteJarPath app_process / com.ai.assistance.shower.Main $targetPackagesArg &"
+        val targetPackagesArg =
+            (setOf(appContext.packageName) + additionalTargetPackages)
+                .filter { PACKAGE_NAME_PATTERN.matches(it) }
+                .joinToString(",")
+        val handshakeToken = UUID.randomUUID().toString().replace("-", "")
+        expectedHandshakeToken = handshakeToken
+        val startCmd =
+            "CLASSPATH=$remoteJarPath app_process / com.ai.assistance.shower.Main " +
+                "$targetPackagesArg $handshakeToken &"
         ShowerLog.d(TAG, "Starting Shower server with command: $startCmd")
         val startResult = runner.run(startCmd, ShellIdentity.SHELL)
         if (!startResult.success) {
+            clearExpectedHandshakeToken(handshakeToken)
             ShowerLog.e(
                 TAG,
                 "Failed to start Shower server (exitCode=${startResult.exitCode}). stdout='${startResult.stdout}', stderr='${startResult.stderr}'"
@@ -107,6 +136,7 @@ object ShowerServerManager {
         }
 
         ShowerLog.e(TAG, "Shower Binder was not received within the expected time")
+        clearExpectedHandshakeToken(handshakeToken)
         return false
     }
 
@@ -153,4 +183,14 @@ object ShowerServerManager {
         ShowerLog.d(TAG, "Copied $ASSET_JAR_NAME to ${outFile.absolutePath}")
         outFile
     }
+
+    private fun clearExpectedHandshakeToken(token: String) {
+        synchronized(this) {
+            if (expectedHandshakeToken == token) {
+                expectedHandshakeToken = null
+            }
+        }
+    }
+
+    private val PACKAGE_NAME_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+$")
 }

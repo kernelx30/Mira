@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -43,6 +44,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.chat.CompanionReminderIntentDetector
+import com.ai.assistance.operit.core.chat.CompanionMemoryReceipt
+import com.ai.assistance.operit.core.chat.CompanionMemoryReceiptKind
 import com.ai.assistance.operit.core.companion.CompanionReminderScheduler
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.model.AITool
@@ -50,6 +53,9 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.CharacterCardChatModelBindingMode
 import com.ai.assistance.operit.data.model.CharacterCardMemoryProfileBindingMode
+import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
+import com.ai.assistance.operit.data.model.CompanionMemoryType
+import com.ai.assistance.operit.data.model.CompanionRecordScope
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.PendingQueueMessageItem
 import com.ai.assistance.operit.data.model.ToolParameter
@@ -61,6 +67,7 @@ import com.ai.assistance.operit.data.preferences.CompanionReminderTargetType
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.WaifuPreferences
+import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
 import com.ai.assistance.operit.ui.components.ErrorDialog
 import com.ai.assistance.operit.ui.features.chat.components.*
 import com.ai.assistance.operit.ui.features.chat.components.style.input.agent.AgentChatInputSection
@@ -81,12 +88,14 @@ import com.ai.assistance.operit.ui.features.chat.webview.MentionSuggestionPanel
 import com.ai.assistance.operit.ui.features.chat.webview.computer.ComputerScreen
 import com.ai.assistance.operit.ui.features.chat.util.ConfigurationStateHolder
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
+import com.ai.assistance.operit.ui.features.memory.screens.dialogs.CompanionMemoryEditorDialog
 import com.ai.assistance.operit.ui.main.PendingChatDraftHandler
 import com.ai.assistance.operit.ui.main.PendingChatOpenHandler
 import com.ai.assistance.operit.ui.main.screens.GestureStateHolder
 import com.ai.assistance.operit.ui.main.SharedFileHandler
 import java.io.File
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.flowOf
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
@@ -138,6 +147,7 @@ fun AIChatScreen(
         onGestureConsumed: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val density = LocalDensity.current
     val colorScheme = MaterialTheme.colorScheme
     val isCurrentScreen = LocalIsCurrentScreen.current
@@ -178,10 +188,10 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     val useBackgroundImage by preferencesManager.useBackgroundImage.collectAsState(initial = false)
     val backgroundImageUri by preferencesManager.backgroundImageUri.collectAsState(initial = null)
     val chatHeaderTransparent by preferencesManager.chatHeaderTransparent.collectAsState(initial = false)
-    val chatInputTransparent by preferencesManager.chatInputTransparent.collectAsState(initial = false)
+    val chatInputTransparent by preferencesManager.chatInputTransparent.collectAsState(initial = true)
     val chatInputFloating by preferencesManager.chatInputFloating.collectAsState(initial = true)
     val chatInputLiquidGlassRaw by
-        preferencesManager.chatInputLiquidGlass.collectAsState(initial = false)
+        preferencesManager.chatInputLiquidGlass.collectAsState(initial = true)
     val chatInputWaterGlass by
         preferencesManager.chatInputWaterGlass.collectAsState(initial = false)
     val chatInputLiquidGlass = chatInputLiquidGlassRaw && !chatInputWaterGlass
@@ -331,9 +341,20 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     val showChatHistorySelector by actualViewModel.showChatHistorySelector.collectAsState()
     val chatHistories by actualViewModel.chatHistories.collectAsState()
     val currentChatId by actualViewModel.currentChatId.collectAsState()
+    val companionMemoryReceiptEvents = actualViewModel.companionMemoryReceiptEvents
+    val companionMemoryRepository = remember(context) { CompanionMemoryRepository(context) }
+    var memoryReceiptForCorrection by remember { mutableStateOf<CompanionMemoryReceipt?>(null) }
+    var memoryCorrectionRecord by remember { mutableStateOf<CompanionMemoryRecordEntity?>(null) }
+    var isSavingMemoryCorrection by remember { mutableStateOf(false) }
+    var memoryCorrectionError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(currentChatId) {
         editingMessageIndex.value = null
         editingMessageContent.value = ""
+        if (!isSavingMemoryCorrection) {
+            memoryCorrectionRecord = null
+            memoryReceiptForCorrection = null
+            memoryCorrectionError = null
+        }
         actualViewModel.clearReplyToMessage()
     }
     val hasNewerDisplayHistory by actualViewModel.hasNewerDisplayHistory.collectAsState()
@@ -773,6 +794,115 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     // 移除原有的 snackbar 错误处理
     val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(
+        companionMemoryReceiptEvents,
+        snackbarHostState,
+        isCurrentScreen,
+        currentChatId,
+    ) {
+        if (!isCurrentScreen) return@LaunchedEffect
+        companionMemoryReceiptEvents.collectLatest { receipt ->
+            if (receipt.conversationId != currentChatId) return@collectLatest
+            if (receipt.kind == CompanionMemoryReceiptKind.DELETED) {
+                snackbarHostState.showSnackbar(
+                    message =
+                        resources.getString(
+                            R.string.mira_memory_deleted_receipt,
+                            receipt.displayLabel ?: receipt.summary,
+                        ),
+                    duration = SnackbarDuration.Short,
+                )
+                return@collectLatest
+            }
+            val result =
+                snackbarHostState.showSnackbar(
+                    message =
+                        resources.getString(
+                            R.string.mira_memory_saved_receipt,
+                            receipt.displayLabel ?: receipt.summary,
+                        ),
+                    actionLabel = resources.getString(R.string.mira_memory_receipt_correct_action),
+                    duration = SnackbarDuration.Short,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                val record = companionMemoryRepository.getRecordById(receipt.recordId)
+                if (record == null) {
+                    snackbarHostState.showSnackbar(
+                        resources.getString(R.string.mira_memory_receipt_not_found),
+                    )
+                } else {
+                    memoryReceiptForCorrection = receipt
+                    memoryCorrectionRecord = record
+                    memoryCorrectionError = null
+                }
+            }
+        }
+    }
+
+    memoryCorrectionRecord?.let { record ->
+        val recordScope =
+            CompanionRecordScope.entries.firstOrNull { it.name == record.scope }
+                ?: CompanionRecordScope.USER
+        val recordType =
+            CompanionMemoryType.entries.firstOrNull { it.name == record.type }
+                ?: CompanionMemoryType.FACT
+        CompanionMemoryEditorDialog(
+            record = record,
+            scope = recordScope,
+            defaultType = recordType,
+            allowedTypes = listOf(recordType),
+            activeTargetName = stringResource(R.string.mate_memory_current_character),
+            isSaving = isSavingMemoryCorrection,
+            errorMessage = memoryCorrectionError,
+            evidenceQuote =
+                memoryReceiptForCorrection
+                    ?.takeIf { it.recordId == record.id }
+                    ?.evidenceQuote,
+            onDismiss = {
+                if (!isSavingMemoryCorrection) {
+                    memoryCorrectionRecord = null
+                    memoryReceiptForCorrection = null
+                    memoryCorrectionError = null
+                }
+            },
+            onSave = { type, displayLabel, value ->
+                coroutineScope.launch {
+                    isSavingMemoryCorrection = true
+                    memoryCorrectionError = null
+                    try {
+                        val savedId =
+                            companionMemoryRepository.saveManualRecord(
+                                profileId = record.profileId,
+                                companionId = record.companionId,
+                                scope = recordScope,
+                                type = type,
+                                displayLabel = displayLabel,
+                                value = value,
+                                existingRecord = record,
+                                conversationId = record.conversationId,
+                            )
+                        if (savedId == null) {
+                            memoryCorrectionError =
+                                resources.getString(R.string.mate_memory_manual_save_failed)
+                        } else {
+                            memoryCorrectionRecord = null
+                            memoryReceiptForCorrection = null
+                            snackbarHostState.showSnackbar(
+                                resources.getString(R.string.mira_memory_receipt_correction_saved),
+                            )
+                        }
+                    } catch (error: Exception) {
+                        AppLogger.e("AIChatScreen", "Failed to correct companion memory", error)
+                        memoryCorrectionError =
+                            resources.getString(R.string.mate_memory_manual_save_failed)
+                    } finally {
+                        isSavingMemoryCorrection = false
+                    }
+                }
+            },
+        )
+    }
+
     // 用新的错误弹窗替换原有的错误显示逻辑
     errorMessage?.let { message ->
         ErrorDialog(errorMessage = message, onDismiss = { actualViewModel.dismissErrorDialog() })
@@ -876,6 +1006,10 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
 
     var bottomBarHeightPx by remember { mutableStateOf(0) }
     val bottomBarHeightDp = with(density) { bottomBarHeightPx.toDp() }
+    // Keep the composer margin stable through the IME animation. Switching from 12dp to 24dp
+    // when the keyboard reports hidden caused a visible second upward jump after it had landed.
+    val chatInputBottomPadding =
+        if (chatViewRuntime == "floating" || !chatInputFloating) 12.dp else 24.dp
     Box(modifier = Modifier.fillMaxSize()) {
         CustomScaffold(
                 containerColor = Color.Transparent,
@@ -1022,7 +1156,7 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
                                      Modifier
                                          .navigationBarsPadding()
                                          .imePadding()
-                                         .padding(bottom = 12.dp),
+                                         .padding(bottom = chatInputBottomPadding),
                                 actualViewModel = actualViewModel,
                                 inputStyle = inputStyle,
                                 currentChatId = currentChatId,

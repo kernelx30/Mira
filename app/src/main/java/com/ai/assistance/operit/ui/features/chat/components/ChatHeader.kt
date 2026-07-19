@@ -81,6 +81,8 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ContextWindowUsage
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.ui.adaptive.LocalAdaptiveWindowMetrics
+import com.ai.assistance.operit.ui.theme.isLiquidGlassSupported
+import com.ai.assistance.operit.ui.theme.liquidGlass
 import kotlin.math.roundToInt
 
 private const val CHAT_HEADER_CHARACTER_NAME_MAX_LENGTH = 24
@@ -133,6 +135,8 @@ fun ChatHeader(
             .toChatHeaderName()
     val adaptiveMetrics = LocalAdaptiveWindowMetrics.current
     val compactHeader = adaptiveMetrics.shouldCompactChatHeader
+    val liquidGlassEnabled = isLiquidGlassSupported()
+    val glassContainerColor = MaterialTheme.colorScheme.surface
 
     val requestNewChat = {
         if (hasDraft) {
@@ -148,11 +152,23 @@ fun ChatHeader(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Surface(
-            modifier = Modifier.size(48.dp),
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .liquidGlass(
+                        enabled = liquidGlassEnabled,
+                        shape = CircleShape,
+                        containerColor = glassContainerColor,
+                        shadowElevation = 8.dp,
+                        borderWidth = 0.36.dp,
+                        blurRadius = 18.dp,
+                        overlayAlphaBoost = 0.08f,
+                        enableLens = true,
+                    ),
             onClick = onToggleChatHistorySelector,
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-            shadowElevation = 2.dp,
+            color = if (liquidGlassEnabled) Color.Transparent else glassContainerColor.copy(alpha = 0.96f),
+            shadowElevation = if (liquidGlassEnabled) 0.dp else 2.dp,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
@@ -168,11 +184,21 @@ fun ChatHeader(
                 Modifier
                     .weight(1f, fill = compactHeader)
                     .widthIn(max = if (compactHeader) 240.dp else 360.dp)
-                    .heightIn(min = 48.dp),
+                    .heightIn(min = 48.dp)
+                    .liquidGlass(
+                        enabled = liquidGlassEnabled,
+                        shape = RoundedCornerShape(24.dp),
+                        containerColor = glassContainerColor,
+                        shadowElevation = 8.dp,
+                        borderWidth = 0.36.dp,
+                        blurRadius = 20.dp,
+                        overlayAlphaBoost = 0.10f,
+                        enableLens = false,
+                    ),
             onClick = onCharacterClick,
             shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-            shadowElevation = 2.dp,
+            color = if (liquidGlassEnabled) Color.Transparent else glassContainerColor.copy(alpha = 0.96f),
+            shadowElevation = if (liquidGlassEnabled) 0.dp else 2.dp,
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 6.dp),
@@ -199,10 +225,23 @@ fun ChatHeader(
 
         Box {
             Surface(
-                modifier = Modifier.width(104.dp).height(48.dp),
+                modifier =
+                    Modifier
+                        .width(104.dp)
+                        .height(48.dp)
+                        .liquidGlass(
+                            enabled = liquidGlassEnabled,
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = glassContainerColor,
+                            shadowElevation = 8.dp,
+                            borderWidth = 0.36.dp,
+                            blurRadius = 18.dp,
+                            overlayAlphaBoost = 0.08f,
+                            enableLens = false,
+                        ),
                 shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                shadowElevation = 2.dp,
+                color = if (liquidGlassEnabled) Color.Transparent else glassContainerColor.copy(alpha = 0.96f),
+                shadowElevation = if (liquidGlassEnabled) 0.dp else 2.dp,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(

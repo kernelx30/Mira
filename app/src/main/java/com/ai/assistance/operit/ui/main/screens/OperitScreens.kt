@@ -40,7 +40,6 @@ import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketManage
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketCategoryScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketAuthorScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketDetailEntryScreen
-import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketNotificationsScreen
 import com.ai.assistance.operit.ui.features.packages.screens.UnifiedMarketScreen
 import com.ai.assistance.operit.ui.features.packages.screens.marketCategoryLabel
 import com.ai.assistance.operit.ui.features.packages.screens.toArtifactPublishClusterContext
@@ -231,9 +230,6 @@ sealed class Screen(
                 },
                 onNavigateToCategory = { categoryId ->
                     navigateTo(MarketCategory(categoryId))
-                },
-                onNavigateToNotifications = {
-                    navigateTo(MarketNotifications)
                 }
             )
         }
@@ -267,22 +263,6 @@ sealed class Screen(
 
         @Composable
         override fun getTitle(): String = marketCategoryLabel(categoryId)
-    }
-
-    data object MarketNotifications :
-            Screen(navItem = NavItem.Packages, titleRes = R.string.market_notifications_title) {
-        @Composable
-        override fun Content(
-                navController: NavController,
-                navigateTo: ScreenNavigationHandler,
-                onGoBack: () -> Unit,
-                hasBackgroundImage: Boolean,
-                onLoading: (Boolean) -> Unit,
-                onError: (String) -> Unit,
-                onGestureConsumed: (Boolean) -> Unit
-        ) {
-            UnifiedMarketNotificationsScreen()
-        }
     }
 
     data class MarketEntryDetail(
@@ -610,6 +590,7 @@ sealed class Screen(
                     navigateToTerminalSetup = { navigateTo(TerminalSetup) },
                     navigateToCompanionSettings = { navigateTo(AssistantConfig) },
                     navigateToCompanionPresence = { navigateTo(CompanionPresenceSettings) },
+                    navigateToAbout = { navigateTo(About) },
             )
         }
     }
@@ -823,7 +804,8 @@ sealed class Screen(
                     profileName = profileName,
                     profileId = profileId,
                     onComplete = onGoBack,
-                    navigateToPermissions = { navigateTo(ShizukuCommands) }
+                    // 首次画像完成后回到宿主流程；MainActivity 会根据权限状态决定是否展示权限引导。
+                    navigateToPermissions = onGoBack
             )
         }
     }

@@ -65,6 +65,7 @@ import com.ai.assistance.operit.data.model.CompanionMemoryScope
 import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
 import com.ai.assistance.operit.data.model.CompanionMemoryTarget
 import com.ai.assistance.operit.data.model.ToolParameter
+import com.ai.assistance.operit.data.model.structuredCompanionId
 import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.CharacterGroupCardManager
@@ -319,17 +320,19 @@ fun MemoryScreen() {
         }
     }
 
+    val activeCompanionId = remember(activeMemoryTarget) { activeMemoryTarget.structuredCompanionId() }
+    // Structured graph visibility depends on the active role, so role switches need a new owner context.
     val viewModel: MemoryViewModel =
         viewModel(
-            key = selectedProfileId, // Recreate ViewModel when profile changes
-            factory = MemoryViewModelFactory(context, selectedProfileId)
+            key = "$selectedProfileId|$activeCompanionId",
+            factory = MemoryViewModelFactory(context, selectedProfileId, activeCompanionId)
         )
     val uiState by viewModel.uiState.collectAsState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val isCurrentScreen = LocalIsCurrentScreen.current
 
-    LaunchedEffect(isCurrentScreen, selectedProfileId) {
+    LaunchedEffect(isCurrentScreen, selectedProfileId, activeCompanionId) {
         if (isCurrentScreen) {
             viewModel.loadMemoryGraph()
             viewModel.loadFolderPaths()

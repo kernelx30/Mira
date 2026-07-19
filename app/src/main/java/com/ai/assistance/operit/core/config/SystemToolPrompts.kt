@@ -60,6 +60,13 @@ object SystemToolPrompts {
                         required = true
                     )
                 )
+            ),
+            ToolPrompt(
+                name = "export_chat_history",
+                description = "Exports chat history directly from the conversation. Call it immediately when the user explicitly asks to export, back up, or save the current chat or chat history; do not search settings or inspect database files. The current conversation is exported by default. If the user explicitly says all or every chat, the tool exports all conversations. The user's wording chooses JSON, TXT, HTML, or Markdown; otherwise use the optional format parameter, defaulting to MARKDOWN. Return the created file path.",
+                parametersStructured = listOf(
+                    ToolParameterSchema(name = "format", type = "string", description = "optional: MARKDOWN, TXT, HTML, or JSON", required = false, default = "MARKDOWN")
+                )
             )
         )
     )
@@ -79,6 +86,13 @@ object SystemToolPrompts {
                 description = "在当前会话中激活包。",
                 parametersStructured = listOf(
                     ToolParameterSchema(name = "package_name", type = "string", description = "要激活的包名", required = true)
+                )
+            ),
+            ToolPrompt(
+                name = "export_chat_history",
+                description = "直接从对话中导出聊天记录。用户明确要求导出、备份或保存当前对话/聊天记录时，立即调用本工具，不要查找设置项，也不要猜数据库文件。默认导出当前会话；只有用户明确说全部或所有聊天记录时才导出全部会话。用户原话指定 JSON、TXT、HTML 或 Markdown 时按原话执行，否则使用可选 format，默认 MARKDOWN。结果返回真实文件路径。",
+                parametersStructured = listOf(
+                    ToolParameterSchema(name = "format", type = "string", description = "可选：MARKDOWN、TXT、HTML 或 JSON", required = false, default = "MARKDOWN")
                 )
             )
         )
@@ -152,6 +166,86 @@ object SystemToolPrompts {
                                     description = "是否包含系统应用",
                                     required = false,
                                     default = "false",
+                                ),
+                            ),
+                    ),
+                ),
+        )
+
+    private val miraSettingsTools =
+        SystemToolPromptCategory(
+            categoryName = "Mira settings tools",
+            tools =
+                listOf(
+                    ToolPrompt(
+                        name = "manage_mira_settings",
+                        description =
+                            "Search, read, or change Mira app settings from the conversation. Use SEARCH with the user's natural wording to discover a stable setting_id, GET to read it, and SET only when the user clearly asks for a change. Conversation overrides, companion preferences, and global defaults are separate scopes: chat.auto_read and chat.memory_auto_update affect this conversation; speech.auto_read.companion affects the current companion; speech.auto_read.global and memory.auto_update.global change global defaults. Other common IDs include chat.immersive_mode, speech.expressive, speech.expression_strength, companion.proactive_enabled, companion.proactive_intensity, appearance.theme, appearance.chat_style, and appearance.font_scale. This tool handles persistence and runtime side effects. It does not expose API keys, destructive reset/import operations, Android permissions, or floating-window service actions.",
+                        parametersStructured =
+                            listOf(
+                                ToolParameterSchema(
+                                    name = "action",
+                                    type = "string",
+                                    description = "SEARCH, GET, or SET",
+                                    required = true,
+                                ),
+                                ToolParameterSchema(
+                                    name = "query",
+                                    type = "string",
+                                    description = "Natural-language setting name for SEARCH; empty SEARCH lists the first settings",
+                                    required = false,
+                                ),
+                                ToolParameterSchema(
+                                    name = "setting_id",
+                                    type = "string",
+                                    description = "Stable setting ID returned by SEARCH; required for GET and SET",
+                                    required = false,
+                                ),
+                                ToolParameterSchema(
+                                    name = "value",
+                                    type = "string",
+                                    description = "New value for SET, using the value_hint returned by SEARCH or GET",
+                                    required = false,
+                                ),
+                            ),
+                    ),
+                ),
+        )
+
+    private val miraSettingsToolsCn =
+        SystemToolPromptCategory(
+            categoryName = "Mira 设置工具",
+            tools =
+                listOf(
+                    ToolPrompt(
+                        name = "manage_mira_settings",
+                        description =
+                            "在对话中搜索、读取或修改 Mira 软件设置。先用 SEARCH 和用户的自然说法查找稳定 setting_id；GET 读取当前值；只有用户明确要求改变设置时才用 SET。会话覆盖、角色偏好和全局默认是三个独立作用域：chat.auto_read、chat.memory_auto_update 只改当前会话；speech.auto_read.companion 改当前角色；speech.auto_read.global、memory.auto_update.global 改全局默认。其他常用 ID 包括 chat.immersive_mode、speech.expressive、speech.expression_strength、companion.proactive_enabled、companion.proactive_intensity、appearance.theme、appearance.chat_style 和 appearance.font_scale。工具会处理持久化和运行时副作用。API Key、清空重置、导入覆盖、安卓系统权限和系统悬浮窗服务不在本工具范围内。",
+                        parametersStructured =
+                            listOf(
+                                ToolParameterSchema(
+                                    name = "action",
+                                    type = "string",
+                                    description = "SEARCH、GET 或 SET",
+                                    required = true,
+                                ),
+                                ToolParameterSchema(
+                                    name = "query",
+                                    type = "string",
+                                    description = "SEARCH 使用的自然语言设置名称；留空时列出首批设置",
+                                    required = false,
+                                ),
+                                ToolParameterSchema(
+                                    name = "setting_id",
+                                    type = "string",
+                                    description = "SEARCH 返回的稳定设置 ID；GET 和 SET 必需",
+                                    required = false,
+                                ),
+                                ToolParameterSchema(
+                                    name = "value",
+                                    type = "string",
+                                    description = "SET 的新值，格式按 SEARCH 或 GET 返回的 value_hint",
+                                    required = false,
                                 ),
                             ),
                     ),
@@ -502,8 +596,33 @@ object SystemToolPrompts {
         categoryName = "Memory and Memory Library Tools",
         tools = listOf(
             ToolPrompt(
+                name = "save_companion_memory",
+                description = "Immediately saves a fact only when the latest user message explicitly asks to remember, note, save to memory, or not forget it. A content-only command such as 'remember' or 'remember this' refers to the immediately preceding user message; quote that original message as evidence. Do not call this tool for an ordinary statement of identity, preference, routine, boundary, relationship, or another durable fact: Mira's background memory extractor handles those silently after the reply. Do not claim that this tool saved anything unless its result has status=saved. Ordinary file-save requests and transient chat are not memory requests. Use an exact quote from the user message that proves the fact; never save credentials, filler, question tails, or invented facts. Use an atomic custom predicate when needed, such as personality.trait, quirk, favorite_game, communication_style, or custom_note.",
+                parametersStructured = listOf(
+                    ToolParameterSchema(name = "value", type = "string", description = "required, concise durable fact to remember", required = true),
+                    ToolParameterSchema(name = "evidence_quote", type = "string", description = "required, exact substring copied from the fact-bearing user message; for a bare remember command, copy from the immediately preceding user message", required = true),
+                    ToolParameterSchema(name = "label", type = "string", description = "optional, short user-facing label", required = false),
+                    ToolParameterSchema(name = "scope", type = "string", description = "optional: USER, COMPANION, RELATIONSHIP, or CONVERSATION", required = false, default = "USER"),
+                    ToolParameterSchema(name = "type", type = "string", description = "optional: IDENTITY, PREFERENCE, FACT, EVENT, ROUTINE, BOUNDARY, COMMITMENT, RELATIONSHIP, or SUMMARY", required = false, default = "FACT"),
+                    ToolParameterSchema(name = "predicate", type = "string", description = "optional stable lowercase key; predefined keys are only examples. Custom keys such as personality.trait, quirk, favorite_game, communication_style, or custom_note are valid", required = false, default = "explicit_memory"),
+                    ToolParameterSchema(name = "action", type = "string", description = "optional: CREATE, UPDATE, or SUPERSEDE", required = false, default = "CREATE"),
+                    ToolParameterSchema(name = "confidence", type = "number", description = "optional confidence from 0 to 1", required = false, default = "1.0"),
+                    ToolParameterSchema(name = "importance", type = "number", description = "optional importance from 0 to 1", required = false, default = "0.9")
+                )
+            ),
+            ToolPrompt(
+                name = "delete_companion_memory",
+                description = "Deletes structured companion memories from the user's latest explicit request. Call it with no parameters: it derives targets from the user's original wording, then deletes all directly matching records in one operation. Do not ask for candidate numbers or record_id. Only when the user asks to clear all or every memory, first call this tool to obtain status=needs_bulk_confirmation, tell the user to send the exact confirmation phrase it returns, and call this tool again after that second confirmation. Do not treat questions about deletion features as deletion requests.",
+                parametersStructured = emptyList()
+            ),
+            ToolPrompt(
+                name = "export_companion_memory",
+                description = "Exports the current memory profile as one portable Mira JSON archive, including structured companion memories, evidence, relationship edges, grants, episodes, and the legacy document memory library. Call it only when the user explicitly asks to export or back up memories. It takes no parameters and returns the created file path and counts.",
+                parametersStructured = emptyList()
+            ),
+            ToolPrompt(
                 name = "query_memory",
-                description = "Searches the memory library for relevant memories and document chunks.",
+                description = "Searches both Mira's accessible structured companion memories and the legacy memory/document library. Results are labeled by source; use this single tool for questions about what the companion remembers.",
                 parametersStructured = listOf(
                     ToolParameterSchema(name = "query", type = "string", description = "string, the search query. You can pass a natural-language question, a space-separated phrase, or use `|` to separate multiple keywords, for example `network error timeout` or `network|error|timeout`. Inside a keyword, `*` acts as a fuzzy wildcard placeholder, for example `error*timeout`; use only `*` to return all memories", required = true),
                     ToolParameterSchema(name = "folder_path", type = "string", description = "optional, string, the specific folder path to search within", required = false),
@@ -526,15 +645,40 @@ object SystemToolPrompts {
                 )
             )
         ),
-        categoryFooter = "\nNote: The memory library and user personality profile may be updated automatically after the current reply is finalized. If you need to manage memories immediately or update user preferences, use the appropriate tools directly."
+        categoryFooter = "\nNote: The memory library and user personality profile may be updated automatically and silently after the current reply is finalized. Never call save_companion_memory for an ordinary durable fact; use it only for the user's latest explicit memory-save request."
     )
     
     val memoryToolsCn = SystemToolPromptCategory(
         categoryName = "记忆与记忆库工具",
         tools = listOf(
             ToolPrompt(
+                name = "save_companion_memory",
+                description = "只在用户最新消息明确要求“记住、记下来、保存到记忆、别忘了”某个具体事实时，立即写入结构化伴侣记忆。只有一句“记住”或“记住这个”时，它指向紧邻的上一条用户消息，证据要从那条原始消息复制。普通的身份、偏好、习惯、边界、关系或其他稳定事实由 Mira 的后台记忆抽取器在回复后静默处理，不要为它们调用本工具。只有工具结果为 status=saved 时才能宣称本工具已经保存。普通文件保存和一次性闲聊不属于记忆请求。证据必须逐字来自实际证明该事实的用户消息；不要保存凭据、语气词、反问尾巴或推测内容。需要时使用原子化自定义谓词，例如 personality.trait、quirk、favorite_game、communication_style 或 custom_note。",
+                parametersStructured = listOf(
+                    ToolParameterSchema(name = "value", type = "string", description = "必需，要长期记住的简洁事实", required = true),
+                    ToolParameterSchema(name = "evidence_quote", type = "string", description = "必需，从实际承载事实的用户消息中原样复制连续片段；如果最新消息只有“记住”，就从紧邻的上一条用户消息复制", required = true),
+                    ToolParameterSchema(name = "label", type = "string", description = "可选，面向用户显示的简短标题", required = false),
+                    ToolParameterSchema(name = "scope", type = "string", description = "可选：USER、COMPANION、RELATIONSHIP 或 CONVERSATION", required = false, default = "USER"),
+                    ToolParameterSchema(name = "type", type = "string", description = "可选：IDENTITY、PREFERENCE、FACT、EVENT、ROUTINE、BOUNDARY、COMMITMENT、RELATIONSHIP 或 SUMMARY", required = false, default = "FACT"),
+                    ToolParameterSchema(name = "predicate", type = "string", description = "可选，稳定的小写键；内置键只是示例，也支持 personality.trait、quirk、favorite_game、communication_style、custom_note 等自定义键", required = false, default = "explicit_memory"),
+                    ToolParameterSchema(name = "action", type = "string", description = "可选：CREATE、UPDATE 或 SUPERSEDE", required = false, default = "CREATE"),
+                    ToolParameterSchema(name = "confidence", type = "number", description = "可选，0 到 1 的置信度", required = false, default = "1.0"),
+                    ToolParameterSchema(name = "importance", type = "number", description = "可选，0 到 1 的重要度", required = false, default = "0.9")
+                )
+            ),
+            ToolPrompt(
+                name = "delete_companion_memory",
+                description = "根据用户最新一条明确删除请求删除结构化伴侣记忆，调用时不传参数：工具会从用户原话自行解析目标，并一次直接删除所有匹配记录。不要要求用户选编号，也不要使用 record_id。仅当用户要求清空全部或所有记忆时，先调用本工具取得 status=needs_bulk_confirmation，告知工具返回的精确确认语，再等用户第二次明确确认后调用本工具执行。询问删除功能的问题不属于删除指令。",
+                parametersStructured = emptyList()
+            ),
+            ToolPrompt(
+                name = "export_companion_memory",
+                description = "把当前记忆档案导出成一个可迁移的 Mira JSON 包，内容包含结构化伴侣记忆、证据、关系边、授权、事件章节和兼容旧版的文档记忆。仅在用户明确要求导出或备份记忆时调用；不传参数，结果会返回文件路径和数量统计。",
+                parametersStructured = emptyList()
+            ),
+            ToolPrompt(
                 name = "query_memory",
-                description = "从记忆库中搜索相关记忆和文档分块。",
+                description = "同时搜索 Mira 当前角色可访问的结构化伴侣记忆和旧版记忆/文档库。结果会标明来源；询问角色记得什么时统一使用这个工具。",
                 parametersStructured = listOf(
                     ToolParameterSchema(name = "query", type = "string", description = "string, 搜索查询。可以传自然语言问题、空格分隔的短语，或使用 `|` 分隔多个关键词，例如 `network error timeout` 或 `network|error|timeout`。在单个关键词内部，`*` 可作为模糊通配占位符，例如 `error*timeout`；仅传 `*` 时返回所有记忆", required = true),
                     ToolParameterSchema(name = "folder_path", type = "string", description = "可选, string, 要搜索的特定文件夹路径", required = false),
@@ -557,7 +701,7 @@ object SystemToolPrompts {
                 )
             )
         ),
-        categoryFooter = "\n注意：记忆库和用户性格档案可能会在当前回复结束后由独立系统自动更新。如果需要立即管理记忆或更新用户偏好，请直接使用相应工具。"
+        categoryFooter = "\n注意：记忆库和用户性格档案可能会在当前回复结束后由独立系统自动静默更新。普通稳定事实不要调用 save_companion_memory；只有用户最新消息明确要求保存记忆时才调用。"
     )
 
     private val internalToolCategoriesEn: List<SystemToolPromptCategory> = SystemToolPromptsInternal.internalToolCategoriesEn
@@ -613,6 +757,7 @@ object SystemToolPrompts {
         return listOf(
             basicTools,
             miraDeviceTools,
+            miraSettingsTools,
             adjustedFileSystemTools,
             httpTools,
             memoryTools
@@ -689,6 +834,7 @@ object SystemToolPrompts {
         return listOf(
             basicToolsCn,
             miraDeviceToolsCn,
+            miraSettingsToolsCn,
             adjustedFileSystemTools,
             httpToolsCn,
             memoryToolsCn
@@ -757,9 +903,9 @@ object SystemToolPrompts {
         toolOrder: List<String> = emptyList()
     ): List<ManageableToolPrompt> {
         val baseCategories = if (useEnglish) {
-            listOf(basicTools, fileSystemTools, httpTools, memoryTools)
+            listOf(basicTools, miraDeviceTools, miraSettingsTools, fileSystemTools, httpTools, memoryTools)
         } else {
-            listOf(basicToolsCn, fileSystemToolsCn, httpToolsCn, memoryToolsCn)
+            listOf(basicToolsCn, miraDeviceToolsCn, miraSettingsToolsCn, fileSystemToolsCn, httpToolsCn, memoryToolsCn)
         }
 
         val result = baseCategories

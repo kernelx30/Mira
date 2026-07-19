@@ -3,6 +3,7 @@ package com.ai.assistance.operit.core.chat
 import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
 import com.ai.assistance.operit.data.model.CompanionMemoryPredicate
 import com.ai.assistance.operit.data.model.CompanionRecordScope
+import com.ai.assistance.operit.data.model.MemoryPerspective
 import com.ai.assistance.operit.data.repository.CompanionMemoryRecallResult
 import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
 import com.ai.assistance.operit.data.repository.decodedValue
@@ -45,7 +46,7 @@ object CompanionMemoryContextBuilder {
         if (recall.records.isEmpty() && recall.episodes.isEmpty()) return ""
         val header =
             if (useEnglish) {
-                "[Local companion memory]\nUser-explicit facts outrank inferred facts. Use only relevant items and never invent missing history."
+                "[Local companion memory]\nUser-explicit facts outrank inferred facts. Items marked shared-by-user are second-hand: never describe them as your own experience. Use only relevant items and never invent missing history."
             } else {
                 "【本地伴侣记忆】\n用户明确说过的事实优先于推断；只在相关时自然使用，不补造缺失经历。"
             }
@@ -82,7 +83,9 @@ object CompanionMemoryContextBuilder {
     }
 
     private fun formatRecord(record: CompanionMemoryRecordEntity, useEnglish: Boolean): String {
-        val source = if (record.sourceKind == "USER_EXPLICIT") {
+        val source = if (record.perspective == MemoryPerspective.USER_SHARED.name) {
+            if (useEnglish) "shared-by-user" else "用户转告"
+        } else if (record.sourceKind == "USER_EXPLICIT") {
             if (useEnglish) "explicit" else "用户明确"
         } else {
             if (useEnglish) "inferred" else "待核实"

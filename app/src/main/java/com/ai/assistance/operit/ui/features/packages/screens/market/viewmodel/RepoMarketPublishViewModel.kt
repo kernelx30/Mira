@@ -1,9 +1,7 @@
 package com.ai.assistance.operit.ui.features.packages.screens.market.viewmodel
 
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
-import android.net.Uri
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -18,7 +16,6 @@ import com.ai.assistance.operit.data.api.MarketV2PublishRequest
 import com.ai.assistance.operit.data.api.MarketV2PublishSource
 import com.ai.assistance.operit.data.api.MarketV2PublishVersion
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
-import com.ai.assistance.operit.ui.features.github.GitHubOAuthCoordinator
 import com.ai.assistance.operit.ui.features.packages.market.MarketStatsType
 import com.ai.assistance.operit.util.AppLogger
 import java.net.URI
@@ -104,20 +101,6 @@ class RepoMarketPublishViewModel(
 
     fun clearError() {
         _errorMessage.value = null
-    }
-
-    fun initiateGitHubLogin(context: Context) {
-        viewModelScope.launch {
-            try {
-                val authUrl = GitHubOAuthCoordinator(context).createExternalAuthorizationUrl()
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                _errorMessage.value = context.getString(R.string.skillmarket_login_failed, e.message ?: "")
-                AppLogger.e(TAG, "Failed to initiate GitHub login", e)
-            }
-        }
     }
 
     fun logoutFromGitHub() {

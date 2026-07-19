@@ -341,6 +341,18 @@ data class WebBubbleTheme(
     val userRounded: Boolean,
     @SerialName("assistant_rounded")
     val assistantRounded: Boolean,
+    @SerialName("user_corner_radius")
+    val userCornerRadius: Float,
+    @SerialName("assistant_corner_radius")
+    val assistantCornerRadius: Float,
+    @SerialName("user_max_width_ratio")
+    val userMaxWidthRatio: Float,
+    @SerialName("assistant_max_width_ratio")
+    val assistantMaxWidthRatio: Float,
+    @SerialName("message_vertical_padding")
+    val messageVerticalPadding: Float,
+    @SerialName("shadow_elevation")
+    val shadowElevation: Float,
     @SerialName("user_padding_left")
     val userPaddingLeft: Float,
     @SerialName("user_padding_right")

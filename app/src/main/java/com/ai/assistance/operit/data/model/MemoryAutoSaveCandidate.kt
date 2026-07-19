@@ -17,14 +17,17 @@ data class MemoryAutoSaveCandidate(
     var lastError: String = "",
     var sourceType: String = SOURCE_TYPE_REPLY_FINALIZED_AUTO,
     var nextAttemptAtMs: Long = 0L,
+    var companionId: String = "",
 ) {
     companion object {
         const val STATUS_PENDING = "pending"
         const val STATUS_PROCESSING = "processing"
         const val STATUS_FAILED = "failed"
+        const val STATUS_SKIPPED_LEGACY_UNSCOPED = "skipped_legacy_unscoped"
 
         const val SOURCE_TYPE_REPLY_FINALIZED_AUTO = "reply_finalized_auto"
         const val SOURCE_TYPE_HIGH_VALUE_AUTO = "high_value_auto"
+        const val SOURCE_TYPE_EXPLICIT_USER = "explicit_user_request"
         const val SOURCE_TYPE_SELECTED_USER_MESSAGE = "selected_user_message"
 
         const val PROCESSING_STALE_AFTER_MS = 10L * 60L * 1000L
@@ -36,6 +39,15 @@ data class MemoryAutoSaveCandidate(
         }
 
         fun isSelectedUserMessageSource(sourceType: String): Boolean {
+            return sourceType == SOURCE_TYPE_SELECTED_USER_MESSAGE ||
+                sourceType == SOURCE_TYPE_EXPLICIT_USER
+        }
+
+        fun isExplicitUserRequestSource(sourceType: String): Boolean {
+            return sourceType == SOURCE_TYPE_EXPLICIT_USER
+        }
+
+        fun isUserSelectedSource(sourceType: String): Boolean {
             return sourceType == SOURCE_TYPE_SELECTED_USER_MESSAGE
         }
 

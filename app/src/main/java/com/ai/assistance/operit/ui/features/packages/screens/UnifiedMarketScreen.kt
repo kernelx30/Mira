@@ -38,17 +38,11 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Store
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Comment
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -89,10 +83,9 @@ import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.api.MarketV2Entry
 import com.ai.assistance.operit.data.api.MarketV2ManifestCategory
-import com.ai.assistance.operit.data.api.MarketV2Notification
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.data.preferences.GitHubUser
-import com.ai.assistance.operit.ui.features.github.GitHubLoginWebViewDialog
+import com.ai.assistance.operit.ui.features.github.GitHubDeviceLoginDialog
 import com.ai.assistance.operit.ui.features.packages.market.BindMarketSearchToTopBar
 import com.ai.assistance.operit.ui.features.packages.market.MarketBrowseSection
 import com.ai.assistance.operit.ui.features.packages.market.MarketStatsType
@@ -179,8 +172,7 @@ fun UnifiedMarketScreen(
     onNavigateToRepoPublish: (MarketStatsType) -> Unit = {},
     onNavigateToMarketManage: () -> Unit = {},
     onNavigateToDetail: (MarketV2Entry) -> Unit = {},
-    onNavigateToCategory: (String) -> Unit = {},
-    onNavigateToNotifications: () -> Unit = {}
+    onNavigateToCategory: (String) -> Unit = {}
 ) {
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
 
@@ -210,8 +202,7 @@ fun UnifiedMarketScreen(
                 MarketHomeTab.MINE -> MarketMinePane(
                     onManage = onNavigateToMarketManage,
                     onPublishArtifact = onNavigateToArtifactPublish,
-                    onPublishRepo = onNavigateToRepoPublish,
-                    onOpenNotifications = onNavigateToNotifications
+                    onPublishRepo = onNavigateToRepoPublish
                 )
             }
         }
@@ -241,11 +232,6 @@ fun UnifiedMarketScreen(
         }
     }
 
-}
-
-@Composable
-fun UnifiedMarketNotificationsScreen() {
-    MarketNotificationsPane()
 }
 
 @Composable
@@ -526,158 +512,6 @@ private fun MarketTypedListPane(
     }
 }
 
-@Composable
-private fun MarketNotificationsPane() {
-    val context = LocalContext.current
-    val viewModel: UnifiedMarketBrowseViewModel =
-        viewModel(
-            key = "market-notifications",
-            factory = UnifiedMarketBrowseViewModel.Factory(
-                context.applicationContext,
-                UnifiedMarketBrowseScope.All
-            )
-        )
-    val notifications by viewModel.notifications.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
-
-    BindMarketSearchToTopBar(
-        enabled = false,
-        searchQuery = "",
-        onSearchQueryChanged = { _ -> },
-        searchPlaceholderRes = UnifiedMarketBrowseConfig.searchPlaceholderRes
-    )
-
-    LaunchedEffect(Unit) {
-        viewModel.loadNotifications()
-    }
-
-    errorMessage?.let { error ->
-        LaunchedEffect(error) {
-            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-            viewModel.clearError()
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        if (isLoading && notifications.isEmpty()) {
-            MarketAccountLoadingCard()
-        } else if (notifications.isEmpty()) {
-            MarketEmptyCard(
-                title = stringResource(R.string.market_notifications_empty_title),
-                description = stringResource(R.string.market_notifications_empty_description)
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(notifications, key = { it.id }) { notification ->
-                    MarketNotificationCard(notification = notification)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MarketNotificationCard(notification: MarketV2Notification) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = notificationKindIcon(notification.kind),
-                contentDescription = null,
-                tint = notificationKindColor(notification.kind),
-                modifier = Modifier.size(24.dp).padding(top = 2.dp)
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = notificationKindLabel(notification.kind),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = notificationKindColor(notification.kind)
-                    )
-                    Text(
-                        text = relativeTime(notification.createdAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
-                Text(
-                    text = notification.title.ifBlank { notificationKindLabel(notification.kind) },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (notification.body.isNotBlank()) {
-                    Text(
-                        text = notification.body,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun notificationKindIcon(kind: String): ImageVector {
-    return when (kind) {
-        "comment_new", "comment_reply" -> Icons.Default.Comment
-        "review_approved", "entry_curated" -> Icons.Default.CheckCircle
-        "review_rejected" -> Icons.Default.Cancel
-        "review_changes" -> Icons.Default.Refresh
-        else -> Icons.Default.Notifications
-    }
-}
-
-private fun notificationKindLabel(kind: String): String {
-    return when (kind) {
-        "comment_new" -> "新评论"
-        "comment_reply" -> "回复了你的评论"
-        "review_approved" -> "已通过审核"
-        "review_rejected" -> "未通过审核"
-        "review_changes" -> "需要修改"
-        "entry_curated" -> "入选精选"
-        else -> kind
-    }
-}
-
-@Composable
-private fun notificationKindColor(kind: String): Color {
-    return when (kind) {
-        "comment_new", "comment_reply" -> MaterialTheme.colorScheme.primary
-        "review_approved" -> MaterialTheme.colorScheme.primary
-        "entry_curated" -> MaterialTheme.colorScheme.tertiary
-        "review_rejected" -> MaterialTheme.colorScheme.error
-        "review_changes" -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}
-
 private fun relativeTime(isoDate: String): String {
     if (isoDate.isBlank()) return ""
     return try {
@@ -703,8 +537,7 @@ private fun relativeTime(isoDate: String): String {
 private fun MarketMinePane(
     onManage: () -> Unit,
     onPublishArtifact: () -> Unit,
-    onPublishRepo: (MarketStatsType) -> Unit,
-    onOpenNotifications: () -> Unit
+    onPublishRepo: (MarketStatsType) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -774,13 +607,6 @@ private fun MarketMinePane(
                 },
                 icon = Icons.Default.Add
             )
-            MarketMineActionCard(
-                title = stringResource(R.string.market_notifications_title),
-                onClick = {
-                    if (authState.isLoggedIn) onOpenNotifications() else showLoginDialog = true
-                },
-                icon = Icons.Default.Notifications
-            )
         }
     }
 
@@ -801,7 +627,7 @@ private fun MarketMinePane(
     }
 
     if (showLoginDialog) {
-        GitHubLoginWebViewDialog(
+        GitHubDeviceLoginDialog(
             onDismissRequest = { showLoginDialog = false },
             onLoginSuccess = { showLoginDialog = false }
         )

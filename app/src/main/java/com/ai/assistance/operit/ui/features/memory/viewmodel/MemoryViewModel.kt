@@ -100,7 +100,8 @@ data class MemoryUiState(
 class MemoryViewModel(
     private val repository: MemoryRepository,
     private val context: Context,
-    private val profileId: String
+    private val profileId: String,
+    private val companionId: String,
 ) : ViewModel() {
 
     companion object {
@@ -131,7 +132,7 @@ class MemoryViewModel(
         if (selectedFolder.isNotEmpty()) return legacyGraph
         return CompanionMemoryGraphProjector.merge(
             legacyGraph = legacyGraph,
-            snapshot = companionMemoryRepository.getGraphSnapshot(profileId),
+            snapshot = companionMemoryRepository.getGraphSnapshot(profileId, companionId),
             query = _uiState.value.searchQuery,
             labels = companionGraphLabels(),
         )
@@ -224,7 +225,7 @@ class MemoryViewModel(
                 val graphData =
                     CompanionMemoryGraphProjector.merge(
                         legacyGraph = repository.getGraphForMemories(memories),
-                        snapshot = companionMemoryRepository.getGraphSnapshot(profileId),
+                        snapshot = companionMemoryRepository.getGraphSnapshot(profileId, companionId),
                         query = query,
                         labels = companionGraphLabels(),
                     )
@@ -1214,12 +1215,15 @@ class MemoryViewModel(
 }
 
 /** Factory for creating MemoryViewModel instances with dependencies. */
-class MemoryViewModelFactory(private val context: Context, private val profileId: String) :
-        ViewModelProvider.Factory {
+class MemoryViewModelFactory(
+    private val context: Context,
+    private val profileId: String,
+    private val companionId: String,
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MemoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST") val repository = MemoryRepository(context, profileId)
-            return MemoryViewModel(repository, context.applicationContext, profileId) as T
+            return MemoryViewModel(repository, context.applicationContext, profileId, companionId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

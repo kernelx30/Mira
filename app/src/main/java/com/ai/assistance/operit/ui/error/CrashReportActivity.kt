@@ -1,16 +1,12 @@
 package com.ai.assistance.operit.ui.error
 
-import android.app.Activity
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import com.ai.assistance.operit.util.AppLogger
+import com.ai.assistance.operit.util.AppProcessRestarter
 import com.ai.assistance.operit.util.CrashRecoveryState
 import com.ai.assistance.operit.util.ThrowableTextFormatter
 import android.widget.Toast
@@ -43,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.common.OperitUtilityTheme
 import com.ai.assistance.operit.ui.features.toolbox.screens.logcat.LogcatExportHelper
-import com.ai.assistance.operit.ui.main.MainActivity
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -280,22 +275,7 @@ private fun exportToFile(context: Context, text: String) {
 }
 
 private fun restartApp(context: Context) {
-    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        ?: Intent(context, MainActivity::class.java)
-    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-
-    val flags = PendingIntent.FLAG_CANCEL_CURRENT or
-        (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
-    val pendingIntent = PendingIntent.getActivity(context, 0, intent, flags)
-
-    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    alarmManager.set(
-        AlarmManager.RTC,
-        System.currentTimeMillis() + 200,
-        pendingIntent
-    )
-
-    (context as? Activity)?.finishAffinity()
-    android.os.Process.killProcess(android.os.Process.myPid())
-    kotlin.system.exitProcess(0)
+    if (!AppProcessRestarter.scheduleAndExit(context, delayMs = 250L)) {
+        Toast.makeText(context, R.string.crash_report_restart_failed, Toast.LENGTH_LONG).show()
+    }
 }

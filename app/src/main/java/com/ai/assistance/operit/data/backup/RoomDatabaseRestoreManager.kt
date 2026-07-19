@@ -21,6 +21,10 @@ object RoomDatabaseRestoreManager {
 
     private const val AUTO_BACKUP_FILE_PREFIX = "room_db_backup_"
     private const val MANUAL_BACKUP_FILE_PREFIX = "room_db_manual_backup_"
+    private const val MAX_DATABASE_BACKUP_ENTRIES = 3
+    private const val MAX_DATABASE_ENTRY_BYTES = 4L * 1024 * 1024 * 1024
+    private const val MAX_DATABASE_TOTAL_BYTES = 8L * 1024 * 1024 * 1024
+    private const val RESTORE_FREE_SPACE_RESERVE_BYTES = 128L * 1024 * 1024
 
     fun listRecentAutoBackups(context: Context, limit: Int = 3): List<File> {
         val newDir = OperitBackupDirs.roomDbDir()
@@ -68,7 +72,16 @@ object RoomDatabaseRestoreManager {
                 try {
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         FileOutputStream(cacheFile).use { output ->
-                            input.copyTo(output)
+                            AtomicRestoreFileOps.copyStreamWithLimit(
+                                input = input,
+                                output = output,
+                                maxBytes =
+                                    minOf(
+                                        MAX_DATABASE_TOTAL_BYTES,
+                                        (context.cacheDir.usableSpace - RESTORE_FREE_SPACE_RESERVE_BYTES)
+                                            .coerceAtLeast(0L),
+                                    ),
+                            )
                         }
                     } ?: throw IllegalStateException("Failed to open uri")
 
@@ -93,12 +106,6 @@ object RoomDatabaseRestoreManager {
             throw IllegalArgumentException("Backup file not found: ${zipFile.absolutePath}")
         }
 
-        try {
-            AppDatabase.closeDatabase()
-        } catch (e: Exception) {
-            AppLogger.w(TAG, "closeDatabase failed", e)
-        }
-
         val targetDb = context.getDatabasePath(DB_NAME)
         val targetWal = File(targetDb.absolutePath + "-wal")
         val targetShm = File(targetDb.absolutePath + "-shm")
@@ -116,6 +123,17 @@ object RoomDatabaseRestoreManager {
         var extractedDb = false
         var extractedWal = false
         var extractedShm = false
+        val extractionBudget =
+            RestoreExtractionBudget(
+                maxEntries = MAX_DATABASE_BACKUP_ENTRIES,
+                maxTotalBytes =
+                    minOf(
+                        MAX_DATABASE_TOTAL_BYTES,
+                        (dir.usableSpace - RESTORE_FREE_SPACE_RESERVE_BYTES).coerceAtLeast(0L),
+                    ),
+                maxEntryBytes = MAX_DATABASE_ENTRY_BYTES,
+            )
+        val extractedEntryNames = HashSet<String>()
 
         try {
             ZipInputStream(BufferedInputStream(FileInputStream(zipFile))).use { zis ->
@@ -125,15 +143,18 @@ object RoomDatabaseRestoreManager {
 
                     when (name) {
                         DB_NAME -> {
-                            writeStreamToFile(zis, tmpDb)
+                            requireNewDatabaseEntry(extractedEntryNames, extractionBudget, name, entry.size)
+                            writeStreamToFile(zis, tmpDb, extractionBudget, name)
                             extractedDb = true
                         }
                         "${DB_NAME}-wal" -> {
-                            writeStreamToFile(zis, tmpWal)
+                            requireNewDatabaseEntry(extractedEntryNames, extractionBudget, name, entry.size)
+                            writeStreamToFile(zis, tmpWal, extractionBudget, name)
                             extractedWal = true
                         }
                         "${DB_NAME}-shm" -> {
-                            writeStreamToFile(zis, tmpShm)
+                            requireNewDatabaseEntry(extractedEntryNames, extractionBudget, name, entry.size)
+                            writeStreamToFile(zis, tmpShm, extractionBudget, name)
                             extractedShm = true
                         }
                     }
@@ -145,25 +166,23 @@ object RoomDatabaseRestoreManager {
             if (!extractedDb) {
                 throw IllegalArgumentException("Invalid backup zip: missing $DB_NAME")
             }
-
-            targetWal.delete()
-            targetShm.delete()
-            targetDb.delete()
-
-            replaceFile(tmpDb, targetDb)
-            if (extractedWal) {
-                replaceFile(tmpWal, targetWal)
-            } else {
-                tmpWal.delete()
-                targetWal.delete()
+            if (!hasValidSqliteHeader(tmpDb)) {
+                throw IllegalArgumentException("Invalid backup zip: $DB_NAME is not a SQLite database")
             }
 
-            if (extractedShm) {
-                replaceFile(tmpShm, targetShm)
-            } else {
-                tmpShm.delete()
-                targetShm.delete()
+            try {
+                AppDatabase.closeDatabase()
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "closeDatabase failed", e)
             }
+
+            replaceDatabaseFilesWithRollback(
+                listOf(
+                    DatabaseRestoreFilePlan(staged = tmpDb, target = targetDb),
+                    DatabaseRestoreFilePlan(staged = tmpWal.takeIf { extractedWal }, target = targetWal),
+                    DatabaseRestoreFilePlan(staged = tmpShm.takeIf { extractedShm }, target = targetShm),
+                )
+            )
         } catch (e: Exception) {
             tmpDb.delete()
             tmpWal.delete()
@@ -172,24 +191,124 @@ object RoomDatabaseRestoreManager {
         }
     }
 
-    private fun writeStreamToFile(input: ZipInputStream, target: File) {
+    private fun requireNewDatabaseEntry(
+        extractedEntryNames: MutableSet<String>,
+        extractionBudget: RestoreExtractionBudget,
+        entryName: String,
+        declaredSize: Long,
+    ) {
+        if (!extractedEntryNames.add(entryName)) {
+            throw IllegalArgumentException("Duplicate database backup entry: $entryName")
+        }
+        extractionBudget.beginEntry(entryName, declaredSize)
+    }
+
+    private fun writeStreamToFile(
+        input: ZipInputStream,
+        target: File,
+        extractionBudget: RestoreExtractionBudget,
+        entryName: String,
+    ) {
         val buffer = ByteArray(64 * 1024)
         BufferedOutputStream(FileOutputStream(target)).use { output ->
             while (true) {
                 val read = input.read(buffer)
                 if (read <= 0) break
+                extractionBudget.recordBytes(entryName, read)
                 output.write(buffer, 0, read)
             }
         }
     }
 
-    private fun replaceFile(from: File, to: File) {
-        if (to.exists()) {
-            to.delete()
+    internal fun hasValidSqliteHeader(file: File): Boolean {
+        if (!file.isFile || file.length() < SQLITE_HEADER.size) return false
+        val header = ByteArray(SQLITE_HEADER.size)
+        FileInputStream(file).use { input ->
+            var offset = 0
+            while (offset < header.size) {
+                val read = input.read(header, offset, header.size - offset)
+                if (read <= 0) return false
+                offset += read
+            }
         }
-        if (!from.renameTo(to)) {
-            from.copyTo(to, overwrite = true)
-            from.delete()
+        return header.contentEquals(SQLITE_HEADER)
+    }
+
+    internal fun replaceFile(from: File, to: File) {
+        AtomicRestoreFileOps.moveReplacing(from, to)
+    }
+
+    internal data class DatabaseRestoreFilePlan(
+        val staged: File?,
+        val target: File,
+    )
+
+    internal fun replaceDatabaseFilesWithRollback(
+        plans: List<DatabaseRestoreFilePlan>,
+        moveFile: (File, File) -> Unit = { source, target ->
+            AtomicRestoreFileOps.moveReplacing(source, target)
+        },
+    ) {
+        require(plans.map { it.target.absolutePath }.distinct().size == plans.size) {
+            "Restore plan contains duplicate targets"
+        }
+        plans.mapNotNull { it.staged }.forEach { staged ->
+            require(staged.isFile) { "Restore source is not a file: ${staged.absolutePath}" }
+        }
+
+        val backups = LinkedHashMap<File, File>()
+        val installedTargets = LinkedHashSet<File>()
+        var committed = false
+        try {
+            plans.forEach { plan ->
+                if (plan.target.exists()) {
+                    val parent = plan.target.parentFile
+                        ?: throw IllegalArgumentException("Restore target has no parent")
+                    val backup = File.createTempFile(".${plan.target.name}.mira_restore_", ".bak", parent)
+                    check(backup.delete()) { "Failed to prepare restore backup: ${backup.absolutePath}" }
+                    moveFile(plan.target, backup)
+                    backups[plan.target] = backup
+                }
+            }
+
+            plans.forEach { plan ->
+                plan.staged?.let { staged ->
+                    moveFile(staged, plan.target)
+                    installedTargets += plan.target
+                }
+            }
+            committed = true
+        } catch (failure: Exception) {
+            installedTargets
+                .filterNot(backups::containsKey)
+                .forEach { target ->
+                    if (target.exists() && !target.delete()) {
+                        failure.addSuppressed(
+                            IllegalStateException("Failed to remove partial restore target: ${target.absolutePath}")
+                        )
+                    }
+                }
+            backups.entries.toList().asReversed().forEach { (target, backup) ->
+                if (backup.exists()) {
+                    try {
+                        moveFile(backup, target)
+                    } catch (rollbackFailure: Exception) {
+                        failure.addSuppressed(
+                            IllegalStateException(
+                                "Failed to roll back ${target.absolutePath}; backup remains at ${backup.absolutePath}",
+                                rollbackFailure,
+                            )
+                        )
+                    }
+                }
+            }
+            throw failure
+        } finally {
+            if (committed) {
+                backups.values.forEach { backup -> backup.delete() }
+            }
         }
     }
+
+    private val SQLITE_HEADER = "SQLite format 3\u0000".toByteArray(Charsets.US_ASCII)
 }

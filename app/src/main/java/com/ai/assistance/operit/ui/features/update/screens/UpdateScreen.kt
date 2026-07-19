@@ -341,6 +341,13 @@ fun UpdateCard(
                                 fontWeight = FontWeight.Medium
                             )
                         }
+                    } else {
+                        Text(
+                            text = stringResource(R.string.update_no_downloadable_apk),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

@@ -36,6 +36,7 @@ data class MessageVariantEntity(
     val outputDurationMs: Long = 0L,
     val waitDurationMs: Long = 0L,
     val completedAt: Long = 0L,
+    val speechDirectionJson: String? = null,
 ) {
     fun applyTo(baseMessage: ChatMessage, variantCount: Int): ChatMessage {
         return baseMessage.copy(
@@ -52,6 +53,7 @@ data class MessageVariantEntity(
             outputDurationMs = outputDurationMs,
             waitDurationMs = waitDurationMs,
             completedAt = completedAt,
+            speechDirectionJson = speechDirectionJson,
         )
     }
 
@@ -79,6 +81,7 @@ data class MessageVariantEntity(
                 outputDurationMs = message.outputDurationMs,
                 waitDurationMs = message.waitDurationMs,
                 completedAt = message.completedAt,
+                speechDirectionJson = message.speechDirectionJson,
             )
         }
     }

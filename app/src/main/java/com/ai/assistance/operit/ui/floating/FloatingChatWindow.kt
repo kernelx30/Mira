@@ -1,16 +1,5 @@
 package com.ai.assistance.operit.ui.floating
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -151,69 +140,20 @@ fun FloatingChatWindow(
         // Keep the floating draft so the full chat can receive it.
     }
 
-    // 根据currentMode参数渲染对应界面，使用AnimatedContent添加炫酷过渡动画
+    // 模式切换保持瞬时完成，悬浮窗不做展开、缩放或淡入淡出动画。
     Box {
-        AnimatedContent(
-            targetState = currentMode, // 只监听 currentMode，避免消息更新时触发动画
-            transitionSpec = {
-                val targetMode = targetState
-                val initialMode = initialState
-
-                // 判断是否从球模式切换到其他模式，或从其他模式切换到球模式
-                val isToBall = targetMode == FloatingMode.BALL || targetMode == FloatingMode.VOICE_BALL
-                val isFromBall = initialMode == FloatingMode.BALL || initialMode == FloatingMode.VOICE_BALL
-
-                // 判断是否是窗口和全屏之间的切换
-                val isWindowFullscreenTransition =
-                    (initialMode == FloatingMode.WINDOW && (targetMode == FloatingMode.FULLSCREEN || targetMode == FloatingMode.SCREEN_OCR)) ||
-                    ((initialMode == FloatingMode.FULLSCREEN || initialMode == FloatingMode.SCREEN_OCR) && targetMode == FloatingMode.WINDOW)
-
-                if (isWindowFullscreenTransition) {
-                    // 窗口 ↔ 全屏：使用简洁的缩放 + 淡入淡出动画
-                    (fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) +
-                     scaleIn(initialScale = 0.92f, animationSpec = tween(220, easing = FastOutSlowInEasing)))
-                        .togetherWith(
-                            fadeOut(animationSpec = tween(160)) +
-                            scaleOut(targetScale = 1.03f, animationSpec = tween(160))
-                        )
-                } else if (isToBall && !isFromBall) {
-                    // 其他模式 -> 球模式：窗口快速缩小消失，球从极小爆炸式出现
-                    (fadeIn(animationSpec = tween(350, delayMillis = 150, easing = FastOutSlowInEasing)) +
-                     scaleIn(initialScale = 0.0f, animationSpec = tween(350, delayMillis = 150, easing = FastOutSlowInEasing)))
-                        .togetherWith(
-                            fadeOut(animationSpec = tween(150)) +
-                            scaleOut(targetScale = 0.0f, animationSpec = tween(150))
-                        )
-                } else if (isFromBall && !isToBall) {
-                    // 球模式 -> 其他模式：球瞬间消失，窗口从中心炸开展现
-                    (fadeIn(animationSpec = tween(400, delayMillis = 100, easing = FastOutSlowInEasing)) +
-                     scaleIn(initialScale = 0.0f, animationSpec = tween(400, delayMillis = 100, easing = FastOutSlowInEasing)))
-                        .togetherWith(
-                            fadeOut(animationSpec = tween(100)) +
-                            scaleOut(targetScale = 0.0f, animationSpec = tween(100))
-                        )
-                } else {
-                    // 球模式之间切换：快速交叉淡入淡出
-                    fadeIn(animationSpec = tween(250, delayMillis = 100))
-                        .togetherWith(fadeOut(animationSpec = tween(100)))
+        when (currentMode) {
+            FloatingMode.WINDOW -> MiraQuickReplyCard(floatContext = floatContext)
+            FloatingMode.BALL -> {
+                when (previousMode) {
+                    FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
+                    else -> FloatingChatBallMode(floatContext = floatContext)
                 }
-            },
-            label = "mode_transition"
-        ) { mode -> // 只接收 currentMode，不是整个 context
-            when (mode) {
-                FloatingMode.WINDOW -> MiraQuickReplyCard(floatContext = floatContext)
-                FloatingMode.BALL -> {
-                    // 根据前一个模式决定显示哪种球
-                    when (previousMode) {
-                        FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
-                        else -> FloatingChatBallMode(floatContext = floatContext)
-                    }
-                }
-                FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
-                FloatingMode.FULLSCREEN -> FloatingFullscreenMode(floatContext = floatContext)
-                FloatingMode.RESULT_DISPLAY -> FloatingResultDisplay(floatContext = floatContext)
-                FloatingMode.SCREEN_OCR -> FloatingScreenOcrMode(floatContext = floatContext)
             }
+            FloatingMode.VOICE_BALL -> FloatingVoiceBallMode(floatContext = floatContext)
+            FloatingMode.FULLSCREEN -> FloatingFullscreenMode(floatContext = floatContext)
+            FloatingMode.RESULT_DISPLAY -> FloatingResultDisplay(floatContext = floatContext)
+            FloatingMode.SCREEN_OCR -> FloatingScreenOcrMode(floatContext = floatContext)
         }
 
         ChatToastHost(

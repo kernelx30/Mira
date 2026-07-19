@@ -10,7 +10,8 @@ import java.io.File
 
 data class MarketInstallMarker(
     val entryId: String,
-    val versionId: String
+    val versionId: String,
+    val origin: String? = null
 )
 
 enum class MarketLocalInstallStateKind {
@@ -34,8 +35,22 @@ fun writeMarketInstallMarker(root: File, entry: MarketV2Entry) {
         throw IllegalStateException("Failed to create market marker dir: ${markerDir.absolutePath}")
     }
     File(markerDir, MARKET_MARKER_FILE_NAME).writeText(
-        Gson().toJson(MarketInstallMarker(entryId = entry.id, versionId = versionId))
+        Gson().toJson(
+            MarketInstallMarker(
+                entryId = entry.id,
+                versionId = versionId,
+                origin = inferArtifactMarketOrigin(entry).wireValue
+            )
+        )
     )
+}
+
+fun installedMarketEntryIds(
+    context: Context,
+    packageManager: PackageManager
+): Set<String> {
+    return readInstalledMarketMarkerRoots(context, packageManager)
+        .mapTo(linkedSetOf()) { markerRoot -> markerRoot.marker.entryId }
 }
 
 fun resolveMarketLocalInstallStates(
@@ -132,7 +147,9 @@ private fun readInstalledMarketMarkerRoots(
 private fun readMarketInstallMarker(root: File): MarketInstallMarker? {
     val markerFile = File(File(root, MARKET_MARKER_DIR_NAME), MARKET_MARKER_FILE_NAME)
     if (!markerFile.exists() || !markerFile.isFile) return null
-    return Gson().fromJson(markerFile.readText(), MarketInstallMarker::class.java)
+    return runCatching {
+        Gson().fromJson(markerFile.readText(), MarketInstallMarker::class.java)
+    }.getOrNull()
 }
 
 private const val MARKET_MARKER_DIR_NAME = ".operit"

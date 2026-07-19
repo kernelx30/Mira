@@ -5,6 +5,7 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.core.chat.AIMessageManager
+import com.ai.assistance.operit.core.chat.CompanionMemoryTargetResolver
 import com.ai.assistance.operit.core.chat.HistoryCompactionPlan
 import com.ai.assistance.operit.core.chat.HistoryCompactionPlanner
 import com.ai.assistance.operit.core.chat.hooks.PromptTurn
@@ -155,6 +156,11 @@ class MessageCoordinationDelegate(
         val isGroupOrchestrationTurn: Boolean,
         val groupParticipantNamesText: String?,
         var waitJob: Job? = null
+    )
+
+    private data class CompanionMemoryEnqueueTarget(
+        val companionId: String,
+        val roleCardId: String?,
     )
 
     private val pendingAutoContinuationByChatId =
@@ -1673,6 +1679,41 @@ class MessageCoordinationDelegate(
         }
     }
 
+    private suspend fun resolveCompanionMemoryEnqueueTarget(
+        chatId: String,
+        characterGroupId: String?,
+        characterCardName: String?,
+    ): CompanionMemoryEnqueueTarget? {
+        // Only the chat binding captured by the user action may own these candidates;
+        // consulting the later active prompt here could move old evidence to another persona.
+        val roleCardId =
+            if (characterGroupId.isNullOrBlank()) {
+                characterCardName
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { characterCardManager.findCharacterCardByName(it)?.id }
+            } else {
+                null
+            }
+        val companionId =
+            CompanionMemoryTargetResolver.snapshotForTurn(
+                characterGroupId = characterGroupId,
+                roleCardId = roleCardId,
+            )
+        if (companionId.isBlank()) {
+            AppLogger.w(
+                TAG,
+                "Skipping companion-memory enqueue because the selected chat has no " +
+                    "resolvable target: chatId=$chatId",
+            )
+            return null
+        }
+        return CompanionMemoryEnqueueTarget(
+            companionId = companionId,
+            roleCardId = roleCardId,
+        )
+    }
+
     private suspend fun resolveChatContextSettingsForRequest(
         chatModelConfigIdOverride: String?
     ): ChatContextSettings {
@@ -1687,21 +1728,33 @@ class MessageCoordinationDelegate(
             uiStateDelegate.showToast(context.getString(R.string.chat_summarizing_memory))
             return
         }
+        // Freeze the selected chat before launching so a navigation change cannot retarget memory.
+        val currentChatId = chatHistoryDelegate.currentChatId.value
+        val currentChatSnapshot =
+            currentChatId?.let { chatId ->
+                chatHistoryDelegate.chatHistories.value.firstOrNull { it.id == chatId }
+            }
         coroutineScope.launch {
-            val currentChatId = chatHistoryDelegate.currentChatId.value
             val runtimeHistory =
                 currentChatId?.let { chatHistoryDelegate.getRuntimeChatHistory(it) }.orEmpty()
             saveMessagesToMemory(
                 sourceMessages = runtimeHistory,
                 currentChatId = currentChatId,
-                emptyToastMessage = context.getString(R.string.chat_history_empty_no_update)
+                emptyToastMessage = context.getString(R.string.chat_history_empty_no_update),
+                characterGroupIdSnapshot = currentChatSnapshot?.characterGroupId,
+                characterCardNameSnapshot = currentChatSnapshot?.characterCardName,
             )
         }
     }
 
     fun enqueueSelectedMessagesForMemoryAutoSave(selectedMessages: List<ChatMessage>) {
+        // Selection belongs to the chat visible at click time, even if the coroutine runs later.
+        val currentChatId = chatHistoryDelegate.currentChatId.value
+        val currentChatSnapshot =
+            currentChatId?.let { chatId ->
+                chatHistoryDelegate.chatHistories.value.firstOrNull { it.id == chatId }
+            }
         coroutineScope.launch {
-            val currentChatId = chatHistoryDelegate.currentChatId.value
             val userMessages = selectedMessages.validUserMessagesForMemory()
 
             if (currentChatId.isNullOrBlank()) {
@@ -1716,17 +1769,19 @@ class MessageCoordinationDelegate(
             }
 
             try {
-                val roleCardId =
-                    resolveWindowEstimateRoleCardId(
+                val target =
+                    resolveCompanionMemoryEnqueueTarget(
                         chatId = currentChatId,
-                        roleCardId = null
-                    )
+                        characterGroupId = currentChatSnapshot?.characterGroupId,
+                        characterCardName = currentChatSnapshot?.characterCardName,
+                    ) ?: return@launch
                 val profileId =
-                    roleCardId?.let { resolveRoleCardMemoryProfileOverride(it) }
+                    target.roleCardId?.let { resolveRoleCardMemoryProfileOverride(it) }
                         ?: preferencesManager.activeProfileIdFlow.first()
                 MemoryAutoSaveCandidateRepository(context, profileId)
                     .enqueueSelectedUserMessages(
                         chatId = currentChatId,
+                        companionId = target.companionId,
                         triggerMessageTimestamps = userMessages.map { it.timestamp }
                     )
                 MemoryAutoSaveScheduler.getInstance()
@@ -1755,7 +1810,9 @@ class MessageCoordinationDelegate(
         sourceMessages: List<ChatMessage>,
         currentChatId: String?,
         emptyToastMessage: String,
-        lastContentOverride: String? = null
+        lastContentOverride: String? = null,
+        characterGroupIdSnapshot: String? = null,
+        characterCardNameSnapshot: String? = null,
     ) {
         val enhancedAiService = getEnhancedAiService()
         if (enhancedAiService == null) {
@@ -1776,15 +1833,19 @@ class MessageCoordinationDelegate(
                 lastContentOverride?.takeIf { it.isNotBlank() }
                     ?: sourceMessages.lastOrNull()?.content
                     ?: ""
-            val roleCardId =
-                resolveWindowEstimateRoleCardId(
-                    chatId = currentChatId,
-                    roleCardId = null
-                )
+            val target =
+                currentChatId?.let { chatId ->
+                    resolveCompanionMemoryEnqueueTarget(
+                        chatId = chatId,
+                        characterGroupId = characterGroupIdSnapshot,
+                        characterCardName = characterCardNameSnapshot,
+                    )
+                }
+            val roleCardId = target?.roleCardId
             val preferenceProfileIdOverride =
                 roleCardId?.let { resolveRoleCardMemoryProfileOverride(it) }
 
-            if (!currentChatId.isNullOrBlank()) {
+            if (!currentChatId.isNullOrBlank() && target != null) {
                 val profileId =
                     preferenceProfileIdOverride
                         ?: preferencesManager.activeProfileIdFlow.first()
@@ -1792,6 +1853,7 @@ class MessageCoordinationDelegate(
                     MemoryAutoSaveCandidateRepository(context, profileId)
                         .enqueueSelectedUserMessages(
                             chatId = currentChatId,
+                            companionId = target.companionId,
                             triggerMessageTimestamps =
                                 sourceMessages.validUserMessagesForMemory().map { it.timestamp }
                         )

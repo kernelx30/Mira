@@ -5,6 +5,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 
 class MessageDispatchAdmissionTest {
     @Test
@@ -54,6 +62,113 @@ class MessageDispatchAdmissionTest {
     fun consumesOnlyTheDraftThatWasActuallyDispatched() {
         assertTrue(shouldConsumeUserDraft(currentText = "hello", dispatchedText = "hello"))
         assertFalse(shouldConsumeUserDraft(currentText = "hello again", dispatchedText = "hello"))
+    }
+
+    @Test
+    fun completedTurnCannotClearAReplacementSendJob() {
+        assertTrue(
+            shouldClearCompletedSendJob(
+                runtimeGeneration = 4L,
+                completedGeneration = 4L,
+                isSameJob = true,
+            )
+        )
+        assertFalse(
+            shouldClearCompletedSendJob(
+                runtimeGeneration = 5L,
+                completedGeneration = 4L,
+                isSameJob = true,
+            )
+        )
+        assertFalse(
+            shouldClearCompletedSendJob(
+                runtimeGeneration = 4L,
+                completedGeneration = 4L,
+                isSameJob = false,
+            )
+        )
+    }
+
+    @Test
+    fun cancellingChatRemainsBusyAfterItsSendJobStops() {
+        assertTrue(isChatRuntimeBusy(isLoading = true, isCancelling = false))
+        assertTrue(isChatRuntimeBusy(isLoading = false, isCancelling = true))
+        assertFalse(isChatRuntimeBusy(isLoading = false, isCancelling = false))
+    }
+
+    @Test
+    fun destructiveCancellationWaitsForAnEarlierCancellationToFinish() = runBlocking {
+        val gate = ChatCancellationGate()
+        val firstEntered = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val order = mutableListOf<String>()
+
+        val first = async {
+            gate.run {
+                order += "first-start"
+                firstEntered.complete(Unit)
+                releaseFirst.await()
+                order += "first-end"
+            }
+        }
+        firstEntered.await()
+        val destructive = async {
+            gate.run { order += "destructive" }
+        }
+        yield()
+
+        assertEquals(listOf("first-start"), order)
+        releaseFirst.complete(Unit)
+        first.await()
+        destructive.await()
+        assertEquals(listOf("first-start", "first-end", "destructive"), order)
+    }
+
+    @Test
+    fun callerCancellationDoesNotReleaseGateBeforeWritersStop() = runBlocking {
+        val gate = ChatCancellationGate()
+        val writerStopping = CompletableDeferred<Unit>()
+        val releaseWriter = CompletableDeferred<Unit>()
+        val destructiveEntered = CompletableDeferred<Unit>()
+        val writer = launch {
+            try {
+                CompletableDeferred<Unit>().await()
+            } finally {
+                withContext(NonCancellable) {
+                    writerStopping.complete(Unit)
+                    releaseWriter.await()
+                }
+            }
+        }
+        val firstCancellation = launch {
+            gate.run { cancelAndJoinJobs(listOf(writer)) }
+        }
+        writerStopping.await()
+        firstCancellation.cancel()
+        val destructive = launch {
+            gate.run { destructiveEntered.complete(Unit) }
+        }
+        yield()
+
+        assertFalse(destructiveEntered.isCompleted)
+        releaseWriter.complete(Unit)
+        firstCancellation.join()
+        destructive.join()
+        assertTrue(destructiveEntered.isCompleted)
+    }
+
+    @Test
+    fun memoryEnqueueFailureDoesNotAbortChatDispatch() = runBlocking {
+        val failure = isolateMemoryEnqueueFailure { error("ObjectBox unavailable") }
+
+        assertEquals("ObjectBox unavailable", failure?.message)
+    }
+
+    @Test(expected = CancellationException::class)
+    fun memoryEnqueueCancellationStillCancelsChatDispatch() {
+        runBlocking {
+            isolateMemoryEnqueueFailure { throw CancellationException("turn cancelled") }
+        }
     }
 
     @Test

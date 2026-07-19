@@ -35,13 +35,104 @@ import com.ai.assistance.operit.util.stream.SharedStream
 import com.ai.assistance.operit.util.stream.share
 import com.ai.assistance.operit.util.stream.shareRevisable
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 internal const val MESSAGE_PROCESS_TIMING_TAG = "MessageProcessTiming"
+
+internal class ActiveOperationRegistry<T : Any> {
+    private val operations = ConcurrentHashMap<String, T>()
+
+    fun register(key: String, operation: T): Boolean = operations.putIfAbsent(key, operation) == null
+
+    fun isCurrent(key: String, operation: T): Boolean = operations[key] === operation
+
+    fun removeIfCurrent(key: String, operation: T): Boolean = operations.remove(key, operation)
+
+    fun current(key: String): T? = operations[key]
+
+    fun keys(): Set<String> = operations.keys.toSet()
+}
+
+internal enum class OperationCancellationStart {
+    STARTED,
+    ALREADY_CANCELLING,
+    ALREADY_COMPLETING,
+}
+
+internal class OperationLifecycle {
+    private val state = AtomicInteger(STATE_ACTIVE)
+    private val cancellationFinished = CompletableDeferred<Unit>()
+
+    fun beginCancellation(): OperationCancellationStart =
+        when {
+            state.compareAndSet(STATE_ACTIVE, STATE_CANCELLING) ->
+                OperationCancellationStart.STARTED
+            state.get() == STATE_CANCELLING ->
+                OperationCancellationStart.ALREADY_CANCELLING
+            else -> OperationCancellationStart.ALREADY_COMPLETING
+        }
+
+    fun beginCompletion(): Boolean = state.compareAndSet(STATE_ACTIVE, STATE_COMPLETING)
+
+    fun isCancelling(): Boolean = state.get() == STATE_CANCELLING
+
+    fun isCompleting(): Boolean = state.get() == STATE_COMPLETING
+
+    fun cancellationCompletion(): Deferred<Unit> = cancellationFinished
+
+    fun finishCancellation() {
+        cancellationFinished.complete(Unit)
+    }
+
+    private companion object {
+        const val STATE_ACTIVE = 0
+        const val STATE_CANCELLING = 1
+        const val STATE_COMPLETING = 2
+    }
+}
+
+internal fun <T : Any> clearControllerAfterNaturalCompletion(
+    lifecycle: OperationLifecycle,
+    controller: AtomicReference<T?>,
+): Boolean {
+    if (!lifecycle.isCompleting()) return false
+    controller.set(null)
+    return true
+}
+
+internal fun <T : Any> takeCurrentController(controller: AtomicReference<T?>): T? =
+    controller.getAndSet(null)
+
+internal fun <T : Any> takeExpectedController(
+    controller: AtomicReference<T?>,
+    expected: T,
+): T? = if (controller.compareAndSet(expected, null)) expected else null
+
+class OperationCancellationHandle internal constructor(
+    private val completion: Deferred<Unit>?,
+) {
+    suspend fun awaitCompletion() {
+        completion?.await()
+    }
+
+    companion object {
+        val None = OperationCancellationHandle(null)
+    }
+}
 
 internal fun messageTimingNow(): Long = SystemClock.elapsedRealtime()
 
@@ -79,8 +170,17 @@ object AIMessageManager {
 
     private const val DEFAULT_CHAT_KEY = "__DEFAULT_CHAT__"
 
-    private val activeEnhancedAiServiceByChatId = ConcurrentHashMap<String, EnhancedAIService>()
-    private val activeMessageProcessingControllerByChatId = ConcurrentHashMap<String, MessageProcessingController>()
+    private class ActiveChatOperation(
+        val token: Long,
+        val service: EnhancedAIService,
+        val producerJob: Job,
+        val producerScope: CoroutineScope,
+        val controller: AtomicReference<MessageProcessingController?> = AtomicReference(null),
+        val lifecycle: OperationLifecycle = OperationLifecycle(),
+    )
+
+    private val activeOperations = ActiveOperationRegistry<ActiveChatOperation>()
+    private val nextOperationToken = AtomicLong(0L)
 
     @Volatile private var lastActiveChatKey: String = DEFAULT_CHAT_KEY
 
@@ -93,6 +193,92 @@ object AIMessageManager {
     private lateinit var packageManager: PackageManager
     private lateinit var context: Context
     private lateinit var apiPreferences: ApiPreferences
+
+    private suspend fun beginOperation(
+        chatKey: String,
+        service: EnhancedAIService,
+    ): ActiveChatOperation {
+        while (true) {
+            val existing = activeOperations.current(chatKey)
+            if (existing != null) {
+                when {
+                    existing.lifecycle.isCancelling() -> {
+                        OperationCancellationHandle(existing.lifecycle.cancellationCompletion())
+                            .awaitCompletion()
+                        // Cancellation completes before its slot is removed; let the owner finish
+                        // that final registry update instead of spinning on an already-complete barrier.
+                        yield()
+                        continue
+                    }
+                    existing.lifecycle.isCompleting() -> {
+                        yield()
+                        continue
+                    }
+                    else -> error("Chat operation already active: chatId=$chatKey")
+                }
+            }
+
+            val producerJob = SupervisorJob(scope.coroutineContext[Job])
+            val operation =
+                ActiveChatOperation(
+                    token = nextOperationToken.incrementAndGet(),
+                    service = service,
+                    producerJob = producerJob,
+                    producerScope = CoroutineScope(Dispatchers.IO + producerJob),
+                )
+            if (activeOperations.register(chatKey, operation)) {
+                return operation
+            }
+            producerJob.cancel()
+        }
+    }
+
+    private fun ensureOperationActive(chatKey: String, operation: ActiveChatOperation) {
+        if (!operation.producerJob.isActive || !activeOperations.isCurrent(chatKey, operation)) {
+            throw CancellationException(
+                "Chat operation was cancelled before its response stream started: " +
+                    "chatId=$chatKey, token=${operation.token}",
+            )
+        }
+    }
+
+    private fun prepareOperationCompletion(chatKey: String, operation: ActiveChatOperation) {
+        if (operation.lifecycle.beginCompletion()) {
+            activeOperations.removeIfCurrent(chatKey, operation)
+        }
+    }
+
+    private fun completeOperation(operation: ActiveChatOperation) {
+        clearControllerAfterNaturalCompletion(operation.lifecycle, operation.controller)
+        // The event-channel share is also a child and otherwise outlives the completed text stream.
+        operation.producerJob.cancel()
+    }
+
+    private fun cancelOwnedController(
+        chatKey: String,
+        operation: ActiveChatOperation,
+        expected: MessageProcessingController? = null,
+    ) {
+        // Transfer ownership atomically so ToolPkg receives exactly one cancellation request.
+        val controller =
+            if (expected == null) {
+                takeCurrentController(operation.controller)
+            } else {
+                takeExpectedController(operation.controller, expected)
+            } ?: return
+        runCatching { controller.cancel() }
+            .onFailure { error ->
+                AppLogger.e(TAG, "取消消息处理插件执行失败: chatId=$chatKey", error)
+            }
+    }
+
+    private fun abandonOperation(chatKey: String, operation: ActiveChatOperation) {
+        if (operation.lifecycle.beginCompletion()) {
+            activeOperations.removeIfCurrent(chatKey, operation)
+        }
+        cancelOwnedController(chatKey, operation)
+        operation.producerJob.cancel()
+    }
 
     fun initialize(context: Context) {
         this.context = context
@@ -335,6 +521,7 @@ object AIMessageManager {
         characterName: String? = null,
         avatarUri: String? = null,
         roleCardId: String,
+        memoryCompanionId: String,
         currentRoleName: String? = null,
         splitHistoryByRole: Boolean = false,
         groupOrchestrationMode: Boolean = false,
@@ -349,10 +536,11 @@ object AIMessageManager {
         toolsEnabledOverride: Boolean? = null,
     ): SharedStream<String> {
         val totalStartTime = messageTimingNow()
-        val chatKey = chatId ?: DEFAULT_CHAT_KEY
+        val chatKey = chatId?.takeIf { it.isNotBlank() } ?: DEFAULT_CHAT_KEY
         lastActiveChatKey = chatKey
-        activeEnhancedAiServiceByChatId[chatKey] = enhancedAiService
+        val operation = beginOperation(chatKey, enhancedAiService)
 
+        try {
         val buildMemoryStartTime = messageTimingNow()
         val memory =
             ConversationTimeContext.markCurrentRequest(
@@ -429,14 +617,27 @@ object AIMessageManager {
                 details = "chatKey=$chatKey, matched=${pluginExecution != null}"
             )
             if (pluginExecution != null) {
-                activeMessageProcessingControllerByChatId[chatKey] = pluginExecution.controller
+                operation.controller.set(pluginExecution.controller)
+                if (!activeOperations.isCurrent(chatKey, operation) || !operation.producerJob.isActive) {
+                    cancelOwnedController(
+                        chatKey = chatKey,
+                        operation = operation,
+                        expected = pluginExecution.controller,
+                    )
+                    throw CancellationException(
+                        "Chat operation was cancelled while a message plugin was starting: " +
+                            "chatId=$chatKey, token=${operation.token}",
+                    )
+                }
                 AppLogger.d(TAG, "消息处理插件已接管消息处理")
                 val pluginStream = pluginExecution.stream.share(
-                    scope = scope,
+                    scope = operation.producerScope,
                     replay = Int.MAX_VALUE,
+                    onBeforeClose = {
+                        prepareOperationCompletion(chatKey, operation)
+                    },
                     onComplete = {
-                        activeMessageProcessingControllerByChatId.remove(chatKey)
-                        activeEnhancedAiServiceByChatId.remove(chatKey)
+                        completeOperation(operation)
                     }
                 )
                 logMessageTiming(
@@ -446,7 +647,6 @@ object AIMessageManager {
                 )
                 return@withContext pluginStream
             } else {
-                activeMessageProcessingControllerByChatId.remove(chatKey)
                 AppLogger.d(TAG, "消息处理插件未接管，使用普通模式")
             }
 
@@ -478,6 +678,7 @@ object AIMessageManager {
                     characterName = characterName,
                     avatarUri = avatarUri,
                     roleCardId = roleCardId,
+                    memoryCompanionId = memoryCompanionId,
                     enableGroupOrchestrationHint = groupOrchestrationMode,
                     groupParticipantNamesText = groupParticipantNamesText,
                     proxySenderName = proxySenderName,
@@ -490,12 +691,16 @@ object AIMessageManager {
                     disableWarning = disableWarning,
                     toolsEnabledOverride = toolsEnabledOverride,
                 )
-            ).shareRevisable(
-                scope = scope,
+            )
+            ensureOperationActive(chatKey, operation)
+            val sharedResponseStream = responseStream.shareRevisable(
+                scope = operation.producerScope,
                 replay = Int.MAX_VALUE,
+                onBeforeClose = {
+                    prepareOperationCompletion(chatKey, operation)
+                },
                 onComplete = {
-                    activeMessageProcessingControllerByChatId.remove(chatKey)
-                    activeEnhancedAiServiceByChatId.remove(chatKey)
+                    completeOperation(operation)
                 }
             )
             logMessageTiming(
@@ -508,7 +713,11 @@ object AIMessageManager {
                 startTimeMs = totalStartTime,
                 details = "chatKey=$chatKey, mode=default, history=${memoryForRequest.size}"
             )
-            responseStream
+            sharedResponseStream
+        }
+        } catch (error: Throwable) {
+            abandonOperation(chatKey, operation)
+            throw error
         }
     }
 
@@ -620,19 +829,36 @@ object AIMessageManager {
         cancelOperation(lastActiveChatKey)
     }
 
-    fun cancelOperation(chatId: String) {
+    internal fun cancelOperation(chatId: String): OperationCancellationHandle {
         val chatKey = chatId.ifBlank { DEFAULT_CHAT_KEY }
         AppLogger.d(TAG, "请求取消AI操作: chatId=$chatKey")
 
-        activeMessageProcessingControllerByChatId.remove(chatKey)?.let {
-            AppLogger.d(TAG, "正在取消消息处理插件执行: chatId=$chatKey")
-            it.cancel()
+        val operation = activeOperations.current(chatKey)
+        if (operation == null) {
+            return OperationCancellationHandle.None
         }
 
-        activeEnhancedAiServiceByChatId.remove(chatKey)?.let {
-            AppLogger.d(TAG, "正在取消 EnhancedAIService 对话: chatId=$chatKey")
-            it.cancelConversation()
+        when (operation.lifecycle.beginCancellation()) {
+            OperationCancellationStart.ALREADY_CANCELLING ->
+                return OperationCancellationHandle(operation.lifecycle.cancellationCompletion())
+            OperationCancellationStart.ALREADY_COMPLETING ->
+                return OperationCancellationHandle.None
+            OperationCancellationStart.STARTED -> Unit
         }
+
+        operation.producerJob.cancel()
+        if (operation.controller.get() != null) {
+            AppLogger.d(TAG, "正在取消消息处理插件执行: chatId=$chatKey")
+        }
+        cancelOwnedController(chatKey, operation)
+
+        AppLogger.d(TAG, "正在取消 EnhancedAIService 对话: chatId=$chatKey")
+        val providerCancellationJob: Job =
+            runCatching { operation.service.cancelConversation() }
+                .getOrElse { error ->
+                    AppLogger.e(TAG, "取消 EnhancedAIService 对话失败: chatId=$chatKey", error)
+                    CompletableDeferred(Unit)
+                }
 
         if (chatId.isNotBlank()) {
             runCatching {
@@ -642,12 +868,27 @@ object AIMessageManager {
             }
         }
 
+        scope.launch {
+            try {
+                withContext(NonCancellable) {
+                    operation.producerJob.join()
+                    providerCancellationJob.join()
+                }
+            } finally {
+                // Keep the cancelling slot installed until producer, provider, and ToolPkg
+                // cancellation requests are all committed.
+                operation.lifecycle.finishCancellation()
+                activeOperations.removeIfCurrent(chatKey, operation)
+            }
+        }
+
         AppLogger.d(TAG, "AI操作取消请求已发送: chatId=$chatKey")
+        return OperationCancellationHandle(operation.lifecycle.cancellationCompletion())
     }
 
     fun cancelAllOperations() {
         AppLogger.d(TAG, "请求取消所有AI操作...")
-        val keys = (activeEnhancedAiServiceByChatId.keys + activeMessageProcessingControllerByChatId.keys).toSet()
+        val keys = activeOperations.keys()
         keys.forEach { cancelOperation(it) }
         AppLogger.d(TAG, "所有AI操作取消请求已发送。")
     }

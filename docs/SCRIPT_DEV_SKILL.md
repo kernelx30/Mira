@@ -5,6 +5,8 @@ description: 用于 Operit Sandbox Package 开发。
 
 # SandboxPackage_DEV
 
+> `/sdcard/Download/Operit/` 是当前运行时保留的兼容数据目录，不代表源码、更新或发布仍指向 Operit。开发支持文件统一从 `kernelx30/Mira` 获取。
+
 ## 第一部分：安装与更新
 
 这个 skill 不再要求 AI 一次性手动下载 `SKILL.md`、两份 guide 文档和整套 `types`。
@@ -47,7 +49,7 @@ description: 用于 Operit Sandbox Package 开发。
 首次安装时，按下面顺序做：
 
 1. 先创建 `/sdcard/Download/Operit/skills/SandboxPackage_DEV/scripts/`
-2. 用 `download_file` 下载 `https://cdn.jsdelivr.net/gh/AAswordman/Operit@main/tools/sandboxpackage_dev_install_or_update.js`
+2. 用 `download_file` 下载 `https://cdn.jsdelivr.net/gh/kernelx30/Mira@main/tools/sandboxpackage_dev_install_or_update.js`
 3. 保存为 `/sdcard/Download/Operit/skills/SandboxPackage_DEV/scripts/install_or_update.js`
 4. 调用 `operit_editor` 的 `debug_run_sandbox_script`
 5. 把 `source_path` 设为 `/sdcard/Download/Operit/skills/SandboxPackage_DEV/scripts/install_or_update.js`
@@ -73,7 +75,7 @@ description: 用于 Operit Sandbox Package 开发。
 更新时按下面规则处理：
 
 1. 每次正式开始新的 Sandbox Package 开发任务前，必须优先重新下载一次安装脚本，再重新运行本地脚本
-   - 安装脚本下载地址：`https://cdn.jsdelivr.net/gh/AAswordman/Operit@main/tools/sandboxpackage_dev_install_or_update.js`
+   - 安装脚本下载地址：`https://cdn.jsdelivr.net/gh/kernelx30/Mira@main/tools/sandboxpackage_dev_install_or_update.js`
    - 安装脚本保存位置：`/sdcard/Download/Operit/skills/SandboxPackage_DEV/scripts/install_or_update.js`
 2. 如果怀疑两份 guide 文档、types 或 `SKILL.md` 已经过旧，也重新运行这个脚本
 3. 如果本地 skill 目录缺文件、文件名不对、或者内容明显陈旧，不要手动零散修补，直接重跑安装脚本

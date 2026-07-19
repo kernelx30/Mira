@@ -15,6 +15,7 @@ import com.ai.assistance.operit.data.model.CompanionMemoryEpisodeEntity
 import com.ai.assistance.operit.data.model.CompanionMemoryEdgeEntity
 import com.ai.assistance.operit.data.model.CompanionMemoryEvidenceEntity
 import com.ai.assistance.operit.data.model.CompanionMemoryRecordEntity
+import com.ai.assistance.operit.data.model.MemoryGrantEntity
 import com.ai.assistance.operit.data.model.MessageEntity
 import com.ai.assistance.operit.data.model.MessageVariantEntity
 
@@ -28,8 +29,9 @@ import com.ai.assistance.operit.data.model.MessageVariantEntity
         CompanionMemoryEvidenceEntity::class,
         CompanionMemoryEpisodeEntity::class,
         CompanionMemoryEdgeEntity::class,
+        MemoryGrantEntity::class,
     ],
-    version = 25,
+    version = 28,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -351,6 +353,94 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        private val MIGRATION_25_26 =
+            object : Migration(25, 26) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // 25 版实体没有这些字段。迁移必须逐项执行并暴露真实 schema 错误，
+                    // 否则吞掉 ALTER TABLE 异常后，Room 会在最终 schema 校验阶段才崩溃。
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN subjectScope TEXT NOT NULL DEFAULT 'USER'")
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN ownerScope TEXT NOT NULL DEFAULT 'GLOBAL_USER'")
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN ownerCompanionId TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN visibility TEXT NOT NULL DEFAULT 'PRIVATE'")
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN perspective TEXT NOT NULL DEFAULT 'USER_DISCLOSED'")
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN evidenceKind TEXT NOT NULL DEFAULT 'USER_DIRECT'")
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN triggerKind TEXT NOT NULL DEFAULT 'AUTO_EXTRACT'")
+                    db.execSQL("ALTER TABLE companion_memory_records ADD COLUMN needsReview INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE companion_memory_evidence ADD COLUMN evidenceKind TEXT NOT NULL DEFAULT 'USER_DIRECT'")
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS companion_memory_grants (
+                            id TEXT NOT NULL PRIMARY KEY,
+                            memoryId TEXT NOT NULL,
+                            granteeCompanionId TEXT NOT NULL,
+                            permission TEXT NOT NULL,
+                            includeSuccessors INTEGER NOT NULL,
+                            grantedBy TEXT NOT NULL,
+                            grantedAt INTEGER NOT NULL,
+                            revokedAt INTEGER,
+                            FOREIGN KEY(memoryId) REFERENCES companion_memory_records(id) ON DELETE CASCADE
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_companion_memory_grants_memoryId ON companion_memory_grants(memoryId)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_companion_memory_grants_granteeCompanionId_revokedAt ON companion_memory_grants(granteeCompanionId, revokedAt)")
+                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_companion_memory_grants_memoryId_granteeCompanionId ON companion_memory_grants(memoryId, granteeCompanionId)")
+                    db.execSQL("UPDATE companion_memory_records SET subjectScope = scope")
+                    db.execSQL("UPDATE companion_memory_records SET ownerCompanionId = companionId WHERE ownerCompanionId = '' AND companionId <> ''")
+                    db.execSQL(
+                        """
+                        UPDATE companion_memory_records
+                        SET ownerCompanionId = COALESCE((
+                            SELECT CASE
+                                WHEN chat.characterGroupId IS NOT NULL AND TRIM(chat.characterGroupId) <> ''
+                                    THEN 'group:' || TRIM(chat.characterGroupId)
+                                WHEN chat.characterCardName IS NOT NULL AND TRIM(chat.characterCardName) <> ''
+                                    THEN 'character_name:' || TRIM(chat.characterCardName)
+                                ELSE ''
+                            END
+                            FROM chats chat
+                            WHERE chat.id = companion_memory_records.conversationId
+                            LIMIT 1
+                        ), '')
+                        WHERE scope = 'USER'
+                          AND ownerCompanionId = ''
+                          AND conversationId <> ''
+                        """.trimIndent(),
+                    )
+                    db.execSQL(
+                        "UPDATE companion_memory_records SET companionId = ownerCompanionId WHERE scope = 'USER' AND companionId = '' AND ownerCompanionId <> ''",
+                    )
+                    db.execSQL(
+                        "UPDATE companion_memory_records SET ownerScope = CASE scope WHEN 'COMPANION' THEN 'COMPANION_PRIVATE' WHEN 'RELATIONSHIP' THEN 'RELATIONSHIP_PAIR' WHEN 'CONVERSATION' THEN 'CONVERSATION' WHEN 'USER' THEN CASE WHEN ownerCompanionId <> '' THEN 'RELATIONSHIP_PAIR' ELSE 'GLOBAL_USER' END ELSE 'GLOBAL_USER' END",
+                    )
+                    db.execSQL("UPDATE companion_memory_records SET visibility = CASE WHEN ownerScope = 'GLOBAL_USER' THEN 'ALL_COMPANIONS' WHEN ownerScope = 'CONVERSATION' THEN 'PARTICIPANTS' ELSE 'PRIVATE' END")
+                    db.execSQL(
+                        "UPDATE companion_memory_records SET needsReview = 1, reviewAt = updatedAt WHERE scope = 'USER' AND ownerCompanionId = ''",
+                    )
+                }
+            }
+
+        private val MIGRATION_26_27 =
+            object : Migration(26, 27) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "ALTER TABLE messages ADD COLUMN `speechDirectionJson` TEXT"
+                    )
+                    db.execSQL(
+                        "ALTER TABLE message_variants ADD COLUMN `speechDirectionJson` TEXT"
+                    )
+                }
+            }
+
+        private val MIGRATION_27_28 =
+            object : Migration(27, 28) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "ALTER TABLE companion_memory_edges ADD COLUMN `pendingEvidenceReferencesJson` TEXT"
+                    )
+                }
+            }
+
         private val COMPANION_MEMORY_DATABASE_CALLBACK =
             object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
@@ -549,6 +639,9 @@ abstract class AppDatabase : RoomDatabase() {
                                 MIGRATION_22_23,
                                 MIGRATION_23_24,
                                 MIGRATION_24_25,
+                                MIGRATION_25_26,
+                                MIGRATION_26_27,
+                                MIGRATION_27_28,
                             ) // 添加新的迁移
                             .addCallback(COMPANION_MEMORY_DATABASE_CALLBACK)
                             .build()

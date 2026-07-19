@@ -49,6 +49,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
 
+internal fun normalizeOpenAiChatReasoningEffort(
+    enableThinking: Boolean,
+    candidate: String?
+): String? {
+    if (!enableThinking) return null
+    return candidate?.trim()?.takeIf { it.isNotEmpty() }
+}
+
 /**
  * OpenAI API格式的实现，支持标准OpenAI接口和兼容此格式的其他提供商
  *
@@ -103,6 +111,10 @@ open class OpenAIProvider(
     // private val client: OkHttpClient = HttpClientFactory.instance
 
     protected val JSON = "application/json".toMediaType()
+
+    /** Custom OpenAI-compatible endpoints may require DeepSeek-style reasoning history. */
+    protected open fun supportsReasoningContentInHistory(): Boolean =
+        providerType == ApiProviderType.OPENAI_GENERIC
 
     // 当前活跃的Call对象，用于取消流式传输
     private var activeCall: Call? = null
@@ -567,8 +579,20 @@ open class OpenAIProvider(
             return
         }
 
-        val existingEffort = requestJson.optString("reasoning_effort", "").trim()
-        if (existingEffort.isNotEmpty()) {
+        val existingEffort =
+            normalizeOpenAiChatReasoningEffort(
+                enableThinking = enableThinking,
+                candidate = requestJson.optString("reasoning_effort", "")
+            )
+        if (!enableThinking) {
+            requestJson.remove("reasoning_effort")
+            AppLogger.d(
+                "OpenAIProvider",
+                "OpenAI Chat Completions reasoning_effort omitted because thinking is disabled"
+            )
+            return
+        }
+        if (existingEffort != null) {
             AppLogger.d(
                 "OpenAIProvider",
                 "Preserving caller-supplied Chat Completions reasoning_effort=$existingEffort"
@@ -576,11 +600,11 @@ open class OpenAIProvider(
             return
         }
 
-        val effort = if (enableThinking) {
-            resolveOpenAiChatReasoningEffort(context)
-        } else {
-            "none"
-        } ?: return
+        val effort =
+            normalizeOpenAiChatReasoningEffort(
+                enableThinking = true,
+                candidate = resolveOpenAiChatReasoningEffort(context)
+            ) ?: return
         requestJson.put("reasoning_effort", effort)
         AppLogger.d(
             "OpenAIProvider",
@@ -934,6 +958,7 @@ open class OpenAIProvider(
         val effectiveHistory = providerReadyHistory
 
         var queuedAssistantToolText: String? = null
+        var queuedAssistantReasoning: String? = null
         var queuedToolCalls = JSONArray()
         val queuedToolCallIds = mutableListOf<String>()
         val openToolCallIds = mutableListOf<String>()
@@ -949,8 +974,25 @@ open class OpenAIProvider(
                 }
         }
 
-        fun queueToolCalls(textContent: String, toolCalls: JSONArray) {
+        fun appendQueuedAssistantReasoning(text: String) {
+            if (text.isBlank()) return
+            queuedAssistantReasoning =
+                if (queuedAssistantReasoning.isNullOrBlank()) {
+                    text
+                } else {
+                    queuedAssistantReasoning + "\n" + text
+                }
+        }
+
+        fun queueToolCalls(
+            textContent: String,
+            toolCalls: JSONArray,
+            reasoningContent: String = ""
+        ) {
             appendQueuedAssistantToolText(textContent)
+            if (supportsReasoningContentInHistory()) {
+                appendQueuedAssistantReasoning(reasoningContent)
+            }
             for (i in 0 until toolCalls.length()) {
                 val sourceToolCall = toolCalls.optJSONObject(i) ?: continue
                 val toolCall = JSONObject(sourceToolCall.toString())
@@ -975,11 +1017,15 @@ open class OpenAIProvider(
             } else {
                 historyMessage.put("content", null)
             }
+            if (supportsReasoningContentInHistory()) {
+                historyMessage.put("reasoning_content", queuedAssistantReasoning.orEmpty())
+            }
             historyMessage.put("tool_calls", queuedToolCalls)
             messagesArray.put(historyMessage)
 
             openToolCallIds.addAll(queuedToolCallIds)
             queuedAssistantToolText = null
+            queuedAssistantReasoning = null
             queuedToolCalls = JSONArray()
             queuedToolCallIds.clear()
         }
@@ -1007,7 +1053,12 @@ open class OpenAIProvider(
         // 添加聊天历史
         if (effectiveHistory.isNotEmpty()) {
             for (turn in effectiveHistory) {
-                val content = comparableContentForTurn(turn, preserveThinkInHistory)
+                val (content, reasoningContent) =
+                    if (turn.kind == PromptTurnKind.ASSISTANT && supportsReasoningContentInHistory()) {
+                        ChatUtils.extractThinkingContent(turn.content)
+                    } else {
+                        comparableContentForTurn(turn, preserveThinkInHistory) to ""
+                    }
                 // 当启用Tool Call API时，转换XML格式的工具调用
                 if (useToolCall) {
                     when (turn.kind) {
@@ -1045,7 +1096,7 @@ open class OpenAIProvider(
                                 if (openToolCallIds.isNotEmpty()) {
                                     flushOpenToolCallsAsCancelled("assistant_tool_call_before_result")
                                 }
-                                queueToolCalls(textContent, toolCalls)
+                                queueToolCalls(textContent, toolCalls, reasoningContent)
                             } else {
                                 flushOpenToolCallsAsCancelled("assistant_boundary")
                                 val effectiveContent = if (content.isBlank()) {
@@ -1057,6 +1108,9 @@ open class OpenAIProvider(
                                 messagesArray.put(
                                     JSONObject().apply {
                                         put("role", "assistant")
+                                        if (supportsReasoningContentInHistory() && reasoningContent.isNotBlank()) {
+                                            put("reasoning_content", reasoningContent)
+                                        }
                                         put("content", buildContentField(context, effectiveContent))
                                     }
                                 )
@@ -1158,6 +1212,9 @@ open class OpenAIProvider(
                     }
 
                     historyMessage.put("content", buildContentField(context, effectiveContent))
+                    if (supportsReasoningContentInHistory() && reasoningContent.isNotBlank()) {
+                        historyMessage.put("reasoning_content", reasoningContent)
+                    }
                     messagesArray.put(historyMessage)
                 }
             }
@@ -1514,6 +1571,19 @@ open class OpenAIProvider(
         checkCancellation(context, exception)
 
         val errorText = resolveRetryErrorText(context, exception)
+
+        val httpStatusException = exception as? HttpStatusCodeException
+        if (httpStatusException != null) {
+            val candidateKeyCount = apiKeyProvider.getCandidateKeyCount()
+            if (
+                !LlmRetryPolicy.shouldRetryHttpStatus(
+                    statusCode = httpStatusException.statusCode,
+                    candidateKeyCount = candidateKeyCount
+                )
+            ) {
+                throw IOException(errorText, exception)
+            }
+        }
 
         if (!enableRetry) {
             throw IOException(errorText, exception)

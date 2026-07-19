@@ -30,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -104,6 +105,10 @@ fun BubbleUserMessageComposable(
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val bubbleShowAvatar by preferencesManager.bubbleShowAvatar.collectAsState(initial = true)
     val bubbleWideLayoutEnabled by preferencesManager.bubbleWideLayoutEnabled.collectAsState(initial = false)
+    val bubbleUserCornerRadius by preferencesManager.bubbleUserCornerRadius.collectAsState(initial = 16f)
+    val bubbleUserMaxWidthRatio by preferencesManager.bubbleUserMaxWidthRatio.collectAsState(initial = 0.78f)
+    val bubbleMessageVerticalPadding by preferencesManager.bubbleMessageVerticalPadding.collectAsState(initial = 4f)
+    val bubbleShadowElevation by preferencesManager.bubbleShadowElevation.collectAsState(initial = 0f)
     val customUserAvatarUri by preferencesManager.customUserAvatarUri.collectAsState(initial = null)
     val globalUserAvatarUri by displayPreferencesManager.globalUserAvatarUri.collectAsState(initial = null)
     val globalUserName by displayPreferencesManager.globalUserName.collectAsState(initial = null)
@@ -243,7 +248,10 @@ fun BubbleUserMessageComposable(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 0.dp, vertical = if (isHiddenPlaceholder) 0.dp else 4.dp)
+            .padding(
+                horizontal = 0.dp,
+                vertical = if (isHiddenPlaceholder) 0.dp else bubbleMessageVerticalPadding.coerceIn(0f, 10f).dp,
+            )
     ) {
         // Display reply info above attachments if present
         replyInfo?.let { reply ->
@@ -439,10 +447,11 @@ fun BubbleUserMessageComposable(
             }
 
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val maxBubbleWidth = maxWidth * 0.78f
+                val maxBubbleWidth = maxWidth * bubbleUserMaxWidthRatio.coerceIn(0.6f, 0.96f)
                 val bubbleShape =
                     userBubbleShape(
                         roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                        cornerRadius = bubbleUserCornerRadius,
                         isVisualGroupStart = isVisualGroupStart,
                         isVisualGroupEnd = isVisualGroupEnd,
                     )
@@ -459,7 +468,11 @@ fun BubbleUserMessageComposable(
                         BubbleImageBackgroundSurface(
                             imageStyle = effectiveBubbleImageStyle,
                             shape = bubbleShape,
-                            modifier = bubbleModifier,
+                            modifier =
+                                bubbleModifier.shadow(
+                                    elevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
+                                    shape = bubbleShape,
+                                ),
                             contentPadding =
                                 PaddingValues(
                                     start = bubbleContentPaddingLeft.dp,
@@ -509,6 +522,12 @@ fun BubbleUserMessageComposable(
                                     Color.Transparent
                                 } else {
                                     effectiveBackgroundColor
+                                },
+                            shadowElevation =
+                                if (liquidGlassEnabled || waterGlassEnabled) {
+                                    0.dp
+                                } else {
+                                    bubbleShadowElevation.coerceIn(0f, 8f).dp
                                 },
                             tonalElevation = 0.dp,
                         ) {
@@ -579,10 +598,11 @@ fun BubbleUserMessageComposable(
                 
                 // Message bubble
                 BoxWithConstraints {
-                    val maxBubbleWidth = maxWidth * 0.78f
+                    val maxBubbleWidth = maxWidth * bubbleUserMaxWidthRatio.coerceIn(0.6f, 0.96f)
                     val bubbleShape =
                         userBubbleShape(
                             roundedCornersEnabled = bubbleRoundedCornersEnabled,
+                            cornerRadius = bubbleUserCornerRadius,
                             isVisualGroupStart = isVisualGroupStart,
                             isVisualGroupEnd = isVisualGroupEnd,
                         )
@@ -595,7 +615,11 @@ fun BubbleUserMessageComposable(
                         BubbleImageBackgroundSurface(
                             imageStyle = effectiveBubbleImageStyle,
                             shape = bubbleShape,
-                            modifier = bubbleModifier,
+                            modifier =
+                                bubbleModifier.shadow(
+                                    elevation = bubbleShadowElevation.coerceIn(0f, 8f).dp,
+                                    shape = bubbleShape,
+                                ),
                             contentPadding =
                                 PaddingValues(
                                     start = bubbleContentPaddingLeft.dp,
@@ -645,6 +669,12 @@ fun BubbleUserMessageComposable(
                                     Color.Transparent
                                 } else {
                                     effectiveBackgroundColor
+                                },
+                            shadowElevation =
+                                if (liquidGlassEnabled || waterGlassEnabled) {
+                                    0.dp
+                                } else {
+                                    bubbleShadowElevation.coerceIn(0f, 8f).dp
                                 },
                             tonalElevation = 0.dp,
                         ) {
@@ -803,16 +833,19 @@ fun BubbleUserMessageComposable(
 
 private fun userBubbleShape(
     roundedCornersEnabled: Boolean,
+    cornerRadius: Float,
     isVisualGroupStart: Boolean,
     isVisualGroupEnd: Boolean,
 ): RoundedCornerShape {
     if (!roundedCornersEnabled) return RoundedCornerShape(0.dp)
 
+    val radius = cornerRadius.coerceIn(4f, 28f)
+    val connectedRadius = (radius * 0.5f).coerceAtMost(8f)
     return RoundedCornerShape(
-        topStart = 16.dp,
-        topEnd = if (isVisualGroupStart) 4.dp else 8.dp,
-        bottomEnd = if (isVisualGroupEnd) 16.dp else 8.dp,
-        bottomStart = 16.dp,
+        topStart = radius.dp,
+        topEnd = if (isVisualGroupStart) minOf(4f, radius).dp else connectedRadius.dp,
+        bottomEnd = if (isVisualGroupEnd) radius.dp else connectedRadius.dp,
+        bottomStart = radius.dp,
     )
 }
 

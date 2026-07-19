@@ -57,7 +57,6 @@ class MarketEntryInstallController(
             writeMarketInstallMarker(installedDir, entry)
         }
         Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-        trackEntryAssetDownload(entry, onProgress)
     }
 
     private suspend fun installMcpEntry(
@@ -101,7 +100,6 @@ class MarketEntryInstallController(
                 context.getString(R.string.mcp_market_config_import_success_with_count, entry.title, count),
                 Toast.LENGTH_SHORT
             ).show()
-            trackEntryAssetDownload(entry, onProgress)
             return
         }
 
@@ -127,7 +125,6 @@ class MarketEntryInstallController(
                     writeMarketInstallMarker(File(result.pluginPath), entry)
                 }
                 Toast.makeText(context, context.getString(R.string.mcp_market_install_success, entry.title), Toast.LENGTH_SHORT).show()
-                trackEntryAssetDownload(entry, onProgress)
             }
             is InstallResult.Error -> {
                 AppLogger.e(TAG, "Failed to install MCP ${entry.title}: ${result.message}")
@@ -197,18 +194,6 @@ class MarketEntryInstallController(
                     root.deleteRecursively()
                 }
             }
-        }
-    }
-
-    private suspend fun trackEntryAssetDownload(
-        entry: MarketV2Entry,
-        onProgress: MarketInstallProgressReporter
-    ) {
-        val assetId = entry.assets.firstOrNull()?.id.orEmpty()
-        if (assetId.isBlank()) return
-        onProgress(MarketInstallStage.RECORDING, null)
-        marketStatsApiService.trackDownload(assetId).onFailure { error ->
-            AppLogger.w(TAG, "Failed to track download for entry=${entry.id} asset=$assetId: ${error.message}")
         }
     }
 

@@ -1,4 +1,3 @@
-import java.io.File
 import java.io.FileInputStream
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -17,41 +16,50 @@ plugins {
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
-    localProperties.load(FileInputStream(localPropertiesFile))
+    FileInputStream(localPropertiesFile).use { localProperties.load(it) }
 }
 
+fun localProperty(name: String): String? =
+    localProperties
+        .getProperty(name)
+        ?.trim()
+        ?.removeSurrounding("\"")
+        ?.takeIf { it.isNotBlank() }
+
 fun buildConfigStringProperty(name: String, defaultValue: String = ""): String {
-    val value =
-        localProperties
-            .getProperty(name, defaultValue)
-            .trim()
-            .removeSurrounding("\"")
-            .ifBlank { defaultValue }
+    val value = localProperty(name) ?: defaultValue
     val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
     return "\"$escaped\""
 }
+
+val releaseKeystorePath = localProperty("RELEASE_STORE_FILE")
+val releaseStorePassword = localProperty("RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = localProperty("RELEASE_KEY_ALIAS")
+val releaseKeyPassword = localProperty("RELEASE_KEY_PASSWORD")
+val releaseKeystoreFile = releaseKeystorePath?.let { rootProject.file(it) }
+val releaseSigningProblems =
+    buildList {
+        if (releaseKeystorePath == null) add("RELEASE_STORE_FILE is missing")
+        if (releaseStorePassword == null) add("RELEASE_STORE_PASSWORD is missing")
+        if (releaseKeyAlias == null) add("RELEASE_KEY_ALIAS is missing")
+        if (releaseKeyPassword == null) add("RELEASE_KEY_PASSWORD is missing")
+        if (releaseKeystoreFile != null && !releaseKeystoreFile.isFile) {
+            add("RELEASE_STORE_FILE does not exist: ${releaseKeystoreFile.path}")
+        }
+    }
+val hasReleaseSigning = releaseSigningProblems.isEmpty()
 
 android {
     namespace = "com.ai.assistance.operit"
     compileSdk = 36
 
     signingConfigs {
-        val releaseKeystorePath = localProperties.getProperty("RELEASE_STORE_FILE")
-        val releaseStorePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD")
-        val releaseKeyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS")
-        val releaseKeyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD")
-
-        if (releaseKeystorePath != null &&
-            releaseStorePassword != null &&
-            releaseKeyAlias != null &&
-            releaseKeyPassword != null &&
-            File(releaseKeystorePath).exists()
-        ) {
+        if (hasReleaseSigning) {
             create("release") {
-                storeFile = file(releaseKeystorePath)
-                storePassword = releaseStorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+                storeFile = requireNotNull(releaseKeystoreFile)
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
             }
         }
     }
@@ -66,8 +74,8 @@ android {
         applicationId = "com.ai.assistance.mira"
         minSdk = 26
         targetSdk = 34
-        versionCode = 44
-        versionName = "1.12.0+4"
+        versionCode = 1
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -87,8 +95,12 @@ android {
             }
         }
 
-        buildConfigField("String", "GITHUB_CLIENT_ID", buildConfigStringProperty("GITHUB_CLIENT_ID"))
-        buildConfigField("String", "GITHUB_CLIENT_SECRET", buildConfigStringProperty("GITHUB_CLIENT_SECRET"))
+        // OAuth Device Flow treats Android apps as public clients; this ID is safe to ship.
+        buildConfigField(
+            "String",
+            "GITHUB_CLIENT_ID",
+            buildConfigStringProperty("GITHUB_CLIENT_ID", "Ov23liKr3DGQsr3PxWg5")
+        )
         buildConfigField("String", "UPDATE_REPO_OWNER", buildConfigStringProperty("UPDATE_REPO_OWNER", "kernelx30"))
         buildConfigField("String", "UPDATE_REPO_NAME", buildConfigStringProperty("UPDATE_REPO_NAME", "Mira"))
         buildConfigField("String", "UPDATE_PATCH_REPO_OWNER", buildConfigStringProperty("UPDATE_PATCH_REPO_OWNER"))
@@ -105,9 +117,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (releaseSigningConfig != null) {
-                signingConfig = releaseSigningConfig
-            }
+            signingConfig = releaseSigningConfig
         }
         debug {
             if (releaseSigningConfig != null) {
@@ -200,6 +210,25 @@ android {
 //    aaptOptions {
 //        noCompress += "tflite"
 //    }
+}
+
+val validateReleaseSigning =
+    tasks.register("validateReleaseSigning") {
+        group = "verification"
+        description = "Validates the fixed Mira release signing configuration."
+        doLast {
+            if (releaseSigningProblems.isNotEmpty()) {
+                throw GradleException(
+                    "Release signing is incomplete: ${releaseSigningProblems.joinToString("; ")}. " +
+                        "Set all RELEASE_* properties in local.properties before building a release."
+                )
+            }
+        }
+    }
+
+// Keep project sync, debug builds, and unit tests independent of local release credentials.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseSigning)
 }
 
 kotlin {
@@ -389,6 +418,7 @@ dependencies {
 
     // Test dependencies
     testImplementation(libs.junit)
+    testImplementation(kotlin("test"))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.compose.bom))

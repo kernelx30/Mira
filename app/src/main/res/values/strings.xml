@@ -97,10 +97,10 @@
     <string name="mate_memory_manual_correct_title">纠正记忆</string>
     <string name="mate_memory_manual_scope_desc">归属决定这条记忆会在哪个角色和会话中参与召回。</string>
     <string name="mate_memory_manual_topic">主题</string>
-    <string name="mate_memory_manual_topic_required">用简短主题标记事实，例如“生日”“饮食偏好”“我们的约定”。</string>
+    <string name="mate_memory_manual_topic_required">用简短主题标记事实，也可以自定义，例如“生日”“喜欢的游戏”“性格：怕生”“我们的约定”。</string>
     <string name="mate_memory_manual_topic_optional">主题留空时沿用原记录，不会破坏版本关系。</string>
     <string name="mate_memory_manual_content">记忆内容</string>
-    <string name="mate_memory_manual_create_desc">手动保存会记为用户明确事实，并保留本次录入证据。</string>
+    <string name="mate_memory_manual_create_desc">手动保存会记为用户明确事实，并保留本次录入证据。主题和值都支持自定义。</string>
     <string name="mate_memory_manual_correct_desc">纠正会创建新版本，旧内容保留为已覆盖记录。</string>
     <string name="mate_memory_manual_cancel">取消</string>
     <string name="mate_memory_manual_save_action">保存</string>
@@ -781,10 +781,8 @@
     <string name="about_version">版本: %1$s</string>
     <string name="about_description">Mira 是一个本地优先、可成长、能说话也能做事的 Android 私人 AI 伴侣。角色、记忆、语音与 Agent 能力都由你掌控。</string>
     <string name="about_developer">Mira 维护者: &lt;a href="https://github.com/kernelx30"&gt;kernelx30&lt;/a&gt;</string>
-    <string name="about_contact">联系我们: aaswordsman@foxmail.com</string>
-    <string name="about_website">&lt;a href="https://github.com/kernelx30/Mira"&gt;GitHub: https://github.com/kernelx30/Mira&lt;/a&gt;</string>
-    <string name="upstream_project">上游项目 Operit</string>
-    <string name="about_copyright">Mira · 基于 Operit 构建 · LGPLv3</string>
+    <string name="about_contact">GitHub Issues: https://github.com/kernelx30/Mira/issues</string>
+    <string name="about_copyright">Mira · LGPLv3</string>
     <string name="star_on_github">在 GitHub 点个 Star</string>
     <string name="update_log">更新日志</string>
     <string name="app_logo_description">应用图标</string>
@@ -1183,7 +1181,7 @@
     <string name="quick_plugin_creator_title">快速创作你的插件</string>
     <string name="quick_plugin_creator_desc">内置和市场都找不到想要的插件？创作你自己想要的！</string>
     <string name="quick_plugin_creator_step1_title">1. 更新或者下载包创作 Skill</string>
-    <string name="quick_plugin_creator_step1_desc">点击按钮后会自动下载 `install_or_update.js`，并调用 operit_editor 的 debug_run_sandbox_script 执行安装或更新。</string>
+    <string name="quick_plugin_creator_step1_desc">点击按钮后会自动下载 `install_or_update.js`，并调用内置插件编辑器完成安装或更新。</string>
     <string name="quick_plugin_creator_run_setup">自动下载并执行</string>
     <string name="quick_plugin_creator_pull_skill_update">拉取 Skill 更新</string>
     <string name="quick_plugin_creator_setup_success">包创作 Skill 安装或更新完成</string>
@@ -1285,7 +1283,7 @@
         a. 本软件包含的自动化功能，仅限于个人学习、研究和日常辅助用途。<br>
         b. <b>严禁将本软件及其功能用于任何形式的商业、盈利性活动或可能对第三方服务造成不当影响的大规模自动化操作。</b><br>
         c. 对于您因使用本软件而对第三方造成的任何损害，您将自行承担赔偿责任。社区保留对滥用行为进行追究的权利。</p>
-        <p><b>4. 隐私保护</b><br>我们尊重并保护所有使用服务用户的个人隐私权。我们承诺：<br>a. <b>本地处理：</b>本应用的语音识别与语音合成功能完全在您的设备本地运行，相关数据不会被上传至任何云端服务器。<br>b. <b>第三方AI服务：</b>本应用使用的AI对话服务由第三方大型模型提供商（如DeepSeek等）支持。当您使用此功能时，您的对话数据将直接发送至相应的服务商，不会经过我们的服务器中转或存储。我们建议您同时查阅并了解对应AI服务商的隐私政策。<br>c. <b>数据安全：</b>除上述情况外，我们不会主动收集或存储您的任何个人信息，并会采取合理的数据安全措施保护应用运行所必需的本地数据。</p>
+        <p><b>4. 隐私保护</b><br>我们尊重并保护所有使用服务用户的个人隐私权。我们承诺：<br>a. <b>本地与云端语音：</b>本应用支持本地语音识别/合成，也支持由您主动配置的第三方语音服务（如豆包、MiniMax、MIMO、OpenAI 等）。使用云端服务时，相关音频或文本会发送至对应服务商；未配置云端服务时，应用不会主动上传语音数据。<br>b. <b>第三方AI服务：</b>本应用使用的AI对话服务由第三方大型模型提供商（如DeepSeek等）支持。当您使用此功能时，您的对话数据将直接发送至相应的服务商，不会经过我们的服务器中转或存储。我们建议您同时查阅并了解对应AI服务商的隐私政策。<br>c. <b>数据安全：</b>除上述情况外，我们不会主动收集或存储您的任何个人信息，并会采取合理的数据安全措施保护应用运行所必需的本地数据。</p>
         <p><b>5. 协议修改</b><br>我们有权在必要时修改本协议条款。您可以在应用内查阅最新版本的协议条款。若您继续使用本服务，则视为您已接受修改后的协议。</p>
     ]]></string>
     <string name="agreement_disclaimer">若"人话版"与"严谨版"协议存在任何不一致或冲突，一切以中文"严谨版"为准。我们保留对本协议的最终解释权。</string>
@@ -1526,7 +1524,7 @@
     <string name="overlay_permission">悬浮窗权限</string>
     <string name="battery_optimization">电池优化豁免</string>
     <string name="location_permission">位置权限</string>
-    <string name="operit_terminal">Operit终端</string>
+    <string name="operit_terminal">Mira 终端</string>
     
     <!-- 权限级别描述 -->
     <string name="permission_level_standard">标准权限</string>
@@ -1622,6 +1620,7 @@
     <!-- Crash Report Screen -->
     <string name="crash_report_header">应用遇到了一个无法恢复的错误，需要重启。</string>
     <string name="crash_report_restart_button">重启应用</string>
+    <string name="crash_report_restart_failed">重启调度失败，请手动重新打开 Mira</string>
     <string name="crash_report_details_title">错误详情</string>
     <string name="crash_report_copy_button">复制</string>
     <string name="crash_report_export_button">导出</string>
@@ -1768,7 +1767,7 @@
     <string name="patch_install_confirm_message">检测到新补丁版本：%1$s\n\n是否现在安装？</string>
     <string name="developer">开发者</string>
     <string name="contact">联系方式</string>
-    <string name="project_url">上游项目</string>
+    <string name="project_url">Mira GitHub 仓库</string>
     <string name="open_source_licenses">开源许可声明</string>
     <string name="license_format">许可: %1$s</string>
     <string name="visit_project">访问项目</string>
@@ -3069,18 +3068,18 @@
     <string name="perm_desc_receive_wap_push">允许应用接收WAP推送消息</string>
     <string name="perm_desc_receive_mms">允许应用接收彩信</string>
     
-    <!-- OperitTerminal Wizard Card -->
-    <string name="operit_terminal_wizard_title">OperitTerminal 设置向导</string>
-    <string name="operit_terminal_not_installed">OperitTerminal 未安装</string>
-    <string name="operit_terminal_update_available">OperitTerminal 有更新可用</string>
-    <string name="operit_terminal_up_to_date">OperitTerminal 已是最新版本</string>
-    <string name="operit_terminal_install_description">OperitTerminal 是一个功能强大的终端应用，提供完整的 Linux 环境和包管理功能。我们需要先安装这个应用。</string>
-    <string name="operit_terminal_install_button">安装 OperitTerminal</string>
-    <string name="operit_terminal_update_description">发现 OperitTerminal 的新版本，建议更新以获得更好的功能和兼容性。</string>
+    <!-- Mira Terminal runtime wizard -->
+    <string name="operit_terminal_wizard_title">Mira 终端环境</string>
+    <string name="operit_terminal_not_installed">Mira 终端环境未安装</string>
+    <string name="operit_terminal_update_available">Mira 终端环境有更新可用</string>
+    <string name="operit_terminal_up_to_date">Mira 终端环境已是最新版本</string>
+    <string name="operit_terminal_install_description">安装 Mira 使用的 Linux 终端环境与包管理能力。</string>
+    <string name="operit_terminal_install_button">安装终端环境</string>
+    <string name="operit_terminal_update_description">发现终端环境的新版本，建议更新以获得更好的功能和兼容性。</string>
     <string name="operit_terminal_release_notes">更新说明：%1$s</string>
-    <string name="operit_terminal_update_button">更新 OperitTerminal</string>
-    <string name="operit_terminal_latest_description">恭喜！您已安装最新版本的 OperitTerminal，可以开始使用其强大的终端功能。</string>
-    <string name="operit_terminal_open_button">打开 OperitTerminal</string>
+    <string name="operit_terminal_update_button">更新终端环境</string>
+    <string name="operit_terminal_latest_description">Mira 终端环境已就绪，可以开始使用终端工具。</string>
+    <string name="operit_terminal_open_button">打开 Mira 终端</string>
     
     <!-- Functional Config Screen -->
     <string name="functional_model_config_title">功能模型配置设置</string>
@@ -3286,7 +3285,7 @@
     <string name="memory">记忆</string>
     <string name="memory_desc">记忆选择包括了用户偏好和该偏好下的记忆库。如果想要新的记忆库，可以去设置新建一个用户偏好并在这里选择</string>
     <string name="memory_auto_update">自动保存记忆</string>
-    <string name="memory_auto_update_desc">开启后，当前轮回复结束时会先把候选内容加入长期记忆队列，并在应用存活期间由后台定时整理写入记忆库。</string>
+    <string name="memory_auto_update_desc">开启后，每轮对话都会交给记忆模型判断是否存在长期事实；明确且高置信的信息会自动写入记忆库，失败任务由后台队列重试。</string>
     <string name="memory_auto_update_runtime_status">待提取记忆的条数%1$d，距离下次保存%2$d分钟</string>
     <string name="chat_summarizing_memory">正在总结记忆...</string>
     <string name="chat_input_processing_collect_failed">输入处理状态收集失败: %1$s</string>
@@ -3643,6 +3642,12 @@
     <string name="layout_reset_settings_desc">将所有布局调整设置恢复为默认值</string>
     
     <string name="settings_data_permissions">数据和权限</string>
+    <string name="settings_section_community_project">社区与项目</string>
+    <string name="settings_join_mira_qq_group">加入 Mira 小窝</string>
+    <string name="settings_join_mira_qq_group_desc">QQ 交流群 · 群号 1070153809</string>
+    <string name="settings_mira_github_repository">Mira GitHub 仓库</string>
+    <string name="settings_mira_github_repository_desc">源码、Release、Issue 与更新说明</string>
+    <string name="settings_check_updates_desc">查看当前版本并从 Mira Releases 检测更新</string>
     <string name="settings_tool_permissions_subtitle">工具权限和安全设置</string>
     <string name="settings_privacy_data_cleanup">隐私与数据清理</string>
     <string name="settings_clear_cookies">清除 Cookie</string>
@@ -3893,6 +3898,27 @@
     <string name="chat_style_bubble_rounded_corners_desc">关闭后消息气泡使用直角矩形</string>
     <string name="chat_style_bubble_rounded_corners_user">用户</string>
     <string name="chat_style_bubble_rounded_corners_ai">AI</string>
+    <string name="bubble_personalization_title">气泡装扮</string>
+    <string name="bubble_personalization_desc">先选一套顺眼的，再按自己的习惯微调。套装会同时协调气泡、文字、圆角、宽度和头像。</string>
+    <string name="bubble_personalization_current_preset">当前套装：%1$s</string>
+    <string name="bubble_personalization_custom">当前：自定义搭配</string>
+    <string name="bubble_personalization_advanced">细节调校</string>
+    <string name="bubble_personalization_custom_colors">自定义颜色</string>
+    <string name="bubble_personalization_custom_colors_desc">点击色块分别调整双方气泡与文字颜色，支持透明度和最近使用颜色。</string>
+    <string name="bubble_preset_mira_blue">Mira 蓝</string>
+    <string name="bubble_preset_wechat_green">微信绿</string>
+    <string name="bubble_preset_sakura">樱花粉</string>
+    <string name="bubble_preset_mint">薄荷绿</string>
+    <string name="bubble_preset_mist_purple">柔雾紫</string>
+    <string name="bubble_preset_monochrome">极简黑白</string>
+    <string name="bubble_user_corner_radius">我的气泡圆润度</string>
+    <string name="bubble_ai_corner_radius">角色气泡圆润度</string>
+    <string name="bubble_user_max_width">我的气泡最大宽度</string>
+    <string name="bubble_ai_max_width">角色气泡最大宽度</string>
+    <string name="bubble_message_spacing">消息上下留白</string>
+    <string name="bubble_shadow_strength">纯色与图片气泡阴影</string>
+    <string name="bubble_value_dp">%1$d dp</string>
+    <string name="bubble_value_percent">%1$d%%</string>
     <string name="chat_style_bubble_advanced_options">高级选项</string>
     <string name="chat_style_bubble_padding_left">左内边距</string>
     <string name="chat_style_bubble_padding_right">右内边距</string>
@@ -4563,11 +4589,21 @@
 
     <string name="github_account">GitHub 账户</string>
     <string name="login_github">登录 GitHub</string>
-    <string name="github_login_method_description">请选择 GitHub 登录方式。内嵌模式适合无法调起外部浏览器的设备，外部浏览器模式兼容性更好。</string>
-    <string name="github_login_method_embedded">使用内嵌页面登录</string>
-    <string name="github_login_method_external">使用外部浏览器登录</string>
-    <string name="github_login_external_waiting">已打开浏览器，请在完成授权后返回应用。</string>
-    <string name="github_login_external_cancelled">已取消 GitHub 授权</string>
+    <string name="github_device_login_requesting_code">正在向 GitHub 申请一次性验证码…</string>
+    <string name="github_device_login_instructions">复制下面的验证码，打开 GitHub 完成授权。授权完成后 Mira 会自动登录。</string>
+    <string name="github_device_login_code_label">GitHub 设备验证码</string>
+    <string name="github_device_login_copy_code">复制验证码</string>
+    <string name="github_device_login_code_copied">验证码已复制</string>
+    <string name="github_device_login_open_github">打开 GitHub</string>
+    <string name="github_device_login_waiting">正在等待 GitHub 授权，验证码约 %1$d 分钟后失效。</string>
+    <string name="github_device_login_retry">重新获取</string>
+    <string name="github_device_login_browser_failed">没有找到可打开 GitHub 的浏览器</string>
+    <string name="github_device_login_client_id_missing">此版本未配置 GitHub 登录 Client ID</string>
+    <string name="github_device_login_expired">验证码已失效，请重新获取</string>
+    <string name="github_device_login_denied">GitHub 授权已取消</string>
+    <string name="github_device_login_rejected">GitHub 拒绝了本次登录请求</string>
+    <string name="github_device_login_verification_failed">GitHub 凭据校验失败，原登录状态未改变</string>
+    <string name="github_device_login_insufficient_scope">GitHub 未授予发布和市场功能所需权限</string>
     <string name="publish_mcp_plugins_to_market">• 发布您的 MCP 插件到市场</string>
     <string name="manage_published_plugins">• 管理您已发布的插件</string>
     <string name="better_installation_experience">• 获得更好的安装体验</string>
@@ -4680,7 +4716,7 @@
     <string name="screen_title_market">市场</string>
     <string name="screen_title_artifact_manage">管理脚本与工具包</string>
     <string name="screen_title_artifact_publish">发布脚本或工具包</string>
-    <string name="artifact_publish_info_description">条目会先上传到您自己的 OperitForge 发布仓库，再根据类型自动登记到脚本市场或工具包市场。请确认内容、版本和兼容范围准确无误。</string>
+    <string name="artifact_publish_info_description">条目会先上传到您自己的 MiraForge 发布仓库，再登记到 Mira 兼容插件市场。现有 Operit 插件格式仍可直接安装和更新。</string>
     <string name="change">更改</string>
     <string name="comma_separator">，</string>
     <string name="github_search_failed">GitHub 搜索失败</string>
@@ -4701,7 +4737,7 @@
     <string name="artifact_publish_normalized_id_exists">市场归一化 ID「%1$s」已存在</string>
     <string name="artifact_publish_identity_conflict_message">%1$s。如果这是发布新版本，请在对应的插件页面里点击“发布更新版本”按钮，而不是重新发布一个新的插件。</string>
     <string name="artifact_publish_stage_validating">正在校验本地条目</string>
-    <string name="artifact_publish_stage_ensuring_repo">正在检查 OperitForge 仓库</string>
+    <string name="artifact_publish_stage_ensuring_repo">正在检查 MiraForge 仓库</string>
     <string name="artifact_publish_stage_creating_release">正在创建或更新 GitHub Release</string>
     <string name="artifact_publish_stage_uploading_asset">正在上传发布资源</string>
     <string name="artifact_publish_stage_registering_market">正在登记市场条目</string>
@@ -4767,13 +4803,13 @@
     <string name="artifact_project_node_view_title">节点查看</string>
     <string name="artifact_project_nodes_loading">正在加载项目节点...</string>
     <string name="artifact_project_node_selection_hint">点击节点选中，再次点击可取消。</string>
-    <string name="plugin_creation_fresh_task_line">请你激活operit editor，并使用沙盒包开发 dev 工具包开发新的沙盒包。</string>
+    <string name="plugin_creation_fresh_task_line">请激活 Mira 内置插件编辑器，并使用沙盒包开发工具包创建新的沙盒包。</string>
     <string name="plugin_creation_fresh_package_rule_line">先确定新的沙盒包 id，后续不要改名。</string>
-    <string name="plugin_creation_fresh_dev_directory_line">开发目录固定为 手机下载/Operit/dev_package/你确定的id。开发、安装和测试都只在这里完成。</string>
-    <string name="plugin_creation_continue_task_line">请你激活operit editor，查找沙盒包 %1$s 的位置，在此版本基础上继续开发并测试。</string>
-    <string name="plugin_creation_merge_task_line">请你激活operit editor，查找沙盒包 %1$s 的位置，在此版本基础上做合并开发并测试。</string>
+    <string name="plugin_creation_fresh_dev_directory_line">按 SandboxPackage_DEV 指定的兼容开发目录创建项目；开发、安装和测试都在同一项目目录完成。</string>
+    <string name="plugin_creation_continue_task_line">请激活 Mira 内置插件编辑器，找到沙盒包 %1$s，并在当前版本基础上继续开发和测试。</string>
+    <string name="plugin_creation_merge_task_line">请激活 Mira 内置插件编辑器，找到沙盒包 %1$s，并在当前版本基础上完成合并开发和测试。</string>
     <string name="plugin_creation_existing_package_rule_line">当前沙盒包 id 是 %1$s。包 id 和插件名字都必须沿用，不要改名，也不要新起包。</string>
-    <string name="plugin_creation_existing_dev_directory_line">开发目录固定为 手机下载/Operit/dev_package/%1$s。开发、安装和测试都只在这里完成。</string>
+    <string name="plugin_creation_existing_dev_directory_line">使用 SandboxPackage_DEV 为 %1$s 指定的兼容开发目录；开发、安装和测试都在该目录完成。</string>
     <string name="plugin_creation_update_sandbox_package_dev">先更新 SandboxPackage_DEV。</string>
     <string name="plugin_creation_copy_types_to_dev_dir">把 skills 里的 types 覆盖复制到开发目录。</string>
     <string name="plugin_creation_use_terminal_ts_js_hint">尽量用终端，优先写 ts 和 js，再编译出最终 js。tsconfig 参考 examples。</string>
@@ -4799,10 +4835,10 @@
     <string name="publish_failed_title">发布失败</string>
     <string name="retry_market_registration">重试市场登记</string>
     <string name="update_to_market">更新到市场</string>
-    <string name="create_operit_forge_title">创建 OperitForge？</string>
-    <string name="create_operit_forge_message">这是你第一次直连发布。Operit 需要先在你的 GitHub 账号下创建公开仓库 `OperitForge`。</string>
+    <string name="create_operit_forge_title">创建 MiraForge？</string>
+    <string name="create_operit_forge_message">这是你第一次直连发布。Mira 需要先在你的 GitHub 账号下创建公开仓库 `MiraForge`。</string>
     <string name="confirm_create_public_forge_title">确认创建公开仓库</string>
-    <string name="confirm_create_public_forge_message">请再次确认，现在创建公开仓库 `OperitForge`。后续发布都会复用这个仓库。</string>
+    <string name="confirm_create_public_forge_message">请再次确认，现在创建公开仓库 `MiraForge`。后续发布都会复用这个仓库。</string>
     <string name="create_and_publish">创建并发布</string>
     <string name="artifact_type_script">脚本</string>
     <string name="artifact_type_package">工具包</string>
@@ -4913,9 +4949,9 @@
     <string name="skill_publish_name_empty">Skill 名称不能为空。</string>
     <string name="skill_publish_check_name_conflict_failed">检查 Skill 名称是否重名失败：%1$s</string>
     <string name="skill_publish_name_taken_message">Skill 市场里已经有同名插件「%1$s」，请换一个名称。</string>
-    <string name="script_publish_info_description">脚本会先上传到您自己的 OperitForge 发布仓库，再将元数据登记到 OperitScriptMarket。请确认脚本内容、版本和描述准确无误。</string>
+    <string name="script_publish_info_description">脚本会先上传到您自己的 MiraForge 发布仓库，再登记到 Mira 兼容插件市场。请确认脚本内容、版本和描述准确无误。</string>
     <string name="script_edit_info_description">您正在编辑已发布脚本的信息。更新后会覆盖市场仓库中对应 Issue 的元数据。</string>
-    <string name="package_publish_info_description">工具包会先上传到您自己的 OperitForge 发布仓库，再将元数据登记到 OperitPackageMarket。请确认工具包内容、版本和描述准确无误。</string>
+    <string name="package_publish_info_description">工具包会先上传到您自己的 MiraForge 发布仓库，再登记到 Mira 兼容插件市场。请确认工具包内容、版本和描述准确无误。</string>
     <string name="package_edit_info_description">您正在编辑已发布工具包的信息。更新后会覆盖市场仓库中对应 Issue 的元数据。</string>
     <string name="script_publish_success_message">您的脚本已成功发布到市场。</string>
     <string name="script_update_success_message">您的脚本信息已成功更新。</string>
@@ -4994,14 +5030,14 @@
     <string name="mcp_issue_body_title_install_info">## 安装信息</string>
     <string name="mcp_issue_body_repo_address">**仓库地址:** %1$s</string>
     <string name="mcp_issue_body_title_install_method">### 安装方式</string>
-    <string name="mcp_issue_body_install_step1">1. 在 Operit MCP 配置页面点击「导入」</string>
+    <string name="mcp_issue_body_install_step1">1. 在 Mira MCP 配置页面点击「导入」</string>
     <string name="mcp_issue_body_install_step2">2. 选择「从仓库导入」</string>
     <string name="mcp_issue_body_install_step3">3. 输入仓库地址: `%1$s`</string>
     <string name="mcp_issue_body_install_step4">4. 设置插件名称并点击导入</string>
     <string name="mcp_issue_body_title_tech_info">## 技术信息</string>
-    <string name="mcp_issue_body_tech_platform">- **发布平台:** Operit MCP 市场</string>
+    <string name="mcp_issue_body_tech_platform">- **发布平台:** Mira 兼容插件市场</string>
     <string name="mcp_issue_body_tech_publish_time">- **发布时间:** %1$s</string>
-    <string name="mcp_issue_body_footer_note">*此Issue由 Operit 自动生成*</string>
+    <string name="mcp_issue_body_footer_note">*此 Issue 由 Mira 自动生成*</string>
 
     <string name="mcp_publish_body_section_plugin_info">## 📋 插件信息</string>
     <string name="mcp_publish_body_label_description">**描述:** %1$s</string>
@@ -5010,18 +5046,18 @@
     <string name="mcp_publish_body_section_quick_install">## ⚡ 快速安装</string>
     <string name="mcp_publish_body_section_install_method">## 📦 安装方式</string>
     <string name="mcp_publish_body_method_repo_import_title">### 方式一：从仓库导入</string>
-    <string name="mcp_publish_body_method_repo_import_step1">1. 打开 Operit MCP 配置页面</string>
+    <string name="mcp_publish_body_method_repo_import_step1">1. 打开 Mira MCP 配置页面</string>
     <string name="mcp_publish_body_method_repo_import_step2">2. 点击「导入」→「从仓库导入」</string>
     <string name="mcp_publish_body_method_repo_import_step3">3. 输入仓库地址：`%1$s`</string>
     <string name="mcp_publish_body_method_repo_import_step4">4. 配置插件名称并导入</string>
     <string name="mcp_publish_body_method_config_import_title">### 方式二：配置导入</string>
-    <string name="mcp_publish_body_method_config_import_step1">1. 打开 Operit MCP 配置页面</string>
+    <string name="mcp_publish_body_method_config_import_step1">1. 打开 Mira MCP 配置页面</string>
     <string name="mcp_publish_body_method_config_import_step2">2. 点击「导入」→「配置导入」</string>
     <string name="mcp_publish_body_method_config_import_step3">3. 粘贴以下配置：</string>
     <string name="mcp_publish_body_section_tech_info">## 🛠️ 技术信息</string>
     <string name="mcp_publish_body_table_header">| 项目 | 值 |</string>
     <string name="mcp_publish_body_table_separator">|------|-----|</string>
-    <string name="mcp_publish_body_table_row_platform">| 发布平台 | Operit MCP 市场 |</string>
+    <string name="mcp_publish_body_table_row_platform">| 发布平台 | Mira 兼容插件市场 |</string>
     <string name="mcp_publish_body_table_row_parser_version">| 解析版本 | 1.0 |</string>
     <string name="mcp_publish_body_table_row_publish_time">| 发布时间 | %1$s |</string>
 
@@ -5822,14 +5858,20 @@
 
     <string name="backup_chat_history">聊天记录</string>
     <string name="backup_chat_history_subtitle">跨格式备份、导出与恢复</string>
+    <string name="backup_import_from_operit">从 Operit 导入</string>
+    <string name="backup_importing_from_operit">正在从 Operit 导入…</string>
+    <string name="backup_import_from_operit_no_backup_title">没找到 Operit 聊天备份</string>
+    <string name="backup_import_from_operit_no_backup_message">请先在 Operit 的「数据备份与恢复」中导出聊天记录 JSON，然后再选择导出的文件。</string>
+    <string name="backup_import_from_operit_choose_file">选择聊天备份</string>
     <string name="backup_chat_current_count">当前共有 %1$d 条聊天记录。</string>
     <string name="backup_export">导出</string>
     <string name="backup_import">导入</string>
     <string name="backup_delete_all">删除全部</string>
     
     <string name="backup_memory_library">记忆库</string>
-    <string name="backup_memory_library_subtitle">跨配置备份与恢复，保持思维链一致</string>
+    <string name="backup_memory_library_subtitle">完整导出旧记忆、新版角色记忆、证据、事件、关系与授权</string>
     <string name="backup_memory_current_count">当前共有 %1$d 条记忆和 %2$d 个链接。</string>
+    <string name="backup_memory_stats_failed">读取记忆统计失败：%1$s</string>
     
     <string name="backup_model_config">模型配置</string>
     <string name="backup_model_config_subtitle">备份与恢复所有模型设置，包括API密钥和参数</string>
@@ -5856,7 +5898,7 @@
     <string name="backup_select_export_format">选择导出格式</string>
     <string name="backup_select_format_hint">请选择要导出的聊天记录格式：</string>
     <string name="backup_format_json">JSON（推荐）</string>
-    <string name="backup_format_json_desc">Operit 原生格式，完整保留消息切换等所有数据</string>
+    <string name="backup_format_json_desc">Mira JSON 格式，保留完整消息与回复版本；附件原文件需另行备份</string>
     <string name="backup_format_markdown">Markdown</string>
     <string name="backup_format_markdown_desc">轻量级标记格式，便于阅读和编辑</string>
     <string name="backup_format_html">HTML</string>
@@ -5867,8 +5909,8 @@
     <!-- 导入格式选择 -->
     <string name="backup_select_import_format">选择导入格式</string>
     <string name="backup_import_format_hint">请选择要导入的聊天记录格式：</string>
-    <string name="backup_format_operit">Operit JSON（推荐）</string>
-    <string name="backup_format_operit_desc">本应用的原生格式，完整保留消息切换等所有数据</string>
+    <string name="backup_format_operit">Mira JSON（推荐）</string>
+    <string name="backup_format_operit_desc">Mira 原生格式，保留完整消息与回复版本；附件原文件需另行备份</string>
     <string name="backup_format_chatgpt">ChatGPT</string>
     <string name="backup_format_chatgpt_desc">OpenAI ChatGPT conversations.json 导出格式</string>
     <string name="backup_format_chatbox">ChatBox</string>
@@ -5987,7 +6029,7 @@
     <string name="logcat_cannot_open_output_stream">无法打开输出流</string>
     <string name="logcat_mediestore_save_failed">MediaStore保存失败：%1$s</string>
     <string name="logcat_cannot_create_download_dir">无法创建下载目录</string>
-    <string name="logcat_cannot_create_operit_dir">无法创建operit目录</string>
+    <string name="logcat_cannot_create_operit_dir">无法创建兼容数据目录</string>
     <string name="logcat_file_create_failed">文件创建失败或为空</string>
     <string name="logcat_filesystem_save_failed">文件系统保存失败：%1$s</string>
 
@@ -6001,8 +6043,8 @@
     <string name="backup_open_file_failed">无法打开文件</string>
     <string name="backup_import_file_empty">导入的文件为空</string>
 
-    <string name="backup_memory_import_result_success">导入到配置「%1$s」成功：\n- 新增记忆：%2$d条\n- 更新记忆：%3$d条\n- 跳过记忆：%4$d条\n- 新增链接：%5$d个</string>
-    <string name="backup_memory_export_result_success">成功从配置「%1$s」导出 %2$d 条记忆和 %3$d 个链接到：\n%4$s</string>
+    <string name="backup_memory_import_result_success">导入到配置「%1$s」成功：\n- 新增记忆：%2$d 条\n- 更新记忆：%3$d 条\n- 跳过记忆：%4$d 条\n- 新增关系：%5$d 条\n- 导入证据：%6$d 条\n- 导入事件：%7$d 条\n- 导入授权：%8$d 条</string>
+    <string name="backup_memory_export_result_success">已从配置「%1$s」完整导出：\n- 记忆：%2$d 条\n- 关系：%3$d 条\n- 证据：%4$d 条\n- 事件：%5$d 条\n- 授权：%6$d 条\n文件：%7$s</string>
 
     <string name="backup_model_config_import_result_success">成功导入模型配置：\n- 新增配置：%1$d个\n- 更新配置：%2$d个%3$s</string>
     <string name="backup_model_config_import_result_skipped">\n- 跳过无效配置：%1$d个</string>
@@ -6067,6 +6109,11 @@
     <string name="toolreg_input_in_terminal_session_desc">向终端会话「%1$s」写入输入（control=%2$s）</string>
     <string name="toolreg_get_terminal_session_screen_desc">获取终端会话「%1$s」当前屏幕内容（单屏）</string>
     <string name="toolreg_query_memory_desc">查询记忆库: %1$s</string>
+    <string name="toolreg_export_companion_memory_desc">导出完整 Mira 记忆包</string>
+    <string name="toolreg_export_chat_history_desc">导出聊天记录</string>
+    <string name="toolreg_manage_mira_settings_desc">Mira 设置：%1$s %2$s</string>
+    <string name="toolreg_save_companion_memory_desc">保存伴侣记忆: %1$s</string>
+    <string name="toolreg_delete_companion_memory_desc">删除伴侣记忆: %1$s</string>
     <string name="toolreg_get_memory_by_title_desc">根据标题获取记忆: %1$s</string>
 
     <string name="toolreg_user_pref_birth_date">生日</string>
@@ -6430,14 +6477,14 @@
     <string name="skill_publish_body_section_repo_info">## 🔗 仓库信息</string>
     <string name="skill_publish_body_label_repo_url">**仓库地址:** %1$s</string>
     <string name="skill_publish_body_section_install_method">## 📦 安装方式</string>
-    <string name="skill_publish_body_install_step1">1. 打开 Operit → 包管理 → Skills</string>
+    <string name="skill_publish_body_install_step1">1. 打开 Mira → 扩展与技能 → Skills</string>
     <string name="skill_publish_body_install_step2">2. 点击「导入 Skill」→ 「从仓库导入」</string>
     <string name="skill_publish_body_install_step3">3. 输入仓库地址：`%1$s`</string>
     <string name="skill_publish_body_install_step4">4. 确认导入</string>
     <string name="skill_publish_body_section_tech_info">## 🛠️ 技术信息</string>
     <string name="skill_publish_body_table_header">| 项目 | 值 |</string>
     <string name="skill_publish_body_table_separator">|------|-----|</string>
-    <string name="skill_publish_body_table_row_platform">| 发布平台 | Operit Skill 市场 |</string>
+    <string name="skill_publish_body_table_row_platform">| 发布平台 | Mira 兼容插件市场 |</string>
     <string name="skill_publish_body_table_row_parser_version">| 解析版本 | 1.0 |</string>
     <string name="skill_publish_body_table_row_publish_time">| 发布时间 | %1$s |</string>
 
@@ -6940,7 +6987,7 @@
     <string name="demo_cmd_list_activities">查看活动的Activity</string>
     <string name="demo_cmd_list_services">列出系统服务</string>
     <string name="demo_cmd_check_resolution">查看屏幕分辨率</string>
-    <string name="demo_cmd_echo_hello">打印Hello OperitTerminal</string>
+    <string name="demo_cmd_echo_hello">打印 Hello Mira Terminal</string>
     <string name="demo_cmd_list_files">列出文件和目录</string>
     <string name="demo_cmd_show_user">显示当前用户</string>
     <string name="demo_cmd_update_package_manager">更新包管理器 (Ubuntu)</string>
@@ -8278,6 +8325,11 @@
     <string name="search_voice_hint">搜索音色名称或 voice_type</string>
     <string name="manage_character_group_chat">创建 / 管理角色群聊</string>
     <string name="mira_memory_saved_receipt">已记住：%1$s</string>
+    <string name="mira_memory_deleted_receipt">已删除记忆：%1$s</string>
+    <string name="mira_memory_receipt_correct_action">纠正</string>
+    <string name="mira_memory_receipt_evidence_title">记录依据</string>
+    <string name="mira_memory_receipt_not_found">这条记忆已发生变化，请到记忆库查看。</string>
+    <string name="mira_memory_receipt_correction_saved">记忆已纠正，旧内容已保留在版本记录中。</string>
     <string name="voice_call_expressive_tts">情感朗读</string>
     <string name="voice_call_expressive_tts_desc">根据回复语气自动调整情绪、节奏与停顿</string>
     <string name="voice_call_expression_restrained">克制</string>
@@ -8315,4 +8367,7 @@
     <string name="profile_display_name_value">名字: %1$s</string>
     <string name="profile_preferred_address_value">希望被称呼为: %1$s</string>
     <string name="profile_pronouns_value">代词或称谓: %1$s</string>
+    <string name="backup_restart_schedule_failed">重启任务启动失败，请手动重新打开 Mira</string>
+    <string name="update_no_downloadable_apk">暂无可下载 APK</string>
+    <string name="market_legacy_entry_read_only">这是从 Operit 兼容目录导入的条目，在 Mira 中只读；安装仍可正常使用。</string>
 </resources>

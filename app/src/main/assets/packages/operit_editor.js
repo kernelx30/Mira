@@ -2,12 +2,12 @@
 {
   name: "operit_editor"
   display_name: {
-    zh: "Operit平台编辑器"
-    en: "Operit Platform Editor"
+    zh: "Mira 平台编辑器"
+    en: "Mira Platform Editor"
   }
   description: {
-    zh: '''Operit 平台配置直改工具包：提供一组可直接读取与修改 Operit 平台设置的工具，覆盖 MCP、Skill、Sandbox Package、功能模型绑定、模型参数、上下文总结与 TTS/STT 语音服务配置。'''
-    en: '''Direct Operit platform configuration toolkit: a collection of tools for reading and directly modifying Operit platform settings, covering MCP, Skill, Sandbox Package, function-model bindings, model parameters, context-summary settings, and TTS/STT speech-service configuration.'''
+    zh: '''Mira 平台配置工具包：提供一组可直接读取与修改 Mira 设置的工具，覆盖 MCP、Skill、Sandbox Package、功能模型绑定、模型参数、上下文总结与 TTS/STT 语音服务配置，并兼容 Operit 原有目录和协议。'''
+    en: '''Mira platform configuration toolkit for MCP, Skill, Sandbox Package, model bindings, model parameters, context summaries, and TTS/STT settings, with compatibility for existing Operit paths and protocols.'''
   }
 
   enabledByDefault: true
@@ -22,7 +22,7 @@
 【触发条件】
 - 用户提到 MCP/Skill 安装失败、无法启动、工具不出现、导入失败、重名冲突、配置文件怎么改
 - 用户提到沙盒包（Package）开关、内置包列表、导入删除路径、包启用状态异常
-- 用户让你排查 Operit 的插件配置路径、部署目录、开关状态、环境变量
+- 用户让你排查 Mira 或 Operit 兼容插件的配置路径、部署目录、开关状态、环境变量
 - 用户提到功能模型绑定、模型配置新增/删除/修改、模型连接测试
 - 用户提到 TTS/STT 语音服务不会配置、参数太多不会填、语音播报/语音识别不可用
 - 问题核心是“配置和部署链路”，而不是普通问答
@@ -117,7 +117,7 @@
 - 先调用 list_sandbox_packages 获取“内置+外部”包列表与当前 enabled 状态。
 - 再调用 set_sandbox_package_enabled(package_name, enabled) 执行启停。
 5) 制作包文档：
-- https://cdn.jsdelivr.net/gh/AAswordman/Operit@main/docs/SCRIPT_DEV_SKILL.md
+- https://github.com/kernelx30/Mira/blob/main/docs/SCRIPT_DEV_SKILL.md
 - 该地址可直接通过 HTTP GET 请求访问，用于拉取原始 Markdown 文档内容。
 6) 软件内调试烧录：
 - 普通 `.js` 沙盒包优先用 `debug_install_js_package`。
@@ -129,14 +129,14 @@
 - `use_package` 是三兼容入口：对 MCP/Skill/Sandbox Package 都可统一调用。
 - `ping_mcp` 工具是 `use_package` 的直通封装，用于快速探测指定包是否可被加载。
 
-【市场 Agent API（HTTP，只读）】
-- 基础前缀：`https://api.operit.app/market-stats`
-- 搜索：`/agent/search?q=<关键词>&type=mcp|skill|package|script&limit=10`
-- 详情：`/agent/items/<type>/<id>`
-- 安装计划：`/agent/items/<type>/<id>/install-plan`
-- `package` / `script` 的 install_plan 通常会返回 `download_url`、`tracked_download_url`、`sha256`、`runtime_package_id`。
-- `skill` 的 install_plan 通常会返回 `repository_url`。
-- `mcp` 的 install_plan 可能返回 `config`（可直接作为 installConfig 参考）或 `repository_url`。
+【Mira 市场 Agent API（HTTP，只读）】
+- 基础前缀：`https://kernelx30.github.io/Mira/market/v2`
+- 清单：`/manifest.json`
+- 全部条目：`/lists/all/updated/page-1.json`；按类型读取 `/lists/type/<type>/updated/page-1.json`。
+- 搜索时读取对应分页 JSON，在本地按标题、简介、作者和类型过滤，不向外部服务发送搜索词或 GitHub Token。
+- 详情位于 `/entries/<shard>.json` 的 `entriesById[id]`；`shard` 是条目 ID 的 FNV-1a 32 位哈希前两位十六进制。
+- 安装地址直接读取条目 `assets[].url` 或 `source.url`，并校验 `sha256`；不使用旧市场跟踪下载地址。
+- 新条目发布到用户自己的 MiraForge，并在 `kernelx30/Mira` 创建登记 Issue；旧 Operit 条目由 Mira Pages 只读镜像兼容。
 - 当前软件未对 JS 暴露统一的一键安装市场接口；需要安装时，按条目类型自行下载、解压、导入，必要时配合 `debug_install_js_package` / `debug_install_toolpkg` / `use_package`。
 
 【功能模型与模型配置】
@@ -365,7 +365,7 @@
 - Call list_sandbox_packages first to get built-in + external package list and current enabled state.
 - Then call set_sandbox_package_enabled(package_name, enabled) to apply changes.
 5) Package authoring guide:
-- https://cdn.jsdelivr.net/gh/AAswordman/Operit@main/docs/SCRIPT_DEV_SKILL.md
+- https://github.com/kernelx30/Mira/blob/main/docs/SCRIPT_DEV_SKILL.md
 - This URL can be accessed directly with an HTTP GET request to fetch the raw Markdown document.
 6) In-app debug install:
 - For plain `.js` sandbox packages, prefer `debug_install_js_package`.
@@ -377,14 +377,14 @@
 - `use_package` is tri-compatible and can be called uniformly for MCP/Skill/Sandbox Package.
 - `ping_mcp` is a thin wrapper over `use_package` for quick package availability probing.
 
-[Market agent API (HTTP, read-only)]
-- Base prefix: `https://api.operit.app/market-stats`
-- Search: `/agent/search?q=<query>&type=mcp|skill|package|script&limit=10`
-- Detail: `/agent/items/<type>/<id>`
-- Install plan: `/agent/items/<type>/<id>/install-plan`
-- `package` / `script` install_plan usually returns `download_url`, `tracked_download_url`, `sha256`, and `runtime_package_id`.
-- `skill` install_plan usually returns `repository_url`.
-- `mcp` install_plan may return `config` (usable as installConfig reference) or `repository_url`.
+[Mira market Agent API (HTTP, read-only)]
+- Base prefix: `https://kernelx30.github.io/Mira/market/v2`
+- Manifest: `/manifest.json`.
+- All entries: `/lists/all/updated/page-1.json`; type pages use `/lists/type/<type>/updated/page-1.json`.
+- Search by loading the relevant page JSON and filtering title, description, author, and type locally. Do not transmit search text or a GitHub token to another market service.
+- Details are stored in `/entries/<shard>.json` under `entriesById[id]`; `shard` is the first two hexadecimal digits of the entry ID's 32-bit FNV-1a hash.
+- Install directly from `assets[].url` or `source.url` and verify `sha256`; legacy tracked-download URLs are not used.
+- New entries publish to the user's MiraForge and register through an Issue in `kernelx30/Mira`; existing Operit entries remain available through the read-only Mira Pages mirror.
 - The app does not currently expose a unified one-click market install API to JS; when installation is needed, download/extract/import by item type and use `debug_install_js_package`, `debug_install_toolpkg`, or `use_package` when appropriate.
 
 [Function model and model config]

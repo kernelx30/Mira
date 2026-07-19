@@ -44,6 +44,7 @@ data class SerializableMemory(
     val createdAt: Date,
     @Serializable(with = DateSerializer::class)
     val updatedAt: Date,
+    val lastAccessedAtMs: Long? = null,
     val tagNames: List<String>, // 标签名称列表
     val propertyValues: Map<String, String> = emptyMap(),
 )
@@ -103,5 +104,9 @@ data class MemoryImportResult(
     val newMemories: Int = 0,      // 新创建的记忆数
     val updatedMemories: Int = 0,  // 更新的记忆数
     val skippedMemories: Int = 0,  // 跳过的记忆数
-    val newLinks: Int = 0          // 新创建的链接数
+    val newLinks: Int = 0,         // 新创建的链接数
+    val importedEvidence: Int = 0,
+    val importedEpisodes: Int = 0,
+    val importedGrants: Int = 0,
+    val includesStructuredMemory: Boolean = false,
 )

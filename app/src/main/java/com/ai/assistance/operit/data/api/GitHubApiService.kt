@@ -1,11 +1,8 @@
 package com.ai.assistance.operit.data.api
 
 import android.content.Context
-import android.os.SystemClock
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.data.preferences.GitHubUser
-import com.ai.assistance.operit.util.AppLogger
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,7 +15,7 @@ import okhttp3.*
 
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 
@@ -28,6 +25,78 @@ data class GitHubAccessTokenResponse(
     val token_type: String,
     val scope: String? = null
 )
+
+@Serializable
+data class GitHubDeviceAuthorizationResponse(
+    val device_code: String,
+    val user_code: String,
+    val verification_uri: String,
+    val expires_in: Long,
+    val interval: Long = 5L
+)
+
+@Serializable
+private data class GitHubDeviceTokenWireResponse(
+    val access_token: String? = null,
+    val token_type: String? = null,
+    val scope: String? = null,
+    val error: String? = null,
+    val error_description: String? = null
+)
+
+sealed interface GitHubDeviceTokenPollResult {
+    data class Granted(val token: GitHubAccessTokenResponse) : GitHubDeviceTokenPollResult
+    data object AuthorizationPending : GitHubDeviceTokenPollResult
+    data object SlowDown : GitHubDeviceTokenPollResult
+    data object Expired : GitHubDeviceTokenPollResult
+    data object AccessDenied : GitHubDeviceTokenPollResult
+    data class Rejected(
+        val error: String,
+        val description: String?
+    ) : GitHubDeviceTokenPollResult
+}
+
+private val githubDeviceFlowJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+}
+
+internal fun decodeGitHubDeviceTokenResponse(responseBody: String): GitHubDeviceTokenPollResult {
+    val wire = githubDeviceFlowJson.decodeFromString<GitHubDeviceTokenWireResponse>(responseBody)
+    val accessToken = wire.access_token?.takeIf { it.isNotBlank() }
+    val tokenType = wire.token_type?.takeIf { it.isNotBlank() }
+    if (accessToken != null && tokenType != null) {
+        return GitHubDeviceTokenPollResult.Granted(
+            GitHubAccessTokenResponse(
+                access_token = accessToken,
+                token_type = tokenType,
+                scope = wire.scope
+            )
+        )
+    }
+
+    if (accessToken != null) {
+        return GitHubDeviceTokenPollResult.Rejected(
+            error = "invalid_response",
+            description = "GitHub omitted token_type"
+        )
+    }
+
+    return when (wire.error) {
+        "authorization_pending" -> GitHubDeviceTokenPollResult.AuthorizationPending
+        "slow_down" -> GitHubDeviceTokenPollResult.SlowDown
+        "expired_token" -> GitHubDeviceTokenPollResult.Expired
+        "access_denied" -> GitHubDeviceTokenPollResult.AccessDenied
+        null -> GitHubDeviceTokenPollResult.Rejected(
+            error = "invalid_response",
+            description = "GitHub returned neither an access token nor an error"
+        )
+        else -> GitHubDeviceTokenPollResult.Rejected(
+            error = wire.error,
+            description = wire.error_description
+        )
+    }
+}
 
 @Serializable
 data class GitHubRepository(
@@ -132,10 +201,11 @@ class GitHubApiService(private val context: Context) {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.SECONDS)
         .addInterceptor { chain ->
             val request = chain.request()
             val builder = request.newBuilder()
-                .addHeader("User-Agent", "Operit-MCP-Client")
+                .addHeader("User-Agent", "Mira-Android")
             if (request.header("Accept") == null) {
                 builder.addHeader("Accept", "application/vnd.github.v3+json")
             }
@@ -152,47 +222,93 @@ class GitHubApiService(private val context: Context) {
     private val authPreferences = GitHubAuthPreferences.getInstance(context)
     
     companion object {
-        private const val TAG = "GitHubApiService"
         private const val GITHUB_API_BASE = "https://api.github.com"
-        private const val GITHUB_OAUTH_BASE = "https://github.com/login/oauth"
+        private const val GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code"
+        private const val GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token"
     }
-    
-    /**
-     * 通过授权码获取访问令牌
-     */
-    suspend fun getAccessToken(code: String): Result<GitHubAccessTokenResponse> = withContext(Dispatchers.IO) {
+
+    suspend fun requestDeviceAuthorization(
+        clientId: String,
+        scope: String
+    ): Result<GitHubDeviceAuthorizationResponse> = withContext(Dispatchers.IO) {
         try {
-            // GitHub OAuth API 要求使用 application/x-www-form-urlencoded 格式
             val formBody = FormBody.Builder()
-                .add("client_id", GitHubAuthPreferences.GITHUB_CLIENT_ID)
-                .add("client_secret", GitHubAuthPreferences.GITHUB_CLIENT_SECRET)
-                .add("code", code)
+                .add("client_id", clientId)
+                .add("scope", scope)
                 .build()
-            
+
             val request = Request.Builder()
-                .url("$GITHUB_OAUTH_BASE/access_token")
+                .url(GITHUB_DEVICE_CODE_URL)
                 .post(formBody)
                 .addHeader("Accept", "application/json")
                 .build()
-            
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
-            
-            if (response.isSuccessful && responseBody != null) {
-                try {
-                    val tokenResponse = json.decodeFromString<GitHubAccessTokenResponse>(responseBody)
-                    Result.success(tokenResponse)
-                } catch (e: Exception) {
-                    com.ai.assistance.operit.util.AppLogger.e("GitHubApiService", "Failed to parse token response", e)
-                    Result.failure(Exception("Failed to parse token response: ${e.message}"))
+
+            client.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string()
+                if (response.isSuccessful && !responseBody.isNullOrBlank()) {
+                    val authorization = try {
+                        json.decodeFromString<GitHubDeviceAuthorizationResponse>(responseBody)
+                    } catch (error: Exception) {
+                        return@use Result.failure(
+                            IllegalStateException("GitHub returned an invalid device authorization")
+                        )
+                    }
+                    val verificationUrl = authorization.verification_uri.toHttpUrlOrNull()
+                    if (
+                        authorization.device_code.isBlank() ||
+                        authorization.user_code.isBlank() ||
+                        verificationUrl == null ||
+                        verificationUrl.scheme != "https" ||
+                        verificationUrl.host != "github.com" ||
+                        authorization.expires_in <= 0L
+                    ) {
+                        Result.failure(IllegalStateException("GitHub returned an invalid device authorization"))
+                    } else {
+                        Result.success(authorization)
+                    }
+                } else {
+                    Result.failure(Exception("GitHub device authorization failed (HTTP ${response.code})"))
                 }
-            } else {
-                val errorMsg = "HTTP ${response.code}: ${response.message}"
-                com.ai.assistance.operit.util.AppLogger.e("GitHubApiService", errorMsg)
-                Result.failure(Exception(errorMsg))
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
-            com.ai.assistance.operit.util.AppLogger.e("GitHubApiService", "Exception in getAccessToken", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun pollDeviceAccessToken(
+        clientId: String,
+        deviceCode: String
+    ): Result<GitHubDeviceTokenPollResult> = withContext(Dispatchers.IO) {
+        try {
+            val formBody = FormBody.Builder()
+                .add("client_id", clientId)
+                .add("device_code", deviceCode)
+                .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+                .build()
+
+            val request = Request.Builder()
+                .url(GITHUB_ACCESS_TOKEN_URL)
+                .post(formBody)
+                .addHeader("Accept", "application/json")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string()
+                if (response.isSuccessful && !responseBody.isNullOrBlank()) {
+                    try {
+                        Result.success(decodeGitHubDeviceTokenResponse(responseBody))
+                    } catch (error: Exception) {
+                        Result.failure(IllegalStateException("GitHub returned an invalid token response"))
+                    }
+                } else {
+                    Result.failure(Exception("GitHub token polling failed (HTTP ${response.code})"))
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -204,27 +320,42 @@ class GitHubApiService(private val context: Context) {
         try {
             val authHeader = authPreferences.getAuthorizationHeader()
                 ?: return@withContext Result.failure(Exception("No access token available"))
-            
-            val request = Request.Builder()
-                .url("$GITHUB_API_BASE/user")
-                .addHeader("Authorization", authHeader)
-                .build()
-            
-            val response = client.newCall(request).execute()
-            
-            if (response.isSuccessful) {
-                val responseBody = response.body?.string()
-                if (responseBody != null) {
-                    val user = json.decodeFromString<GitHubUser>(responseBody)
-                    Result.success(user)
-                } else {
-                    Result.failure(Exception("Empty response body"))
-                }
-            } else {
-                Result.failure(Exception("HTTP ${response.code}: ${response.message}"))
-            }
+            getCurrentUserWithAuthorization(authHeader)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /** Validates a newly issued token without changing the stored login session. */
+    suspend fun getCurrentUserWithAccessToken(accessToken: String): Result<GitHubUser> =
+        withContext(Dispatchers.IO) {
+            try {
+                if (accessToken.isBlank()) {
+                    return@withContext Result.failure(IllegalArgumentException("Access token is empty"))
+                }
+                getCurrentUserWithAuthorization("Bearer $accessToken")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    private fun getCurrentUserWithAuthorization(authorization: String): Result<GitHubUser> {
+        val request = Request.Builder()
+            .url("$GITHUB_API_BASE/user")
+            .addHeader("Authorization", authorization)
+            .build()
+
+        return client.newCall(request).execute().use { response ->
+            val responseBody = response.body?.string()
+            if (response.isSuccessful && !responseBody.isNullOrBlank()) {
+                Result.success(json.decodeFromString<GitHubUser>(responseBody))
+            } else {
+                Result.failure(Exception("GitHub user verification failed (HTTP ${response.code})"))
+            }
         }
     }
     
@@ -856,4 +987,3 @@ class GitHubApiService(private val context: Context) {
         )
     }
 }
-

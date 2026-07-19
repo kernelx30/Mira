@@ -32,6 +32,12 @@ data class CompanionMemoryTarget(
         }
 }
 
+fun CompanionMemoryTarget.structuredCompanionId(): String =
+    characterGroupId.takeIf { it.isNotBlank() }?.let { "group:$it" }
+        ?: characterId.takeIf { it.isNotBlank() }?.let { "character:$it" }
+        ?: characterName.takeIf { it.isNotBlank() }?.let { "character_name:$it" }
+        .orEmpty()
+
 data class CompanionMemoryOwnership(
     val scope: CompanionMemoryScope,
     val profileId: String,

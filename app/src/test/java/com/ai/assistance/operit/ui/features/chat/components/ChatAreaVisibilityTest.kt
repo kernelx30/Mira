@@ -47,6 +47,23 @@ class ChatAreaVisibilityTest {
     }
 
     @Test
+    fun attachmentOnlyAssistantMarkupDoesNotLeaveAnEmptyBubble() {
+        val attachmentOnly =
+            ChatMessage(
+                sender = "ai",
+                content =
+                    "<attachment id=\"file-1\" filename=\"note.txt\" type=\"text/plain\">content</attachment>",
+            )
+
+        assertFalse(
+            shouldRenderChatTimelineMessage(
+                message = attachmentOnly,
+                hideAsLoadingPlaceholder = false,
+            )
+        )
+    }
+
+    @Test
     fun markdownListMarkerWithoutBodyDoesNotLeaveAnEmptyBubble() {
         val markerOnly = ChatMessage(sender = "ai", content = "1.")
 

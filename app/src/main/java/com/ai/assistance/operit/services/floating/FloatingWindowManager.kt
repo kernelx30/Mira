@@ -82,6 +82,7 @@ enum class StatusIndicatorStyle {
 
 interface FloatingWindowCallback {
     fun onClose()
+    fun onModeWillChange(newMode: FloatingMode) {}
     fun onSendMessage(message: String, promptType: PromptFunctionType = PromptFunctionType.CHAT)
     fun onSendMessageWithResult(
         message: String,
@@ -664,6 +665,8 @@ class FloatingWindowManager(
                         PixelFormat.TRANSLUCENT
                 )
         params.gravity = Gravity.TOP or Gravity.START
+        // Overlay startup should be immediate; the platform window animation made the ball visibly jump in.
+        params.windowAnimations = 0
 
         // Disable system move animations to allow custom animations to take full control
         setPrivateFlag(params, PRIVATE_FLAG_NO_MOVE_ANIMATION)
@@ -897,6 +900,7 @@ class FloatingWindowManager(
             }
         }
 
+        callback.onModeWillChange(newMode)
         state.currentMode.value = newMode
         if (newMode != FloatingMode.WINDOW) {
             pendingImeFocusRunnable?.let { mainHandler.removeCallbacks(it) }
@@ -1064,6 +1068,7 @@ class FloatingWindowManager(
             // 球模式切换：需要与 Compose AnimatedContent 动画同步
             val isToBall = newMode == FloatingMode.BALL || newMode == FloatingMode.VOICE_BALL
             val isFromBall = state.previousMode == FloatingMode.BALL || state.previousMode == FloatingMode.VOICE_BALL
+            val isBallToWindow = isFromBall && newMode == FloatingMode.WINDOW
             
             if (isToBall && !isFromBall) {
                 // 其他模式 -> 球模式
@@ -1087,6 +1092,22 @@ class FloatingWindowManager(
                     }
                 }, 150) // 与 fadeOut/scaleOut 的时长匹配
                 
+            } else if (isBallToWindow) {
+                state.ballExploding.value = false
+                updateViewLayout { params ->
+                    params.width = target.width
+                    params.height = target.height
+                    params.x = target.x
+                    params.y = target.y
+                    params.flags = target.flags
+                    params.gravity = target.gravity
+                    params.softInputMode = resolveSoftInputModeForMode(newMode)
+                    applyFullscreenOverlayWindowPolicy(params, willFullscreen)
+                    applyFullscreenBlur(params, target.blurEnabled)
+                    state.x = params.x
+                    state.y = params.y
+                }
+                state.isTransitioning = false
             } else if (isFromBall && !isToBall) {
                 // 球模式 -> 其他模式：触发淡出动画，球平滑消失
                 // 1. 触发淡出动画（100ms）
@@ -1133,9 +1154,11 @@ class FloatingWindowManager(
             }
             
             // 延迟标记过渡完成，与 AnimatedContent 动画时长匹配
-            mainHandler.postDelayed({
-                state.isTransitioning = false
-            }, 500) // 匹配 AnimatedContent 的最长动画时长
+            if (!isBallToWindow) {
+                mainHandler.postDelayed({
+                    state.isTransitioning = false
+                }, 500) // 匹配 AnimatedContent 的最长动画时长
+            }
         } else {
             // 非球模式切换（如窗口↔全屏）：立即改变窗口尺寸
             updateViewLayout { params ->

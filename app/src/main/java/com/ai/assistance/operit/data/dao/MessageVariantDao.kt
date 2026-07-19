@@ -61,7 +61,8 @@ interface MessageVariantDao {
             sentAt,
             outputDurationMs,
             waitDurationMs,
-            completedAt
+            completedAt,
+            speechDirectionJson
         )
         SELECT
             :targetChatId,
@@ -77,7 +78,8 @@ interface MessageVariantDao {
             sentAt,
             outputDurationMs,
             waitDurationMs,
-            completedAt
+            completedAt,
+            speechDirectionJson
         FROM message_variants
         WHERE chatId = :sourceChatId
             AND (:upToTimestampInclusive IS NULL OR messageTimestamp <= :upToTimestampInclusive)

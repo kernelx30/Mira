@@ -3,6 +3,7 @@ package com.ai.assistance.operit.util
 import android.content.Context
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.data.api.GitHubApiService
+import com.ai.assistance.operit.data.updates.apkBrowserDownloadUrlOrNull
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.async
@@ -181,7 +182,7 @@ class GithubReleaseUtil(private val context: Context) {
                 owner = repoOwner,
                 repo = repoName,
                 page = 1,
-                perPage = 1
+                perPage = 20
             )
 
             result.fold(
@@ -191,13 +192,17 @@ class GithubReleaseUtil(private val context: Context) {
                         return@withContext null
                     }
 
-                    val latestRelease = releases.first()
+                    val latestRelease =
+                        releases.firstOrNull { !it.draft && !it.prerelease }
+                            ?: run {
+                                AppLogger.e(TAG, "No stable releases found for $repoOwner/$repoName")
+                                return@withContext null
+                            }
                     val tagName = latestRelease.tag_name
                     val version = tagName.removePrefix("v")
 
                     // 查找 APK 资源
-                    val apkAsset = latestRelease.assets.find { it.name.endsWith(".apk") }
-                    val downloadUrl = apkAsset?.browser_download_url ?: latestRelease.html_url
+                    val downloadUrl = latestRelease.apkBrowserDownloadUrlOrNull().orEmpty()
 
                     ReleaseInfo(
                         version = version,

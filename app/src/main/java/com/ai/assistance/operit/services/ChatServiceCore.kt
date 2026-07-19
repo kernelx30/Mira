@@ -10,6 +10,7 @@ import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatTurnOptions
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.PromptFunctionType
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.WaifuPreferences
 import com.ai.assistance.operit.data.preferences.resolveAutoReadEnabled
 import com.ai.assistance.operit.services.core.ApiConfigDelegate
@@ -105,7 +106,7 @@ class ChatServiceCore(
             }.stateIn(
                 scope = coroutineScope,
                 started = SharingStarted.Eagerly,
-                initialValue = false,
+                initialValue = ApiPreferences.DEFAULT_ENABLE_AUTO_READ,
             )
 
         // 初始化 Token 统计委托

@@ -24,4 +24,34 @@ class MemoryAutoSaveCandidateTest {
             ),
         )
     }
+
+    @Test
+    fun explicitUserRequestUsesStrongConfirmationPath() {
+        assertTrue(
+            MemoryAutoSaveCandidate.isExplicitUserRequestSource(
+                MemoryAutoSaveCandidate.SOURCE_TYPE_EXPLICIT_USER,
+            ),
+        )
+    }
+
+    @Test
+    fun selectedMessageIsNotAnExplicitMemoryRequest() {
+        assertTrue(
+            MemoryAutoSaveCandidate.isUserSelectedSource(
+                MemoryAutoSaveCandidate.SOURCE_TYPE_SELECTED_USER_MESSAGE,
+            ),
+        )
+        assertTrue(
+            !MemoryAutoSaveCandidate.isExplicitUserRequestSource(
+                MemoryAutoSaveCandidate.SOURCE_TYPE_SELECTED_USER_MESSAGE,
+            ),
+        )
+    }
+
+    @Test
+    fun candidateKeepsCompanionTargetSnapshot() {
+        val candidate = MemoryAutoSaveCandidate(companionId = "character:zero")
+
+        assertEquals("character:zero", candidate.companionId)
+    }
 }

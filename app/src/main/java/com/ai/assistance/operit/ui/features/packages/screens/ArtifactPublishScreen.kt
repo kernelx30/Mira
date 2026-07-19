@@ -54,6 +54,7 @@ import com.ai.assistance.operit.ui.features.packages.market.ArtifactPublishClust
 import com.ai.assistance.operit.ui.features.packages.market.GitHubForgePublishService
 import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactType
 import com.ai.assistance.operit.ui.features.packages.market.PublishProgressStage
+import com.ai.assistance.operit.ui.features.packages.market.inferArtifactForgeRepoName
 import com.ai.assistance.operit.ui.features.packages.market.isOperit2VersionAllowed
 import com.ai.assistance.operit.ui.features.packages.market.sameArtifactRuntimePackageId
 import com.ai.assistance.operit.ui.features.packages.screens.artifact.viewmodel.ArtifactMarketViewModel
@@ -103,7 +104,8 @@ fun com.ai.assistance.operit.data.api.MarketV2Entry.toArtifactPublishClusterCont
         lockedDisplayName = title,
         projectDisplayName = title,
         projectDescription = detail.ifBlank { description },
-        categoryId = categoryId
+        categoryId = categoryId,
+        preferredForgeRepo = this.inferArtifactForgeRepoName()
     )
 }
 

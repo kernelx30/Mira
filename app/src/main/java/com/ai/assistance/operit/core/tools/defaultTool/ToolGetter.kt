@@ -157,6 +157,26 @@ object ToolGetter {
         return MemoryQueryToolExecutor(context)
     }
 
+    fun getCompanionMemoryToolExecutor(context: Context): CompanionMemoryToolExecutor {
+        return CompanionMemoryToolExecutor(context)
+    }
+
+    fun getCompanionMemoryDeleteToolExecutor(context: Context): CompanionMemoryDeleteToolExecutor {
+        return CompanionMemoryDeleteToolExecutor(context)
+    }
+
+    fun getCompanionMemoryExportToolExecutor(context: Context): CompanionMemoryExportToolExecutor {
+        return CompanionMemoryExportToolExecutor(context)
+    }
+
+    fun getChatHistoryExportToolExecutor(context: Context): ChatHistoryExportToolExecutor {
+        return ChatHistoryExportToolExecutor(context)
+    }
+
+    fun getMiraSettingsToolExecutor(context: Context): MiraSettingsToolExecutor {
+        return MiraSettingsToolExecutor(context)
+    }
+
     /**
      * 获取FFmpeg工具执行器
      * @param context 应用上下文

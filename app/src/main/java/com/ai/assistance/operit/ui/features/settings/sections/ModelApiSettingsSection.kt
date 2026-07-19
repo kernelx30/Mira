@@ -82,10 +82,12 @@ fun ModelApiSettingsSection(
         configManager: ModelConfigManager,
         saveCoordinator: ModelConfigSaveCoordinator,
         showNotification: (String) -> Unit,
-        navigateToMnnModelDownload: (() -> Unit)? = null
+        navigateToMnnModelDownload: (() -> Unit)? = null,
+        externalReloadToken: Int = 0
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val editorStateKey = config.id to externalReloadToken
 
     // 区域告警可见性
     var showRegionWarning by remember { mutableStateOf(false) }
@@ -107,40 +109,40 @@ fun ModelApiSettingsSection(
     }
 
     // API编辑状态
-    var apiEndpointInput by remember(config.id) { mutableStateOf(config.apiEndpoint) }
-    var apiKeyInput by remember(config.id) { mutableStateOf(config.apiKey) }
-    var modelNameInput by remember(config.id) { mutableStateOf(config.modelName) }
-    var selectedProviderTypeId by remember(config.id) { mutableStateOf(config.apiProviderTypeId) }
-    var hasInitializedProviderEndpointSync by remember(config.id) { mutableStateOf(false) }
-    var previousProviderTypeId by remember(config.id) { mutableStateOf(config.apiProviderTypeId) }
+    var apiEndpointInput by remember(editorStateKey) { mutableStateOf(config.apiEndpoint) }
+    var apiKeyInput by remember(editorStateKey) { mutableStateOf(config.apiKey) }
+    var modelNameInput by remember(editorStateKey) { mutableStateOf(config.modelName) }
+    var selectedProviderTypeId by remember(editorStateKey) { mutableStateOf(config.apiProviderTypeId) }
+    var hasInitializedProviderEndpointSync by remember(editorStateKey) { mutableStateOf(false) }
+    var previousProviderTypeId by remember(editorStateKey) { mutableStateOf(config.apiProviderTypeId) }
     val selectedApiProvider = ApiProviderType.fromProviderTypeId(selectedProviderTypeId)
 
     // MNN特定配置状态
-    var mnnForwardTypeInput by remember(config.id) { mutableStateOf(config.mnnForwardType) }
-    var mnnThreadCountInput by remember(config.id) { mutableStateOf(config.mnnThreadCount.toString()) }
+    var mnnForwardTypeInput by remember(editorStateKey) { mutableStateOf(config.mnnForwardType) }
+    var mnnThreadCountInput by remember(editorStateKey) { mutableStateOf(config.mnnThreadCount.toString()) }
 
     // llama.cpp 常用配置状态
-    var llamaThreadCountInput by remember(config.id) { mutableStateOf(config.llamaThreadCount.toString()) }
-    var llamaContextSizeInput by remember(config.id) { mutableStateOf(config.llamaContextSize.toString()) }
-    var llamaGpuLayersInput by remember(config.id) { mutableStateOf(config.llamaGpuLayers.toString()) }
+    var llamaThreadCountInput by remember(editorStateKey) { mutableStateOf(config.llamaThreadCount.toString()) }
+    var llamaContextSizeInput by remember(editorStateKey) { mutableStateOf(config.llamaContextSize.toString()) }
+    var llamaGpuLayersInput by remember(editorStateKey) { mutableStateOf(config.llamaGpuLayers.toString()) }
 
     // 图片处理配置状态
-    var enableDirectImageProcessingInput by remember(config.id) { mutableStateOf(config.enableDirectImageProcessing) }
+    var enableDirectImageProcessingInput by remember(editorStateKey) { mutableStateOf(config.enableDirectImageProcessing) }
 
-    var enableDirectAudioProcessingInput by remember(config.id) { mutableStateOf(config.enableDirectAudioProcessing) }
+    var enableDirectAudioProcessingInput by remember(editorStateKey) { mutableStateOf(config.enableDirectAudioProcessing) }
 
-    var enableDirectVideoProcessingInput by remember(config.id) { mutableStateOf(config.enableDirectVideoProcessing) }
+    var enableDirectVideoProcessingInput by remember(editorStateKey) { mutableStateOf(config.enableDirectVideoProcessing) }
     
     // Google Search Grounding 配置状态 (仅Gemini)
-    var enableGoogleSearchInput by remember(config.id) { mutableStateOf(config.enableGoogleSearch) }
+    var enableGoogleSearchInput by remember(editorStateKey) { mutableStateOf(config.enableGoogleSearch) }
 
     // Claude 1小时提示缓存配置状态 (仅Claude)
-    var enableClaude1hPromptCacheInput by remember(config.id) {
+    var enableClaude1hPromptCacheInput by remember(editorStateKey) {
         mutableStateOf(config.enableClaude1hPromptCache)
     }
     
     // Tool Call配置状态
-    var enableToolCallInput by remember(config.id) { mutableStateOf(config.enableToolCall) }
+    var enableToolCallInput by remember(editorStateKey) { mutableStateOf(config.enableToolCall) }
 
     data class ApiAutoSaveState(
         val apiEndpoint: String,
@@ -242,7 +244,7 @@ fun ModelApiSettingsSection(
     )
 
     DebouncedModelConfigAutoSaveEffect(
-        effectKey = config.id,
+        effectKey = editorStateKey,
         valueProvider = { buildAutoSaveState() },
         persist = { state -> persist(state) },
         onError = { e ->
@@ -336,7 +338,7 @@ fun ModelApiSettingsSection(
     var showModelsDialog by remember { mutableStateOf(false) }
     var modelsList by remember { mutableStateOf<List<ModelOption>>(emptyList()) }
     var modelLoadError by remember { mutableStateOf<String?>(null) }
-    var showEndpointDialog by remember(config.id) { mutableStateOf(false) }
+    var showEndpointDialog by remember(editorStateKey) { mutableStateOf(false) }
 
     // 检查是否未填写API密钥（仅用于UI显示）
     val isUsingDefaultApiKey = apiKeyInput.isBlank()

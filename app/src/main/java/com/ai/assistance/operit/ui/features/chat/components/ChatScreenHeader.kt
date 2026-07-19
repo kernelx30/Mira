@@ -165,7 +165,8 @@ fun ChatScreenHeader(
         modifier =
             modifier
                 .fillMaxWidth()
-                .then(if (isFloatingMode) Modifier else Modifier.statusBarsPadding())
+                // The service state only controls the toolbar action; this header still belongs to the Activity.
+                .statusBarsPadding()
                 .heightIn(min = 56.dp)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,

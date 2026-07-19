@@ -77,7 +77,7 @@ import ru.noties.jlatexmath.JLatexMathDrawable
 
 private const val TAG = "MarkdownRenderer"
 private const val RENDER_INTERVAL_MS = 200L // 渲染间隔 0.2 秒
-private const val FADE_IN_DURATION_MS = 800 // 淡入动画持续时间
+private const val FADE_IN_DURATION_MS = 220 // 淡入动画持续时间，避免流式节点连续叠加造成拖尾
 private const val MAX_CONSECUTIVE_RENDERED_NEWLINES = 2
 
 internal enum class MarkdownRenderMode {

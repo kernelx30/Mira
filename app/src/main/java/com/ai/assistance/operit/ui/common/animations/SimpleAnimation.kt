@@ -1,6 +1,8 @@
 package com.ai.assistance.operit.ui.common.animations
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -18,9 +20,13 @@ fun SimpleAnimatedVisibility(
 ) {
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        label = "Visibility Animation"
+        animationSpec = tween(
+            durationMillis = 180,
+            easing = FastOutSlowInEasing,
+        ),
+        label = "Visibility Animation",
     )
-    
+
     if (alpha > 0f) {
         Box(
             modifier = modifier.alpha(alpha)
@@ -28,4 +34,4 @@ fun SimpleAnimatedVisibility(
             content()
         }
     }
-} 
+}

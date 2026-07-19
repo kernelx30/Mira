@@ -67,7 +67,14 @@ object CompanionMemoryPredicate {
         return canonical in singletonPredicates || canonical.startsWith("family.")
     }
 
-    fun isPreference(predicate: String): Boolean = canonicalize(predicate) in setOf("likes", "dislikes")
+    fun isPreference(predicate: String): Boolean {
+        val canonical = canonicalize(predicate)
+        return canonical == "likes" ||
+            canonical == "dislikes" ||
+            canonical.startsWith("likes.") ||
+            canonical.startsWith("dislikes.") ||
+            canonical in setOf("favorite_game", "hobby", "interest", "favorite_genre")
+    }
 
     fun isOppositePreference(left: String, right: String): Boolean {
         val canonicalLeft = canonicalize(left)

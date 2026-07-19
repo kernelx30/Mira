@@ -1372,6 +1372,7 @@ data class ComputerDesktopActionResultData(
 @Serializable
 data class MemoryQueryResultData(
     val memories: List<MemoryInfo>,
+    val companionMemories: List<CompanionMemoryInfo> = emptyList(),
     val snapshotId: String? = null,
     val snapshotCreated: Boolean = false,
     val excludedBySnapshotCount: Int = 0
@@ -1388,6 +1389,19 @@ data class MemoryQueryResultData(
         val chunkIndices: List<Int>? = null
     )
 
+    @Serializable
+    data class CompanionMemoryInfo(
+        val id: String,
+        val label: String,
+        val content: String,
+        val scope: String,
+        val type: String,
+        val status: String,
+        val confidence: Double,
+        val importance: Double,
+        val createdAt: String,
+    )
+
     override fun toString(): String {
         val snapshotSummary = buildList {
             snapshotId?.takeIf { it.isNotBlank() }?.let {
@@ -1401,14 +1415,30 @@ data class MemoryQueryResultData(
             }
         }.joinToString("\n")
 
-        if (memories.isEmpty()) {
+        if (memories.isEmpty() && companionMemories.isEmpty()) {
             return if (snapshotSummary.isBlank()) {
                 "No relevant memories found."
             } else {
                 "$snapshotSummary\nNo relevant memories found."
             }
         }
-        val memoryText = memories.joinToString("\n---\n") { memory ->
+        val companionText = companionMemories.takeIf { it.isNotEmpty() }?.let { records ->
+            records.joinToString("\n---\n", prefix = "Structured companion memories:\n") { memory ->
+                """
+                ID: ${memory.id}
+                Label: ${memory.label}
+                Content: ${memory.content}
+                Scope: ${memory.scope}
+                Type: ${memory.type}
+                Status: ${memory.status}
+                Confidence: ${memory.confidence}
+                Importance: ${memory.importance}
+                Created: ${memory.createdAt}
+                """.trimIndent()
+            }
+        }
+        val legacyText = memories.takeIf { it.isNotEmpty() }?.let { records ->
+            records.joinToString("\n---\n", prefix = "Legacy/document memories:\n") { memory ->
             """
             Title: ${memory.title}
             Content: ${memory.content}
@@ -1416,7 +1446,9 @@ data class MemoryQueryResultData(
             Tags: ${memory.tags.joinToString(", ")}
             Created: ${memory.createdAt}
             """.trimIndent()
+            }
         }
+        val memoryText = listOfNotNull(companionText, legacyText).joinToString("\n---\n")
         return if (snapshotSummary.isBlank()) {
             memoryText
         } else {

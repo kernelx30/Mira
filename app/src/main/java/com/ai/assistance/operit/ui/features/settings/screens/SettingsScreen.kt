@@ -1,5 +1,7 @@
 package com.ai.assistance.operit.ui.features.settings.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,11 +31,13 @@ import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
@@ -46,6 +50,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SettingsEthernet
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -70,6 +75,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +88,14 @@ import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.launch
 
 private val SettingsScreenScrollPosition = mutableStateOf(0)
+
+private const val MIRA_QQ_GROUP_URL =
+    "https://qun.qq.com/universal-share/share?ac=1" +
+        "&authKey=T1QUgCwcBvZgzJ8p%2B1cG723go8dbe8EtOC35wtUQiFkjoyg88AfApHet%2F6VerSL2" +
+        "&busi_data=eyJncm91cENvZGUiOiIxMDcwMTUzODA5IiwidG9rZW4iOiJ3WlBoa3BRNVFxQ3dEVC9ld0JDNTNoY3d1QlNyMnRlR3gvdlhZNEtZbUFrc2UxQ1JUeFZhb1Q2dGFmRUpDY0xYIiwidWluIjoiNDgyNzM0MTE5In0%3D" +
+        "&data=QaDcQk3MDx_wS59qrWDZXsmhCGW7cSQq_JR31WvZfb5cGWQtn1PnwSW3Asblpq4zaqyuUmAh0WiFSHjUVphX2A" +
+        "&svctype=4&tempid=h5_group_info"
+private const val MIRA_GITHUB_REPOSITORY_URL = "https://github.com/kernelx30/Mira"
 
 private data class MateSettingsItem(
     val title: String,
@@ -121,14 +135,34 @@ fun SettingsScreen(
     navigateToTerminalSetup: () -> Unit,
     navigateToCompanionSettings: () -> Unit,
     navigateToCompanionPresence: () -> Unit,
+    navigateToAbout: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val githubAuth = remember { GitHubAuthPreferences.getInstance(context) }
     val scope = rememberCoroutineScope()
     var showClearCookieConfirm by remember { mutableStateOf(false) }
     val isGitHubLoggedIn by githubAuth.isLoggedInFlow.collectAsState(initial = false)
     val gitHubUser by githubAuth.userInfoFlow.collectAsState(initial = null)
     val scrollState = rememberScrollState(SettingsScreenScrollPosition.value)
+
+    fun openExternalUrl(url: String) {
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
+        }.onFailure { error ->
+            AppLogger.e("SettingsScreen", "Failed to open settings external link", error)
+            Toast.makeText(
+                    context,
+                    resources.getString(R.string.open_link_failed, error.message.orEmpty()),
+                    Toast.LENGTH_SHORT,
+                )
+                .show()
+        }
+    }
 
     LaunchedEffect(scrollState) {
         snapshotFlow { scrollState.value }.collect { SettingsScreenScrollPosition.value = it }
@@ -288,6 +322,29 @@ fun SettingsScreen(
                             stringResource(R.string.settings_capability_center_subtitle),
                             Icons.Filled.Extension,
                             navigateToCapabilities,
+                        ),
+                    ),
+            ),
+            MateSettingsSection(
+                title = stringResource(R.string.settings_section_community_project),
+                icon = Icons.Filled.Groups,
+                items =
+                    listOf(
+                        MateSettingsItem(
+                            stringResource(R.string.settings_join_mira_qq_group),
+                            stringResource(R.string.settings_join_mira_qq_group_desc),
+                            Icons.Filled.Groups,
+                        ) { openExternalUrl(MIRA_QQ_GROUP_URL) },
+                        MateSettingsItem(
+                            stringResource(R.string.settings_mira_github_repository),
+                            stringResource(R.string.settings_mira_github_repository_desc),
+                            Icons.Filled.Code,
+                        ) { openExternalUrl(MIRA_GITHUB_REPOSITORY_URL) },
+                        MateSettingsItem(
+                            stringResource(R.string.check_for_updates),
+                            stringResource(R.string.settings_check_updates_desc),
+                            Icons.Filled.Update,
+                            navigateToAbout,
                         ),
                     ),
             ),

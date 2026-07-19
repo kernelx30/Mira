@@ -11,12 +11,15 @@ import com.ai.assistance.operit.data.model.WorkspaceRenameResult
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -28,6 +31,9 @@ import com.ai.assistance.operit.data.model.ChatMessageTimestampAllocator
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** 委托类，负责管理聊天历史相关功能 */
+internal fun shouldApplyCurrentChatLoad(requestedChatId: String, currentChatId: String?): Boolean =
+    requestedChatId == currentChatId
+
 class ChatHistoryDelegate(
         private val context: Context,
         private val coroutineScope: CoroutineScope,
@@ -57,6 +63,9 @@ class ChatHistoryDelegate(
     private var afterDestructiveHistoryMutation: (suspend (String) -> Unit)? = null
 
     private var pendingPersistChatOrderJob: Job? = null
+    private val switchChatGeneration = AtomicLong(0L)
+    private val switchChatLock = Any()
+    private var switchChatJob: Job? = null
 
     // This is no longer needed here as summary logic is moved.
     // private val apiPreferences = ApiPreferences(context)
@@ -139,7 +148,15 @@ class ChatHistoryDelegate(
         chatId: String,
         messages: List<ChatMessage>,
     ): List<ChatMessage> {
+        if (!shouldApplyCurrentChatLoad(chatId, _currentChatId.value)) {
+            AppLogger.d(TAG, "忽略过期会话窗口加载: requested=$chatId, current=${_currentChatId.value}")
+            return _chatHistory.value
+        }
         val loadResult = buildCurrentChatLoadResult(chatId, messages)
+        if (!shouldApplyCurrentChatLoad(chatId, _currentChatId.value)) {
+            AppLogger.d(TAG, "会话窗口加载完成时目标已变化: requested=$chatId, current=${_currentChatId.value}")
+            return _chatHistory.value
+        }
         currentChatWindow.applyLoadResult(loadResult, _chatHistory)
         if (loadResult.messages.isEmpty()) {
             latestDisplayPageCountByChatId.remove(chatId)
@@ -561,21 +578,24 @@ class ChatHistoryDelegate(
         when (selectionMode) {
             ChatSelectionMode.FOLLOW_GLOBAL -> {
                 coroutineScope.launch {
-                    chatHistoryManager.currentChatIdFlow.collect { chatId ->
+                    chatHistoryManager.currentChatIdFlow.collectLatest { chatId ->
                         if (chatId != null && chatId != _currentChatId.value) {
                             if (!chatHistoryManager.chatExists(chatId)) {
                                 AppLogger.w(TAG, "currentChatId不存在于数据库，已清除: $chatId")
                                 chatHistoryManager.clearCurrentChatId()
                                 _currentChatId.value = null
                                 clearCurrentChatHistoryInMemory()
-                                return@collect
+                                return@collectLatest
                             }
                             AppLogger.d(TAG, "检测到聊天ID变化: ${_currentChatId.value} -> $chatId")
+                            allowAddMessage.set(false)
                             _currentChatId.value = chatId
                             loadChatMessages(chatId)
-                        } else if (chatId == null && _currentChatId.value == null) {
-                            AppLogger.d(TAG, "首次初始化，没有当前聊天")
-                            currentChatWindow.reset()
+                        } else if (chatId == null) {
+                            AppLogger.d(TAG, "全局 currentChatId 已清空")
+                            _currentChatId.value = null
+                            allowAddMessage.set(true)
+                            clearCurrentChatHistoryInMemory()
                         }
                     }
                 }
@@ -636,8 +656,12 @@ class ChatHistoryDelegate(
         } catch (e: Exception) {
             AppLogger.e(TAG, "加载聊天消息失败", e)
         } finally {
-            allowAddMessage.set(true)
-            AppLogger.d(TAG, "聊天 $chatId 加载流程结束，已允许添加消息")
+            if (shouldApplyCurrentChatLoad(chatId, _currentChatId.value)) {
+                allowAddMessage.set(true)
+                AppLogger.d(TAG, "聊天 $chatId 加载流程结束，已允许添加消息")
+            } else {
+                AppLogger.d(TAG, "聊天 $chatId 加载流程已过期，不修改当前会话发送锁")
+            }
         }
     }
 
@@ -667,6 +691,10 @@ class ChatHistoryDelegate(
         AppLogger.d(TAG, "开始同步开场白，聊天ID: $chatId")
 
         historyUpdateMutex.withLock {
+            if (!shouldApplyCurrentChatLoad(chatId, _currentChatId.value)) {
+                AppLogger.d(TAG, "开场白同步目标已切换，跳过: requested=$chatId, current=${_currentChatId.value}")
+                return@withLock
+            }
             val chatMeta = _chatHistories.value.firstOrNull { it.id == chatId }
             if (!chatMeta?.characterGroupId.isNullOrBlank()) {
                 AppLogger.d(TAG, "聊天 $chatId 绑定群组角色卡，跳过开场白同步")
@@ -674,6 +702,10 @@ class ChatHistoryDelegate(
             }
 
             val hasUserMessage = chatHistoryManager.hasUserMessage(chatId)
+            if (!shouldApplyCurrentChatLoad(chatId, _currentChatId.value)) {
+                AppLogger.d(TAG, "检查开场白期间会话已切换，跳过: requested=$chatId, current=${_currentChatId.value}")
+                return@withLock
+            }
             
             AppLogger.d(
                 TAG,
@@ -693,6 +725,10 @@ class ChatHistoryDelegate(
                 is ActivePrompt.CharacterGroup -> null
             }
             val effectiveCard = boundCard ?: activeCard
+            if (!shouldApplyCurrentChatLoad(chatId, _currentChatId.value)) {
+                AppLogger.d(TAG, "读取角色期间会话已切换，跳过开场白同步: requested=$chatId")
+                return@withLock
+            }
 
             // 如果没有有效的角色卡，使用默认角色卡
             if (effectiveCard == null) {
@@ -878,43 +914,60 @@ class ChatHistoryDelegate(
 
     /** 切换聊天 */
     fun switchChat(chatId: String, syncToGlobal: Boolean = true) {
-        coroutineScope.launch {
-            // 切换对话时，禁止添加消息
-            allowAddMessage.set(false)
-            AppLogger.d(TAG, "切换对话到 $chatId (syncToGlobal=$syncToGlobal)，已禁止添加消息")
+        val newSwitchJob = synchronized(switchChatLock) {
+            val generation = switchChatGeneration.incrementAndGet()
+            switchChatJob?.cancel()
+            coroutineScope.launch(start = CoroutineStart.LAZY) {
+                if (generation != switchChatGeneration.get()) {
+                    return@launch
+                }
+                if (_currentChatId.value == chatId) {
+                    onScrollToBottom()
+                    return@launch
+                }
+                allowAddMessage.set(false)
+                AppLogger.d(TAG, "切换对话到 $chatId (syncToGlobal=$syncToGlobal)，已禁止添加消息")
 
-            try {
-                val (inputTokens, outputTokens, windowSize) = getChatStatistics()
-                saveCurrentChat(inputTokens, outputTokens, windowSize) // 切换前使用正确的窗口大小保存
-
-                if (syncToGlobal) {
-                    chatHistoryManager.setCurrentChatId(chatId)
-                    // _currentChatId.value will be updated by the collector, no need to set it here.
-                    // loadChatMessages(chatId) is also called by the collector.
-
-                    // 等待切换完成，并确保加载流程已经恢复消息添加。
-                    withTimeoutOrNull(500) {
-                        while (_currentChatId.value != chatId || !allowAddMessage.get()) {
-                            delay(10)
-                        }
+                var globalSelectionRequested = false
+                try {
+                    val (inputTokens, outputTokens, windowSize) = getChatStatistics()
+                    saveCurrentChat(inputTokens, outputTokens, windowSize)
+                    if (generation != switchChatGeneration.get()) {
+                        return@launch
                     }
-                } else {
-                    // 本地切换：只更新内存态（供悬浮窗使用），不写回 DataStore。
-                    _currentChatId.value = chatId
-                    loadChatMessages(chatId)
-                }
 
-                onScrollToBottom()
-            } finally {
-                if (!allowAddMessage.get()) {
-                    allowAddMessage.set(true)
-                    AppLogger.w(
-                        TAG,
-                        "切换对话流程结束时消息添加仍被禁用，已恢复状态: chatId=$chatId, syncToGlobal=$syncToGlobal"
-                    )
+                    if (syncToGlobal) {
+                        globalSelectionRequested = true
+                        chatHistoryManager.setCurrentChatId(chatId)
+                        withTimeoutOrNull(500) {
+                            while (_currentChatId.value != chatId || !allowAddMessage.get()) {
+                                delay(10)
+                            }
+                        }
+                    } else {
+                        _currentChatId.value = chatId
+                        loadChatMessages(chatId)
+                    }
+
+                    onScrollToBottom()
+                } finally {
+                    val stillOwnsSwitch = generation == switchChatGeneration.get()
+                    val selectionDidNotReachCollector = syncToGlobal && _currentChatId.value != chatId
+                    if (
+                        stillOwnsSwitch &&
+                            !allowAddMessage.get() &&
+                            (!globalSelectionRequested || selectionDidNotReachCollector)
+                    ) {
+                        allowAddMessage.set(true)
+                        AppLogger.w(
+                            TAG,
+                            "切换对话流程结束时消息添加仍被禁用，已恢复状态: chatId=$chatId, syncToGlobal=$syncToGlobal"
+                        )
+                    }
                 }
-            }
+            }.also { switchChatJob = it }
         }
+        newSwitchJob.start()
     }
 
     /** 创建对话分支 */

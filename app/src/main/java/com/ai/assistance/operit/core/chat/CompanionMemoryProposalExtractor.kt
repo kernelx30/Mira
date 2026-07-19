@@ -6,12 +6,14 @@ import com.ai.assistance.operit.core.chat.hooks.PromptTurn
 import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
 import com.ai.assistance.operit.data.model.CompanionMemoryProposal
 import com.ai.assistance.operit.data.model.CompanionMemoryProposalAction
+import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.data.model.CompanionMemoryPredicate
 import com.ai.assistance.operit.data.model.CompanionMemoryEdgeType
 import com.ai.assistance.operit.data.model.CompanionMemorySourceKind
 import com.ai.assistance.operit.data.model.CompanionMemoryType
 import com.ai.assistance.operit.data.model.CompanionRecordScope
 import com.ai.assistance.operit.data.model.MessageEntity
+import com.ai.assistance.operit.data.model.MemoryTriggerKind
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.repository.CompanionMemoryRepository
 import com.ai.assistance.operit.util.ChatUtils
@@ -44,6 +46,7 @@ object CompanionMemoryProposalExtractor {
         aiService: AIService,
         requireReview: Boolean,
         autoConfirmHighImportance: Boolean = false,
+        triggerKind: MemoryTriggerKind,
         nowMs: Long = System.currentTimeMillis(),
     ): Int {
         val sourceMessages =
@@ -51,6 +54,7 @@ object CompanionMemoryProposalExtractor {
                 .asSequence()
                 .filter { it.sender == "user" || it.sender == "ai" }
                 .filter { it.content.isNotBlank() }
+                .filter { it.displayMode != ChatMessageDisplayMode.HIDDEN_PLACEHOLDER.name }
                 .toList()
                 .takeLast(MAX_SOURCE_MESSAGES)
         if (sourceMessages.none { it.sender == "user" && it.messageId > 0L }) return 0
@@ -106,6 +110,7 @@ object CompanionMemoryProposalExtractor {
                 messages = sourceMessages,
                 requireReview = requireReview,
                 autoConfirmHighImportance = autoConfirmHighImportance,
+                triggerKind = triggerKind,
                 nowMs = nowMs,
             )
         val repository = CompanionMemoryRepository(context)
@@ -114,7 +119,8 @@ object CompanionMemoryProposalExtractor {
             val recordId = repository.applyProposal(profileId, companionId, proposal)
             if (recordId != null) {
                 applied += 1
-                CompanionMemoryReceiptBus.publishConfirmedHighValue(recordId, proposal)
+                // Background extraction is deliberately silent. Only the explicit save tool owns
+                // the receipt, otherwise two independent writers race to notify the same turn.
                 if (proposal.reviewAt == null) {
                     repository.refreshEpisodeForRecord(recordId)
                 }
@@ -129,12 +135,14 @@ object CompanionMemoryProposalExtractor {
         messages: List<MessageEntity>,
         requireReview: Boolean = true,
         autoConfirmHighImportance: Boolean = false,
+        triggerKind: MemoryTriggerKind = MemoryTriggerKind.AUTO_EXTRACT,
         nowMs: Long,
     ): List<CompanionMemoryProposal> {
         val evidenceMessages =
             messages
                 .asSequence()
                 .filter { it.sender == "user" && it.messageId > 0L }
+                .filter { it.displayMode != ChatMessageDisplayMode.HIDDEN_PLACEHOLDER.name }
                 .associateBy { it.messageId }
         if (evidenceMessages.isEmpty()) return emptyList()
 
@@ -185,6 +193,7 @@ object CompanionMemoryProposalExtractor {
                             edgeStrength =
                                 item.doubleValue("edge_strength")?.coerceIn(0.0, 1.0) ?: 0.5,
                             evidenceMessageIds = listOf(evidence.messageId),
+                            triggerKind = triggerKind,
                         ),
                     )
                     continue
@@ -197,7 +206,7 @@ object CompanionMemoryProposalExtractor {
                 val predicate =
                     CompanionMemoryPredicate.canonicalize(item.stringValue("predicate"))
                 if (!predicatePattern.matches(predicate)) continue
-                val value = item.stringValue("value").trim().take(500)
+                val value = normalizeCandidateValue(item.stringValue("value")).take(500)
                 if (value.isBlank()) continue
                 if (CompanionMemorySensitiveDataGuard.containsSensitiveData(value)) continue
 
@@ -208,12 +217,21 @@ object CompanionMemoryProposalExtractor {
                 val displayLabel = item.stringValue("label").trim().take(48).takeIf { it.isNotBlank() }
                 val confidence = item.doubleValue("confidence")?.coerceIn(0.4, 0.9) ?: 0.65
                 val importance = item.doubleValue("importance")?.coerceIn(0.3, 0.95) ?: 0.6
+                val evidenceSupportsValue =
+                    CompanionMemoryEvidenceValidator.supportsValue(evidenceQuote, value)
                 val autoConfirmed =
-                    autoConfirmHighImportance &&
+                    evidenceSupportsValue &&
+                        autoConfirmHighImportance &&
                         confidence >= 0.8 &&
-                        importance >= 0.85 &&
+                        (importance >= 0.85 ||
+                            (type in
+                                setOf(
+                                    CompanionMemoryType.PREFERENCE,
+                                    CompanionMemoryType.ROUTINE,
+                                ) && importance >= 0.75)) &&
                         type in AUTO_CONFIRM_TYPES
-                val needsReview = requireReview && !autoConfirmed
+                // A direct/user-selected trigger does not make a model-transformed value true.
+                val needsReview = !evidenceSupportsValue || (requireReview && !autoConfirmed)
                 add(
                     CompanionMemoryProposal(
                         action = action,
@@ -249,6 +267,7 @@ object CompanionMemoryProposalExtractor {
                         edgeType = edgeType,
                         edgeStrength = item.doubleValue("edge_strength")?.coerceIn(0.0, 1.0) ?: 0.5,
                         evidenceMessageIds = listOf(evidence.messageId),
+                        triggerKind = triggerKind,
                     ),
                 )
             }
@@ -281,6 +300,20 @@ object CompanionMemoryProposalExtractor {
 
     private fun JsonObject.doubleValue(key: String): Double? =
         (get(key) as? JsonPrimitive)?.doubleOrNull
+
+    private fun normalizeCandidateValue(rawValue: String): String {
+        val value = rawValue.trim()
+        if (value.isBlank()) return ""
+        val withoutQuestionTail =
+            value.replace(
+                Regex("[，,;；\\s]*(?:记住了吗|明白了吗|懂了吗|对吧|是不是这样)[？?。.!！]*$"),
+                "",
+            ).trim()
+        if (withoutQuestionTail in INVALID_DISCOURSE_VALUES) return ""
+        return withoutQuestionTail
+    }
+
+    private val INVALID_DISCOURSE_VALUES = setOf("了吗", "吗", "了", "吧", "哦", "呀")
 
     private fun typeAllowedInScope(type: CompanionMemoryType, scope: CompanionRecordScope): Boolean =
         when (scope) {
@@ -348,9 +381,16 @@ object CompanionMemoryProposalExtractor {
         - Evidence must reference a real user message_id and quote an exact substring from it.
         - Never use assistant text as evidence and never invent shared history.
         - Save durable identity, preference, routine, boundary, event, commitment, or relationship facts only.
-        - Prioritize facts that materially change future companionship: identity and preferred address; family and close relationships; health, allergies, medication and food restrictions; occupation and education; long-term goals; stable routines; firm boundaries; promises; major life events.
+        - Prioritize facts that materially change future companionship: identity and preferred address; family and close relationships; health, allergies, medication and food restrictions; occupation and education; long-term goals; stable routines; firm boundaries; promises; major life events; stable hobbies, favorite games, media, genres, and recurring likes or dislikes.
+        - Build the user's profile across these categories when the evidence is direct: identity (name, age, location, background), role (occupation, school, skills), relationships (family, partner, friends, pets), health and food restrictions, interests and hobbies, likes and dislikes, routines and habits, goals and ongoing projects, communication preferences, personality traits, boundaries, and recurring quirks.
+        - Store each independently useful fact as an atomic record. Do not wait for the user to use a memory command when the wording clearly describes an enduring characteristic.
+        - The schema is extensible: when a direct user trait does not fit a predefined label, keep it as USER/FACT or USER/PREFERENCE with a concise custom predicate such as personality.trait, quirk, communication_style, or custom_note. Never discard a concrete durable fact merely because its label is new.
+        - A direct statement such as "我喜欢玩原神" / "I enjoy playing Genshin" is a USER/PREFERENCE memory (for example predicate "favorite_game" or "hobby"), even when the user does not say "记住". A direct trait such as "我有点怕生" is a USER/FACT memory with a custom personality predicate. Treat a one-off activity report as an EVENT instead of a stable preference.
         - Explicit phrases such as "remember this", "this is important", "from now on", "I always", or their Chinese equivalents are strong durability signals when the quoted fact is concrete.
-        - Assign importance >= 0.85 to identity, health or allergy facts, firm boundaries, close relationships, long-term goals, promises, and major life events. Use confidence >= 0.8 only when the user's wording directly states the fact.
+        - When the latest user message asks to remember "this", "that", "the previous message", "这个", "刚才那条", or "上面那个", resolve the referenced fact from preceding user messages and cite that earlier message as evidence.
+        - Treat question tails and conversational checks such as "记住了吗", "明白了吗", "对吧", "懂了吗" as discourse, never as the memory value. If a preceding clause contains a concrete durable fact, quote that fact; otherwise return [].
+        - Never turn a question, filler phrase, or acknowledgement into a standalone memory. Values like "了吗", "吗", "了", "吧", "哦", and "呀" are always invalid.
+        - Assign importance >= 0.85 to identity, health or allergy facts, firm boundaries, close relationships, long-term goals, promises, and major life events. Stable user preferences and routines stated directly can use importance >= 0.75. Use confidence >= 0.8 only when the user's wording directly states the fact.
         - Prefer multiple atomic memories over one vague summary when a message contains several independently useful facts.
         - Ignore greetings, transient wording, tool logs, role-play narration without a durable fact, and guesses.
         - Never store passwords, API keys, verification codes, access tokens, private keys, or financial credentials.

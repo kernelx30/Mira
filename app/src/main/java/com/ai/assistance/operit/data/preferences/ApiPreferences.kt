@@ -179,7 +179,7 @@ class ApiPreferences private constructor(private val context: Context) {
         const val DEFAULT_ENABLE_MEMORY_AUTO_UPDATE = true
 
         // Default value for Auto Read
-        const val DEFAULT_ENABLE_AUTO_READ = false
+        const val DEFAULT_ENABLE_AUTO_READ = true
 
         // Default value for Tools Enable/Disable
         const val DEFAULT_ENABLE_TOOLS = true
