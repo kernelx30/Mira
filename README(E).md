@@ -29,6 +29,10 @@
 > [!TIP]
 > [Join the Mira QQ community group](https://qun.qq.com/universal-share/share?ac=1&authKey=T1QUgCwcBvZgzJ8p%2B1cG723go8dbe8EtOC35wtUQiFkjoyg88AfApHet%2F6VerSL2&busi_data=eyJncm91cENvZGUiOiIxMDcwMTUzODA5IiwidG9rZW4iOiJ3WlBoa3BRNVFxQ3dEVC9ld0JDNTNoY3d1QlNyMnRlR3gvdlhZNEtZbUFrc2UxQ1JUeFZhb1Q2dGFmRUpDY0xYIiwidWluIjoiNDgyNzM0MTE5In0%3D&data=QaDcQk3MDx_wS59qrWDZXsmhCGW7cSQq_JR31WvZfb5cGWQtn1PnwSW3Asblpq4zaqyuUmAh0WiFSHjUVphX2A&svctype=4&tempid=h5_group_info), group number: `1070153809`. In the app, open `Settings → Community and Project → Join Mira Home`.
 
+> [!TIP]
+> **Recommended API relay: [HackerX30](https://hackerx30.com)**
+> Use HackerX30 to power Mira's everyday conversation, memory extraction, and reply suggestions with GPT-5.6 at a very low rate. Add the API Key, Endpoint, and model ID supplied by the platform under Mira's Model and API settings.
+
 ## What Mira Is
 
 Mira is an Android AI companion created through a substantial redesign of [Operit](https://github.com/AAswordman/Operit). It inherits Operit's model integrations, tool calling, local runtime, and extension ecosystem, but reorganizes the product around one path:

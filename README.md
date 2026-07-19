@@ -31,6 +31,10 @@
 > [!TIP]
 > [加入 Mira QQ 交流群](https://qun.qq.com/universal-share/share?ac=1&authKey=T1QUgCwcBvZgzJ8p%2B1cG723go8dbe8EtOC35wtUQiFkjoyg88AfApHet%2F6VerSL2&busi_data=eyJncm91cENvZGUiOiIxMDcwMTUzODA5IiwidG9rZW4iOiJ3WlBoa3BRNVFxQ3dEVC9ld0JDNTNoY3d1QlNyMnRlR3gvdlhZNEtZbUFrc2UxQ1JUeFZhb1Q2dGFmRUpDY0xYIiwidWluIjoiNDgyNzM0MTE5In0%3D&data=QaDcQk3MDx_wS59qrWDZXsmhCGW7cSQq_JR31WvZfb5cGWQtn1PnwSW3Asblpq4zaqyuUmAh0WiFSHjUVphX2A&svctype=4&tempid=h5_group_info)，群号：`1070153809`。软件内入口：`设置 → 社区与项目 → 加入 Mira 小窝`。
 
+> [!TIP]
+> **推荐 API 中转：[HackerX30](https://hackerx30.com)**
+> 想让 Mira 的日常聊天、记忆提炼和接话建议都用上更强模型，可以试试 HackerX30。提供 GPT-5.6 超低倍率接入；注册后把平台给出的 API Key、Endpoint 和模型 ID 填到 Mira 的“模型与 API”即可开始使用。
+
 ## Mira 是什么
 
 Mira 是基于 [Operit](https://github.com/AAswordman/Operit) 深度改造的 Android AI 伴侣。它继承 Operit 的模型接入、工具调用、本地运行环境与扩展生态，但重新组织了产品主线：
